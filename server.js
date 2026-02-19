@@ -1,9 +1,12 @@
 import express from 'express';
 import Parser from 'rss-parser';
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
+import { promisify } from 'util'; // Permet d'utiliser ffprobe de manière asynchrone
 
 const app = express();
+const execPromise = promisify(exec);
 
+// --- CONFIGURATION ---
 const TORRSERVER_IP = "192.168.1.55"; 
 
 const parser = new Parser({
@@ -32,8 +35,7 @@ app.get('/', (req, res) => {
             
             .debug-tools { margin-top: 15px; display: flex; justify-content: center; gap: 10px; }
             .vlc-btn { background: #ff8800; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px; }
-            .vlc-btn:hover { background: #e67a00; }
-
+            
             #results { display: flex; flex-direction: column; gap: 10px; max-width: 800px; margin: 30px auto; }
             .torrent-card { background: #222; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; text-align: left; border: 1px solid #333; }
             .torrent-info h3 { margin: 0 0 5px 0; font-size: 16px; }
@@ -50,7 +52,7 @@ app.get('/', (req, res) => {
       </div>
 
       <div id="player-container">
-          <h2 id="now-playing">Chargement...</h2>
+          <h2 id="now-playing">Chargement... (Cela peut prendre 15 à 30 secondes)</h2>
           <video id="videoPlayer" controls autoplay></video>
           
           <div class="debug-tools">
@@ -63,7 +65,6 @@ app.get('/', (req, res) => {
       <div id="results"></div>
 
       <script>
-        // On injecte l'IP du serveur pour pouvoir générer le lien brut TorrServer
         const TORRSERVER_IP = "${TORRSERVER_IP}";
 
         async function searchNyaa() {
@@ -80,11 +81,7 @@ app.get('/', (req, res) => {
                     card.className = 'torrent-card';
                     
                     const magnetEncoded = encodeURIComponent(torrent.lienMagnet);
-                    
-                    // 1. URL pour le navigateur (Passe par Node.js et FFmpeg)
                     const webUrl = '/play?magnet=' + magnetEncoded;
-                    
-                    // 2. URL pour VLC (Passe directement par TorrServer, pur et sans transcodage)
                     const vlcUrl = \`http://\${TORRSERVER_IP}:8090/stream?link=\${magnetEncoded}&index=1&play\`;
 
                     card.innerHTML = \`
@@ -97,24 +94,21 @@ app.get('/', (req, res) => {
                     resultsDiv.appendChild(card);
                 });
             } catch (err) {
-                resultsDiv.innerHTML = '<p style="color:red;">Erreur de connexion au serveur.</p>';
+                resultsDiv.innerHTML = '<p style="color:red;">Erreur de connexion.</p>';
             }
         }
 
         function playVideo(webUrl, vlcUrl, titre) {
             document.getElementById('player-container').style.display = 'block';
-            document.getElementById('now-playing').innerText = "Lecture : " + titre;
-            
-            // On sépare les deux flux !
+            document.getElementById('now-playing').innerText = "Lecture : " + titre + " (Analyse des sous-titres en cours...)";
             document.getElementById('videoPlayer').src = webUrl;
             document.getElementById('vlcLink').href = vlcUrl; 
-            
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
-                alert("Lien brut copié ! Colle-le dans VLC (Média > Ouvrir un flux réseau)");
+                alert("Lien copié ! Média > Ouvrir un flux réseau dans VLC");
             });
         }
       </script>
@@ -123,6 +117,7 @@ app.get('/', (req, res) => {
   `);
 });
 
+// --- ROUTE 2 : LA RECHERCHE NYAA ---
 app.get('/api/search', async (req, res) => {
   const query = req.query.q;
   if (!query) return res.json([]);
@@ -132,10 +127,7 @@ app.get('/api/search', async (req, res) => {
     const xmlText = await response.text();
     const feed = await parser.parseString(xmlText);
     const videos = feed.items.map(t => ({ 
-        titre: t.title, 
-        lienMagnet: t.link, 
-        taille: t.size, 
-        seeders: parseInt(t.seeders, 10) || 0 
+        titre: t.title, lienMagnet: t.link, taille: t.size, seeders: parseInt(t.seeders, 10) || 0 
     }));
     res.json(videos);
   } catch (error) {
@@ -143,41 +135,87 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// --- ROUTE 3 : LE TRANSCODEUR AVEC SOUS-TITRES (HARDCODING) ---
-app.get('/play', (req, res) => {
+// --- NOUVELLE FONCTION INTELLIGENTE : TROUVER LE FRANÇAIS ---
+async function getSubtitleConfig(videoUrl) {
+    try {
+        console.log("🔍 Lancement de ffprobe pour analyser les langues...");
+        // On demande à ffprobe de lister uniquement les sous-titres en format JSON
+        const cmd = `ffprobe -v error -select_streams s -show_entries stream=index:stream_tags=language -of json "${videoUrl}"`;
+        
+        // On met un timeout de 15s au cas où le torrent est très lent à démarrer
+        const { stdout } = await execPromise(cmd, { timeout: 15000 });
+        const data = JSON.parse(stdout);
+        const streams = data.streams || [];
+        
+        if (streams.length === 0) {
+            console.log("ℹ️ Aucun sous-titre trouvé dans ce fichier.");
+            return null; // Pas de sous-titres
+        }
+
+        // On parcourt les sous-titres pour trouver le français
+        for (let i = 0; i < streams.length; i++) {
+            const lang = streams[i].tags?.language?.toLowerCase();
+            if (lang === 'fre' || lang === 'fra') {
+                console.log(`✅ Sous-titre Français trouvé à l'index relatif : ${i}`);
+                return i;
+            }
+        }
+        
+        console.log("⚠️ Pas de Français trouvé. Utilisation du sous-titre par défaut (0).");
+        return 0; // On prend le premier si on n'a pas trouvé de français
+    } catch (error) {
+        console.error("❌ Erreur ffprobe (Le torrent met trop de temps à charger ou erreur réseau).", error.message);
+        return 0; // En cas de doute, on tente de lire le premier
+    }
+}
+
+// --- ROUTE 3 : LE TRANSCODEUR FFMPEG DYNAMIQUE ---
+app.get('/play', async (req, res) => {
     const magnet = req.query.magnet;
     if (!magnet) return res.status(400).send("Lien magnet manquant");
 
     const torrUrl = `http://${TORRSERVER_IP}:8090/stream?link=${encodeURIComponent(magnet)}&index=1&play`;
 
+    // 1. Analyse intelligente avant de lancer la vidéo
+    const subIndex = await getSubtitleConfig(torrUrl);
+
     res.setHeader('Content-Type', 'video/mp4');
 
-    // On utilise une syntaxe plus simple pour le filtre subtitles
-    const ffmpeg = spawn('ffmpeg', [
-        '-re',                       // Lit à la vitesse réelle (plus stable pour le streaming)
-        '-i', torrUrl,
-        '-vf', `subtitles=filename='${torrUrl}'`, 
-        '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-tune', 'zerolatency',      // Réduit le temps d'attente avant le début
+    // 2. Construction dynamique de la commande FFmpeg
+    let ffmpegArgs = [
+        '-re',
+        '-i', torrUrl
+    ];
+
+    // Si on a trouvé des sous-titres (Français ou Défaut), on ajoute le filtre d'incrustation
+    if (subIndex !== null) {
+        const escapedUrl = torrUrl.replace(/:/g, '\\:');
+        ffmpegArgs.push('-vf', `subtitles='${escapedUrl}':si=${subIndex}`);
+        ffmpegArgs.push('-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency');
+    } else {
+        // S'il n'y a pas de sous-titres du tout, on copie juste la vidéo (zéro effort pour le processeur !)
+        ffmpegArgs.push('-c:v', 'copy');
+    }
+
+    // On ajoute la conversion du son (qui est toujours nécessaire) et les paramètres finaux
+    ffmpegArgs.push(
         '-c:a', 'aac',
         '-movflags', 'frag_keyframe+empty_moov',
         '-f', 'mp4',
         'pipe:1'
-    ]);
+    );
 
+    console.log("🎬 Lancement de FFmpeg avec les arguments :", ffmpegArgs.join(' '));
+
+    const ffmpeg = spawn('ffmpeg', ffmpegArgs);
     ffmpeg.stdout.pipe(res);
 
-    // AFFICHAGE DES ERREURS (Très important pour comprendre pourquoi ça bloque)
-    ffmpeg.stderr.on('data', (data) => {
-        console.log(`FFmpeg Log: ${data.toString()}`);
-    });
-
     req.on('close', () => {
+        console.log("🛑 Utilisateur déconnecté, arrêt de FFmpeg.");
         ffmpeg.kill('SIGKILL');
     });
 });
 
 app.listen(3000, () => {
-  console.log('✅ Serveur web lancé avec FFmpeg sur le port 3000 !');
+  console.log('✅ Serveur web lancé avec Analyse Intelligente sur le port 3000 !');
 });
