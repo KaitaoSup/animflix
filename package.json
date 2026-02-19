@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "express": "^5.2.1",
+    "puppeteer": "^24.37.5",
     "rss-parser": "^3.13.0"
   }
 }

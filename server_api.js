@@ -1,10 +1,16 @@
 import express from 'express';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+import puppeteer from 'puppeteer';
 
 const app = express();
 const PORT = 3001;
+const BASE_URL = 'https://anime-sama.tv'; // L'URL de base du site cible (peut changer, à vérifier)
 
-// URL d'une instance publique de l'API Consumet (Provider: Gogoanime)
-const CONSUMET_API = "https://api.consumet.org/meta/anilist";
+// Configuration des headers pour tromper le serveur
+const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+};
 
 // --- ROUTE 1 : L'INTERFACE WEB (FRONTEND) ---
 app.get('/', (req, res) => {
@@ -147,30 +153,100 @@ app.get('/', (req, res) => {
   `);
 });
 
-// --- ROUTES BACKEND (PROXY VERS CONSUMET) ---
+// --- ROUTE DE RECHERCHE SUR ANIME-SAMA ---
+app.get('/api/search-fr', async (req, res) => {
+    const query = req.query.q;
+    const browser = await puppeteer.launch({ 
+        headless: "new", 
+        args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+    });
 
-app.get('/api/search', async (req, res) => {
     try {
-        const response = await fetch(`${CONSUMET_API}/${req.query.q}`);
-        const data = await response.json();
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Erreur Serveur' }); }
+        const page = await browser.newPage();
+        // On va sur la page catalogue
+        await page.goto('https://anime-sama.fr/catalogue/', { waitUntil: 'networkidle2' });
+
+        // On exécute un petit script DANS la page pour filtrer les animes
+        const results = await page.evaluate((searchQuery) => {
+            const items = [];
+            // On cible les cartes d'animes (à ajuster selon les classes réelles du site)
+            document.querySelectorAll('.cardAnime').forEach(el => {
+                const title = el.querySelector('h1')?.innerText;
+                if (title && title.toLowerCase().includes(searchQuery.toLowerCase())) {
+                    items.push({
+                        title: title,
+                        link: el.querySelector('a')?.href,
+                        img: el.querySelector('img')?.src
+                    });
+                }
+            });
+            return items;
+        }, query);
+
+        await browser.close();
+        res.json({ results });
+
+    } catch (error) {
+        await browser.close();
+        res.status(500).json({ error: "Puppeteer n'a pas pu lire la page." });
+    }
 });
 
-app.get('/api/info', async (req, res) => {
+app.get('/api/test-direct', async (req, res) => {
     try {
-        const response = await fetch(`${CONSUMET_API}/info/${req.query.id}`);
-        const data = await response.json();
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Erreur Serveur' }); }
+        // On essaie d'appeler directement le fichier PHP que tu as trouvé
+        // Note: l'URL exacte dépend de l'anime, ici on teste une structure type
+        const targetUrl = "https://anime-sama.fr/api/get-data.php";
+        
+        const response = await axios.get(targetUrl, {
+            params: {
+                // Ici il faudrait les paramètres exacts vus dans l'onglet 'Payload' ou 'Query String'
+                // de ta requête get-data.php (ex: anime=frieren, ep=1, etc.)
+                filever: "17483" 
+            },
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                'Referer': 'https://anime-sama.fr/',
+                'Accept': '*/*'
+            }
+        });
+
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({ error: "Cloudflare bloque l'accès direct à l'API PHP." });
+    }
 });
 
-app.get('/api/watch', async (req, res) => {
+// --- ROUTE POUR RÉCUPÉRER L'EPISODE ---
+app.get('/api/watch-fr', async (req, res) => {
+    const url = req.query.url; // URL de la page de l'anime sur Anime-Sama
+    if (!url) return res.status(400).send("URL manquante");
+
     try {
-        const response = await fetch(`${CONSUMET_API}/watch/${req.query.id}`);
-        const data = await response.json();
-        res.json(data);
-    } catch (e) { res.status(500).json({ error: 'Erreur Serveur' }); }
+        const response = await axios.get(url, { headers });
+        const $ = cheerio.load(response.data);
+        
+        // C'est ici que ça se corse : Anime-Sama utilise souvent des scripts 
+        // pour générer les boutons d'épisodes. On va chercher les balises <script>
+        // ou les iframes directement présentes.
+        let videoUrl = "";
+        
+        // Tentative d'extraction de l'iframe du lecteur
+        $('iframe').each((i, el) => {
+            const src = $(el).attr('src');
+            if (src && (src.includes('sibnet') || src.includes('myvi'))) {
+                videoUrl = src;
+            }
+        });
+
+        if (videoUrl) {
+            res.json({ videoUrl });
+        } else {
+            res.status(404).json({ error: "Lecteur vidéo non trouvé. Le site utilise peut-être du JavaScript dynamique." });
+        }
+    } catch (error) {
+        res.status(500).json({ error: "Erreur lors de l'extraction de la vidéo" });
+    }
 });
 
 app.listen(PORT, () => {
