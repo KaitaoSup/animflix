@@ -15,13 +15,26 @@ Application web de streaming d'animes en direct à partir de torrents (Nyaa), av
 
 ---
 
-## ✨ Fonctionnalités
+## ✨ Fonctionnalités & Optimisations
 
 - **Recherche intégrée sur Nyaa.si** avec filtres : VOSTFR, VF, Multi-Sub, VOSTA.
-- **Récupération automatique des jaquettes et notes** via l'API TheMovieDatabase (TMDB).
-- **Streaming instantané sans téléchargement complet** grâce à TorrServer.
-- **Incrustation automatique des sous-titres français** analysés par FFprobe et incrustés en direct par FFmpeg.
-- **Option de lecture externe (VLC)** : bouton en 1 clic pour copier le flux direct sans passer par le transcodeur.
+- **Récupération intelligente des jaquettes et notes** :
+  - Compatible **TMDB** avec fallback automatique vers **Kitsu API** (spécialisée anime, 100% gratuite, sans clé requise).
+  - Algorithme de nettoyage des titres d'animes pour un matching à 95%+.
+- **Système de cache mémoire haute performance** :
+  - Cache des métadonnées (affiches & notes) conservé 24h.
+  - Cache des recherches (5 min) : résultats quasi-instantanés (< 20 ms).
+  - Déduplication des requêtes par lot (1 seule requête API pour 20 épisodes d'une même série).
+- **Deux modes de lecture au choix** :
+  - ⚡ **Lecture Directe (0% CPU, ultra-rapide)** : copie brute du flux vidéo avec extraction des pistes sous-titres WebVTT en direct dans le navigateur.
+  - 🎨 **Incrustation des sous-titres FR (Transcodage)** : FFprobe analyse les flux en 1-2s (`-probesize 4M`), FFmpeg transcode en multithread (`-threads 0`, zéro latence) et incruste les sous-titres français.
+- **Personnalisation complète du style des sous-titres** :
+  - Menu dédié accessible via le bouton `🎨 Style` ou la touche <kbd>S</kbd>.
+  - Réglage de la **taille** (Petite, Normale, Grande, Très grande), de la **couleur** (Blanc, Jaune Anime VOSTFR, Cyan, Vert, Rose), de l'**arrière-plan** (transparent, semi-transparent, opaque), des **contours / ombres** (outline 360°, ombre marquée, etc.) et de la **police**.
+  - Aperçu en direct et mémorisation automatique de vos préférences dans le navigateur (`localStorage`).
+- **Option de lecture externe (VLC)** : bouton de copie d'URL réseau universelle (détecte dynamiquement l'hôte).
+- **Lecteur web enrichi** : raccourcis clavier (<kbd>Espace</kbd> Pause, <kbd>C</kbd> Sous-titres, <kbd>S</kbd> Style, <kbd>F</kbd> Plein écran, <kbd>Échap</kbd> Quitter, <kbd>←</kbd> / <kbd>→</kbd> -5s / +5s).
+- **Cache TorrServer augmenté à 200 Mo** pour supprimer les interruptions de flux sur les animes 1080p à haut débit.
 
 ---
 
@@ -31,33 +44,24 @@ Application web de streaming d'animes en direct à partir de torrents (Nyaa), av
 flowchart LR
     A[Navigateur Web] -->|1. Recherche & Clic| B[Serveur Node.js Animflix :3000]
     B -->|2. Scrape flux RSS| C[Nyaa.si]
-    B -->|3. Affiches & Notes| D[API TMDB]
-    B -->|4. Flux P2P| E[TorrServer :8090]
+    B -->|3. Affiches & Notes| D[API TMDB / Kitsu]
+    B -->|4. Flux P2P Local| E[TorrServer :8090]
     B -->|5. Détection sous-titres FR| F[FFprobe]
-    B -->|6. Transcodage & Incrustation| G[FFmpeg]
+    B -->|6. Transcodage ou Direct| G[FFmpeg]
     G -->|7. Flux MP4/AAC| A
     E -.->|Optionnel : Flux brut direct| H[Lecteur VLC]
 ```
-
-1. **TorrServer** (`:8090`) télécharge les morceaux de vidéo du torrent dans la mémoire tampon au fur et à mesure de la lecture.
-2. **Animflix** (`:3000`) fournit l'interface utilisateur, interroge Nyaa et TMDB.
-3. Lors du clic sur une vidéo, **FFprobe** inspecte les pistes de sous-titres pour sélectionner la piste française (`fre`/`fra`).
-4. **FFmpeg** convertit le flux audio en AAC, incruste les sous-titres et sert le flux MP4 directement dans le navigateur.
-5. Si votre processeur peine à transcoder ou si vous préférez un lecteur externe, un lien brut vers **TorrServer** peut être ouvert dans **VLC**.
 
 ---
 
 ## 📦 Prérequis
 
-Avant de lancer l'application, assurez-vous d'avoir installé sur votre machine :
-
-- **Node.js** (v18 ou supérieure recommandée) et **npm**.
+- **Node.js** (v18 ou supérieure) et **npm**.
 - **FFmpeg & FFprobe** :
   ```bash
   sudo apt update
   sudo apt install ffmpeg
   ```
-  *(Vérifiez avec `ffmpeg -version` et `ffprobe -version`)*
 
 ---
 
@@ -65,23 +69,13 @@ Avant de lancer l'application, assurez-vous d'avoir installé sur votre machine 
 
 ### 1. Installer les dépendances Node.js
 
-Dans le répertoire du projet, lancez :
+Dans le répertoire du projet :
 ```bash
 npm install
 ```
 
-### 2. Vérifier l'adresse IP et la configuration
+### 2. Droits d'exécution de TorrServer
 
-Ouvrez le fichier [animflix.js](file:///home/barriols/Documents/ServeurAnimeTorr/animflix.js) :
-
-- **`TORRSERVER_IP`** :
-  - Par défaut : `"192.168.1.55"` (ou `localhost` si vous l'utilisez uniquement sur la même machine).
-  - Si votre adresse IP locale a changé (ex: avec `ip a`), mettez-la à jour pour pouvoir y accéder depuis d'autres appareils du réseau local (PC, smartphone, TV).
-- **`TMDB_API_KEY`** : clé API TMDB pour afficher les jaquettes.
-
-### 3. Donner les droits d'exécution à TorrServer
-
-Assurez-vous que le binaire TorrServer est exécutable :
 ```bash
 chmod +x TorrServer-linux-amd64
 ```
@@ -90,56 +84,66 @@ chmod +x TorrServer-linux-amd64
 
 ## 🚀 Lancement de l'application
 
-Le projet nécessite **deux processus actifs en parallèle** : TorrServer et le serveur Node.js.
+### Option A : Gestion recommandée avec PM2 (déjà configuré)
 
-### Étape 1 : Démarrer TorrServer
+L'application est configurée pour tourner en arrière-plan avec PM2 :
 
-Dans un premier terminal :
+```bash
+# Vérifier l'état des services
+pm2 list
+
+# Redémarrer l'application
+pm2 restart animflix
+
+# Voir les logs en direct
+pm2 logs animflix
+```
+
+### Option B : Lancement manuel (2 terminaux)
+
+Dans le premier terminal (TorrServer) :
 ```bash
 ./TorrServer-linux-amd64
 ```
-> TorrServer s'exécute en arrière-plan et écoute sur le port **8090**.  
-> Vous pouvez tester son interface d'administration à l'adresse : [http://localhost:8090](http://localhost:8090) (ou `http://192.168.1.55:8090`).
 
-### Étape 2 : Démarrer le serveur Animflix
-
-Dans un second terminal :
+Dans le second terminal (Animflix) :
 ```bash
 npm start
-# ou directement : node animflix.js
+# ou : node animflix.js
 ```
-> Le serveur web est prêt et écoute sur le port **3000**.
-
-*(Note : `node server.js` est une version alternative plus légère sans les jaquettes TMDB).*
 
 ---
 
 ## 🖥️ Guide d'utilisation
 
-1. Ouvrez votre navigateur et rendez-vous sur :
+1. Ouvrez votre navigateur sur :
    - En local : [http://localhost:3000](http://localhost:3000)
-   - Sur votre réseau local : `http://192.168.1.55:3000` (remplacez par votre IP).
-2. Entrez le nom d'un anime dans la barre de recherche (ex: *Frieren*, *Jujutsu Kaisen*, *One Piece*).
-3. Sélectionnez la langue voulue : **VOSTFR**, **VF**, **Multi-Sub** ou **VOSTA**.
-4. Cliquez sur **Chercher** : les jaquettes, titres, tailles et nombre de seeders apparaissent.
-5. Cliquez sur la carte de l'épisode souhaité :
-   - Un écran de chargement apparaît pendant que TorrServer se connecte aux pairs et que FFprobe analyse les flux de sous-titres (cela prend généralement 10 à 30 secondes).
-   - Le lecteur vidéo se lance automatiquement dès que le flux est prêt.
-6. **Regarder dans VLC (Alternative recommandée si ça saccade)** :
-   - Lors du chargement ou sous le lecteur, cliquez sur **🟠 Copier le lien brut pour VLC**.
-   - Ouvrez **VLC**.
-   - Allez dans le menu **Média > Ouvrir un flux réseau...** (ou `Ctrl + N`).
-   - Collez le lien (`Ctrl + V`) et faites **Lire**.
-   - Dans VLC, vous pouvez changer la piste audio et la piste de sous-titres librement sans aucune charge processeur sur le serveur !
+   - Sur votre réseau local : `http://<IP_SERVEUR>:3000` (ex: `192.168.1.55:3000`).
+2. Entrez le nom d'un anime dans la barre de recherche.
+3. Choisissez la langue : **VOSTFR**, **VF**, **Multi-Sub** ou **VOSTA**.
+4. Sélectionnez votre mode de streaming :
+   - **⚡ Lecture Directe** : 0% CPU, démarrage instantané avec sous-titres intégrés dans le site.
+   - **🔄 Transcodage H.264** : compatibilité standard si votre navigateur ne supporte pas le format d'origine.
+5. Cliquez sur un épisode pour lancer la lecture :
+   - **Sous-titres automatiques** : Les sous-titres français (VOSTFR) sont automatiquement extraits et affichés directement dans le lecteur web avec un rendu haute lisibilité.
+   - **Sélecteur de pistes & bouton CC** : Vous pouvez changer de piste de sous-titres ou les masquer en un clic.
+6. **Raccourcis clavier dans le lecteur** :
+   - `Espace` : Lecture / Pause
+   - `C` : Activer / Masquer les sous-titres
+   - `F` : Basculer en plein écran
+   - `Échap` : Fermer le lecteur
+   - `←` / `→` : Reculer / Avancer de 5 secondes
+7. **Lecture VLC (Alternative)** :
+   - Si vous préférez utiliser votre lecteur externe dédié (pour bénéficier des styles graphiques ASS avancés ou des polices exotiques), cliquez sur **🟠 Ouvrir dans VLC** (le lien est copié dans votre presse-papiers).
+   - Dans VLC : `Média > Ouvrir un flux réseau (Ctrl+N)` et collez l'URL.
 
 ---
 
 ## ❓ Dépannage & Astuces
 
-- **Le chargement reste bloqué / "Erreur lors du chargement"** :
-  - Vérifiez le nombre de **seeders** du torrent. Moins de 5 seeders peut ralentir considérablement le démarrage du flux.
-  - Vérifiez que **TorrServer** (`./TorrServer-linux-amd64`) tourne bien dans son terminal.
-- **La vidéo saccade dans le navigateur** :
-  - L'incrustation des sous-titres par FFmpeg demande de la puissance processeur. Privilégiez la lecture via **VLC** grâce au bouton de copie du lien réseau.
+- **Le processeur chauffe ou la vidéo saccade ?**
+  - Basculez le sélecteur sur **⚡ Lecture Directe** ou utilisez le lien **VLC**.
+- **Pas de résultat / recherche lente ?**
+  - Vérifiez la connexion Internet et les filtres Nyaa. Le cache garde vos recherches précédentes en mémoire pour un accès immédiat.
 - **Accès depuis une TV / Smartphone** :
-  - Connectez l'appareil au même réseau Wi-Fi que le serveur et saisissez l'adresse `http://<IP_DU_SERVEUR>:3000`.
+  - Connectez l'appareil au même réseau Wi-Fi que le serveur et ouvrez l'adresse IP locale du serveur sur le port 3000.

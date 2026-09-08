@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animflix 🍿</title>
+    <style>
+        :root {
+            --primary: #e50914;
+            --bg: #141414;
+            --card-bg: #1f1f1f;
+            --text: #ffffff;
+            --text-muted: #aaaaaa;
+        }
+        * { box-sizing: border-box; }
+        body { 
+            background: var(--bg); 
+            color: var(--text); 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+        }
+        .navbar { 
+            background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.7) 70%, transparent 100%); 
+            padding: 18px 40px; 
+            position: fixed; 
+            top: 0; left: 0; right: 0; 
+            z-index: 100; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            gap: 20px; 
+            flex-wrap: wrap;
+            backdrop-filter: blur(8px);
+        }
+        .logo { 
+            color: var(--primary); 
+            font-size: 26px; 
+            font-weight: 900; 
+            letter-spacing: 1px;
+            text-decoration: none; 
+        }
+        .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .search-box { display: flex; gap: 8px; }
+        input[type="text"], select { 
+            padding: 10px 14px; 
+            border-radius: 6px; 
+            border: 1px solid #333; 
+            background: rgba(30, 30, 30, 0.9); 
+            color: white; 
+            outline: none; 
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus, select:focus { border-color: var(--primary); }
+        input[type="text"] { width: 260px; }
+        button { 
+            padding: 10px 20px; 
+            background: var(--primary); 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: background 0.2s, transform 0.1s;
+        }
+        button:hover { background: #b80710; }
+        button:active { transform: scale(0.98); }
+
+        .container { padding: 110px 40px 40px; max-width: 1600px; margin: 0 auto; }
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); 
+            gap: 24px; 
+        }
+        .card { 
+            cursor: pointer; 
+            transition: transform 0.25s ease, box-shadow 0.25s ease; 
+            position: relative; 
+            border-radius: 10px; 
+            overflow: hidden; 
+            background: var(--card-bg); 
+            border: 1px solid #2a2a2a; 
+            display: flex;
+            flex-direction: column;
+        }
+        .card:hover { 
+            transform: translateY(-6px) scale(1.02); 
+            box-shadow: 0 12px 24px rgba(0,0,0,0.6);
+            border-color: var(--primary); 
+        }
+        .card-img-wrap {
+            width: 100%;
+            aspect-ratio: 2/3;
+            background: #111;
+            overflow: hidden;
+        }
+        .card img { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            display: block; 
+            transition: transform 0.3s;
+        }
+        .card:hover img { transform: scale(1.04); }
+        .card-info { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; flex-grow: 1; }
+        .card-title { 
+            font-weight: 600; 
+            font-size: 14px; 
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .stats { color: var(--text-muted); font-size: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .seeders { color: #46d369; font-weight: bold; }
+        .badge-rating {
+            background: rgba(255, 193, 7, 0.15);
+            color: #ffc107;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid #222;
+            border-top: 5px solid var(--primary); border-radius: 50%;
+            animation: spin 0.9s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* LECTEUR VIDÉO PLEIN ÉCRAN */
+        #player-container { 
+            position: fixed; inset: 0; background: #000; z-index: 200; 
+            display: none; flex-direction: column; align-items: center; justify-content: center; 
+        }
+        video { width: 90%; max-height: 74vh; border-radius: 8px; outline: none; background: #000; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+        
+        /* STYLISATION HAUTE DÉFINITION DES SOUS-TITRES DIRECTS DANS LE SITE */
+        video::cue {
+            background-color: rgba(0, 0, 0, 0.75) !important;
+            color: #ffffff !important;
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif !important;
+            font-size: 1.3rem !important;
+            font-weight: 600 !important;
+            line-height: 1.35 !important;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95), 0 0 8px #000000 !important;
+            padding: 3px 10px !important;
+            border-radius: 4px !important;
+            white-space: pre-line !important;
+            max-width: 96% !important;
+            text-align: center !important;
+        }
+        @media (max-width: 768px) {
+            video::cue { font-size: 1rem !important; }
+        }
+
+        /* BOUTON & MENU DE PERSONNALISATION DU STYLE DES SOUS-TITRES */
+        .btn-sub-style {
+            padding: 4px 10px; font-size: 12px; background: #2f2f2f; border: 1px solid #444;
+            border-radius: 4px; margin: 0; color: #fff; cursor: pointer; display: inline-flex;
+            align-items: center; gap: 5px; transition: background 0.2s, border-color 0.2s;
+        }
+        .btn-sub-style:hover { background: #3f3f3f; border-color: #666; }
+        .sub-style-popup {
+            display: none; position: absolute; bottom: calc(100% + 12px); left: 0;
+            background: #181818; border: 1px solid #383838; border-radius: 10px;
+            padding: 16px; box-shadow: 0 14px 40px rgba(0,0,0,0.95); z-index: 350;
+            width: 325px; max-width: calc(100vw - 30px); color: #fff; font-size: 13px;
+            animation: fadeIn 0.2s ease-out; box-sizing: border-box;
+        }
+        .sub-style-row {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+        }
+        .sub-style-row label { color: #bbb; font-size: 12px; font-weight: 500; }
+        .sub-style-row select {
+            background: #262626; border: 1px solid #444; color: white; border-radius: 4px;
+            padding: 5px 8px; font-size: 12px; cursor: pointer; outline: none; transition: border-color 0.2s;
+        }
+        .sub-style-row select:focus { border-color: var(--primary); }
+
+        .player-header {
+            width: 90%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+        }
+        .close-btn { font-size: 32px; cursor: pointer; color: #fff; line-height: 1; transition: color 0.2s; }
+        .close-btn:hover { color: var(--primary); }
+        .vlc-btn { 
+            color: #ffa033; text-decoration: none; font-weight: bold; 
+            cursor: pointer; border: 1px solid #ffa033; padding: 7px 14px; border-radius: 6px; 
+            font-size: 13px; transition: background 0.2s, color 0.2s; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .vlc-btn:hover { background: #ffa033; color: #000; }
+
+        /* TOAST NOTIFICATION */
+        #toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: #333; color: white; padding: 12px 24px; border-radius: 6px;
+            font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 500;
+            display: none; animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+        .empty-state { text-align: center; padding: 100px 20px; color: var(--text-muted); font-size: 16px; }
+        .shortcuts-hint { font-size: 11px; color: #777; margin-top: 8px; }
+    </style>
+</head>
+<body>
+  <div class="navbar">
+      <a href="/" class="logo">ANIMFLIX</a>
+      <div class="controls">
+          <div class="search-box">
+              <input type="text" id="searchInput" placeholder="Nom de l'anime (ex: Frieren)..." onkeypress="if(event.key === 'Enter') searchNyaa()">
+              <select id="searchType" onchange="searchNyaa()">
+                  <option value="vostfr">VOSTFR</option>
+                  <option value="vf">VF</option>
+                  <option value="multisub">Multi-Sub</option>
+                  <option value="sub">VOSTA</option>
+              </select>
+              <select id="streamMode" title="Mode de lecture">
+                  <option value="direct" selected>⚡ Lecture Directe (0% CPU, Instantané)</option>
+                  <option value="transcode">🔄 Transcodage H.264 (Compatibilité standard)</option>
+              </select>
+              <button onclick="searchNyaa()">Chercher</button>
+          </div>
+      </div>
+  </div>
+
+  <div class="container">
+      <div id="results" class="grid">
+          <div class="empty-state" style="grid-column: 1 / -1;">
+              Tapez le nom d'un anime ci-dessus pour lancer la recherche 🍿
+          </div>
+      </div>
+  </div>
+
+  <!-- LECTEUR INTÉGRÉ AVEC SOUS-TITRES DIRECTS ET OPTION VLC -->
+  <div id="player-container">
+      <div class="player-header">
+          <h2 id="now-playing" style="font-size: 18px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%;"></h2>
+          <span class="close-btn" onclick="closePlayer()" title="Fermer (Échap)">&times;</span>
+      </div>
+      
+      <div style="position: relative; width: 90%; display: flex; justify-content: center; align-items: center;">
+          <video id="videoPlayer" controls autoplay style="width: 100%; max-height: 72vh;"></video>
+          
+          <div id="player-status" style="position: absolute; background: rgba(0,0,0,0.85); padding: 25px 35px; border-radius: 10px; text-align: center; border: 1px solid #333; z-index: 10;">
+              <div class="spinner" style="margin: 0 auto 15px; width: 44px; height: 44px;"></div>
+              <div id="status-text" style="font-size: 15px; font-weight: 500;">Connexion au torrent & démarrage du lecteur... ⏳</div>
+          </div>
+      </div>
+
+      <!-- BARRE DE GESTION DES SOUS-TITRES & ACTIONS DU LECTEUR -->
+      <div style="width: 90%; display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: relative;">
+              <div style="display: flex; align-items: center; gap: 6px; background: #1f1f1f; padding: 5px 10px; border-radius: 6px; border: 1px solid #333;">
+                  <span style="font-size: 13px; color: #aaa;">💬 Sous-titres :</span>
+                  <select id="subSelect" onchange="onSubtitleChange(this.value)" style="padding: 4px 8px; font-size: 13px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; color: white;">
+                      <option value="-1">Recherche des pistes... ⏳</option>
+                  </select>
+                  <button id="toggleSubBtn" onclick="toggleSubtitles()" title="Raccourci : [C]" style="padding: 4px 10px; font-size: 12px; background: var(--primary); border-radius: 4px; margin: 0;">CC ON</button>
+                  <button id="subStyleBtn" class="btn-sub-style" onclick="toggleSubStyleMenu(event)" title="Personnaliser l'apparence des sous-titres [S]">
+                      🎨 Style
+                  </button>
+              </div>
+              <span id="sub-status" style="font-size: 12px; color: #46d369; font-weight: 500;"></span>
+
+              <!-- POPUP DE MODIFICATION DU STYLE DES SOUS-TITRES -->
+              <div id="subStyleMenu" class="sub-style-popup">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #2e2e2e; padding-bottom: 8px;">
+                      <span style="font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                          🎨 Style des sous-titres
+                      </span>
+                      <span onclick="toggleSubStyleMenu(event)" style="cursor: pointer; font-size: 20px; color: #888; line-height: 1;" title="Fermer">&times;</span>
+                  </div>
+
+                  <!-- APERÇU EN DIRECT -->
+                  <div style="background: #0d0d0d; border-radius: 6px; padding: 14px 10px; text-align: center; margin-bottom: 12px; border: 1px solid #282828; min-height: 54px; display: flex; flex-direction: column; justify-content: center; align-items: center; background-image: radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px); background-size: 10px 10px;">
+                      <div style="font-size: 10px; color: #777; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Aperçu en direct</div>
+                      <span id="sub-preview-box" style="display: inline-block; padding: 3px 10px; border-radius: 4px; transition: all 0.15s ease;">
+                          Sous-titre VOSTFR d'exemple
+                      </span>
+                  </div>
+
+                  <!-- TAILLE -->
+                  <div class="sub-style-row">
+                      <label for="subStyleSize">Taille :</label>
+                      <select id="subStyleSize" onchange="updateSubStyle()">
+                          <option value="1.0rem">Petite (80%)</option>
+                          <option value="1.3rem" selected>Normale (100%)</option>
+                          <option value="1.65rem">Grande (125%)</option>
+                          <option value="2.0rem">Très grande (150%)</option>
+                      </select>
+                  </div>
+
+                  <!-- COULEUR -->
+                  <div class="sub-style-row">
+                      <label for="subStyleColor">Couleur :</label>
+                      <select id="subStyleColor" onchange="updateSubStyle()">
+                          <option value="#ffffff" selected>⚪ Blanc pur</option>
+                          <option value="#ffeb3b">🟡 Jaune Anime (VOSTFR)</option>
+                          <option value="#00e5ff">🔵 Cyan éclatant</option>
+                          <option value="#69f0ae">🟢 Vert pastel</option>
+                          <option value="#ff80ab">🌸 Rose pastel</option>
+                      </select>
+                  </div>
+
+                  <!-- ARRIÈRE-PLAN -->
+                  <div class="sub-style-row">
+                      <label for="subStyleBg">Arrière-plan :</label>
+                      <select id="subStyleBg" onchange="updateSubStyle()">
+                          <option value="rgba(0, 0, 0, 0.75)" selected>Noir semi-transparent (Défaut)</option>
+                          <option value="rgba(0, 0, 0, 0.95)">Noir opaque</option>
+                          <option value="rgba(20, 20, 35, 0.85)">Bleu nuit semi-transparent</option>
+                          <option value="transparent">Transparent (Aucun fond)</option>
+                      </select>
+                  </div>
+
+                  <!-- EFFET / CONTOUR -->
+                  <div class="sub-style-row">
+                      <label for="subStyleShadow">Contour / Ombre :</label>
+                      <select id="subStyleShadow" onchange="updateSubStyle()">
+                          <option value="shadow" selected>Ombre portée marquée</option>
+                          <option value="outline">Contour net (Outline noir 360°)</option>
+                          <option value="light">Légère</option>
+                          <option value="none">Aucune</option>
+                      </select>
+                  </div>
+
+                  <!-- POLICE -->
+                  <div class="sub-style-row">
+                      <label for="subStyleFont">Police :</label>
+                      <select id="subStyleFont" onchange="updateSubStyle()">
+                          <option value='"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif' selected>Sans-Serif (Moderne)</option>
+                          <option value='Arial, Helvetica, sans-serif'>Arial (Standard)</option>
+                          <option value='"Trebuchet MS", sans-serif'>Trebuchet (Arrondi)</option>
+                          <option value='Impact, "Arial Black", sans-serif'>Impact (Gras)</option>
+                          <option value='"Courier New", monospace'>Monospace (Rétro)</option>
+                      </select>
+                  </div>
+
+                  <!-- DISPOSITION / LIGNES -->
+                  <div class="sub-style-row">
+                      <label for="subStyleLayout">Disposition :</label>
+                      <select id="subStyleLayout" onchange="updateSubStyle()">
+                          <option value="compact" selected>Optimisée (1 ligne max si possible)</option>
+                          <option value="original">Standard (Coupures d'origine)</option>
+                      </select>
+                  </div>
+
+                  <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #2e2e2e; padding-top: 10px; margin-top: 4px;">
+                      <button type="button" onclick="resetSubStyle()" style="background: transparent; border: 1px solid #555; color: #aaa; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s;">
+                          Réinitialiser
+                      </button>
+                      <button type="button" onclick="toggleSubStyleMenu(event)" style="background: var(--primary); border: none; color: white; padding: 5px 14px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                          Fermer
+                      </button>
+                  </div>
+              </div>
+          </div>
+
+          <div style="display: flex; gap: 12px; align-items: center;">
+              <a id="vlcLink" href="#" class="vlc-btn" onclick="copyVlcLink(this.href); return false;">
+                🟠 Ouvrir dans VLC (Option alternative)
+              </a>
+          </div>
+      </div>
+      <div class="shortcuts-hint">Raccourcis : [Espace] Pause | [C] Sous-titres | [S] Style | [F] Plein écran | [Échap] Quitter | [← / →] -5s / +5s</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const TORR_HOST = window.location.hostname || '127.0.0.1';
+    let streamTimeout = null;
+    let currentActiveMagnet = null;
+    let currentSubAbort = null;
+    let currentTextTrack = null;
+
+    // --- GESTION ET PERSONNALISATION DU STYLE DES SOUS-TITRES ---
+    const defaultSubStyle = {
+        size: '1.3rem',
+        color: '#ffffff',
+        bg: 'rgba(0, 0, 0, 0.75)',
+        shadow: 'shadow',
+        font: '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif',
+        layout: 'compact'
+    };
+
+    let currentSubStyle = { ...defaultSubStyle };
+
+    function cleanSubtitleLines(rawLines) {
+        if (!rawLines || rawLines.length === 0) return "";
+        if (currentSubStyle.layout === 'original' || rawLines.length === 1) {
+            return rawLines.join('\n').trim();
+        }
+
+        const result = [];
+        for (let idx = 0; idx < rawLines.length; idx++) {
+            let line = rawLines[idx].trim();
+            if (!line) continue;
+            line = line.replace(/\\h/gi, ' ').replace(/\\N/g, ' ');
+
+            if (result.length === 0) {
+                result.push(line);
+                continue;
+            }
+
+            const prev = result[result.length - 1];
+            const cleanPrev = prev.replace(/<[^>]*>/g, '').trim();
+            const cleanCurrent = line.replace(/<[^>]*>/g, '').trim();
+
+            const isDialogue = /^[-—–]/.test(cleanCurrent);
+            const prevIsDialogue = /^[-—–]/.test(cleanPrev);
+            const isMusic = /^[♪♫♩]/.test(cleanCurrent) || /[♪♫♩]$/.test(cleanPrev);
+
+            // Conserver le retour à la ligne pour dialogues distincts ou paroles musicales
+            if (isDialogue || (prevIsDialogue && !cleanPrev.endsWith(',')) || isMusic) {
+                result.push(line);
+            } else {
+                // Pour une même phrase coupée artificiellement, fusionner si elle rentre sur l'écran
+                const combinedClean = cleanPrev + ' ' + cleanCurrent;
+                if (combinedClean.length <= 110) {
+                    result[result.length - 1] = prev + ' ' + line;
+                } else {
+                    result.push(line);
+                }
+            }
+        }
+        return result.join('\n');
+    }
+
+    function loadSavedSubStyle() {
+        try {
+            const saved = localStorage.getItem('animflix_sub_style');
+            if (saved) {
+                currentSubStyle = Object.assign({}, defaultSubStyle, JSON.parse(saved));
+            }
+        } catch (e) {}
+
+        const sizeEl = document.getElementById('subStyleSize');
+        const colorEl = document.getElementById('subStyleColor');
+        const bgEl = document.getElementById('subStyleBg');
+        const shadowEl = document.getElementById('subStyleShadow');
+        const fontEl = document.getElementById('subStyleFont');
+        const layoutEl = document.getElementById('subStyleLayout');
+
+        if (sizeEl) sizeEl.value = currentSubStyle.size;
+        if (colorEl) colorEl.value = currentSubStyle.color;
+        if (bgEl) bgEl.value = currentSubStyle.bg;
+        if (shadowEl) shadowEl.value = currentSubStyle.shadow;
+        if (fontEl) fontEl.value = currentSubStyle.font;
+        if (layoutEl) layoutEl.value = currentSubStyle.layout || 'compact';
+
+        applySubStyle();
+    }
+
+    function updateSubStyle() {
+        const sizeEl = document.getElementById('subStyleSize');
+        const colorEl = document.getElementById('subStyleColor');
+        const bgEl = document.getElementById('subStyleBg');
+        const shadowEl = document.getElementById('subStyleShadow');
+        const fontEl = document.getElementById('subStyleFont');
+        const layoutEl = document.getElementById('subStyleLayout');
+
+        if (sizeEl) currentSubStyle.size = sizeEl.value;
+        if (colorEl) currentSubStyle.color = colorEl.value;
+        if (bgEl) currentSubStyle.bg = bgEl.value;
+        if (shadowEl) currentSubStyle.shadow = shadowEl.value;
+        if (fontEl) currentSubStyle.font = fontEl.value;
+        if (layoutEl) currentSubStyle.layout = layoutEl.value;
+
+        try {
+            localStorage.setItem('animflix_sub_style', JSON.stringify(currentSubStyle));
+        } catch (e) {}
+
+        applySubStyle();
+    }
+
+    function resetSubStyle() {
+        currentSubStyle = { ...defaultSubStyle };
+        try {
+            localStorage.removeItem('animflix_sub_style');
+        } catch (e) {}
+        loadSavedSubStyle();
+        showToast("Style des sous-titres réinitialisé");
+    }
+
+    function applySubStyle() {
+        let shadowCss = '0 2px 4px rgba(0, 0, 0, 0.95), 0 0 8px #000000';
+        if (currentSubStyle.shadow === 'outline') {
+            shadowCss = '-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 2px 5px rgba(0,0,0,0.95)';
+        } else if (currentSubStyle.shadow === 'light') {
+            shadowCss = '0 1px 2px rgba(0,0,0,0.8)';
+        } else if (currentSubStyle.shadow === 'none') {
+            shadowCss = 'none';
+        }
+
+        let styleEl = document.getElementById('dynamic-sub-style');
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'dynamic-sub-style';
+            document.head.appendChild(styleEl);
+        }
+
+        styleEl.textContent = `
+            video::cue {
+                background-color: ${currentSubStyle.bg} !important;
+                color: ${currentSubStyle.color} !important;
+                font-family: ${currentSubStyle.font} !important;
+                font-size: ${currentSubStyle.size} !important;
+                font-weight: 600 !important;
+                line-height: 1.35 !important;
+                text-shadow: ${shadowCss} !important;
+                padding: 3px 10px !important;
+                border-radius: 4px !important;
+                white-space: pre-line !important;
+                max-width: 96% !important;
+                text-align: center !important;
+            }
+            @media (max-width: 768px) {
+                video::cue {
+                    font-size: calc(${currentSubStyle.size} * 0.8) !important;
+                }
+            }
+        `;
+
+        const preview = document.getElementById('sub-preview-box');
+        if (preview) {
+            preview.style.backgroundColor = currentSubStyle.bg;
+            preview.style.color = currentSubStyle.color;
+            preview.style.fontFamily = currentSubStyle.font;
+            preview.style.fontSize = currentSubStyle.size;
+            preview.style.fontWeight = "600";
+            preview.style.textShadow = shadowCss;
+            if (currentSubStyle.layout === 'original') {
+                preview.innerHTML = "Sous-titre d'exemple<br>sur deux lignes";
+            } else {
+                preview.innerHTML = "Sous-titre VOSTFR d'exemple sur une seule ligne";
+            }
+        }
+    }
+
+    function toggleSubStyleMenu(e) {
+        if (e && e.stopPropagation) e.stopPropagation();
+        const menu = document.getElementById('subStyleMenu');
+        if (!menu) return;
+        const isVisible = menu.style.display === 'block';
+        menu.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+            applySubStyle();
+        }
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    function copyVlcLink(url) {
+        navigator.clipboard.writeText(url).then(() => {
+            showToast("✅ Lien copié ! Ouvrez VLC > Média > Ouvrir un flux réseau (Ctrl+N)");
+        });
+    }
+
+    async function searchNyaa() {
+        const query = document.getElementById('searchInput').value.trim();
+        const type = document.getElementById('searchType').value;
+        const resultsDiv = document.getElementById('results');
+        if (!query) return;
+
+        resultsDiv.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;"><div class="spinner" style="margin: 0 auto 20px;"></div>Recherche en cours... ⏳</div>';
+        
+        try {
+            const response = await fetch('/api/search?q=' + encodeURIComponent(query) + '&type=' + type);
+            const torrents = await response.json();
+            
+            if (!torrents || torrents.length === 0) {
+                resultsDiv.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;">Aucun torrent trouvé pour "' + query + '".</div>';
+                return;
+            }
+
+            resultsDiv.innerHTML = '';
+            torrents.forEach(t => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                const vlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(t.lienMagnet) + "&index=1&play";
+                const posterSrc = t.poster || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(t.cleanTitle || 'Anime');
+                
+                card.innerHTML = `
+                    <div class="card-img-wrap">
+                        <img src="${posterSrc}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                    </div>
+                    <div class="card-info">
+                        <span class="card-title" title="${t.titre}">${t.titre}</span>
+                        <div class="stats">
+                            <span class="badge-rating">⭐ ${t.rating}</span>
+                            <span>${t.taille}</span>
+                            <span class="seeders">🌱 ${t.seeders}</span>
+                        </div>
+                    </div>`;
+                card.onclick = () => startStreaming(t.lienMagnet, t.titre, vlcUrl, type);
+                resultsDiv.appendChild(card);
+            });
+        } catch (err) { 
+            resultsDiv.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1; color:#ff4444;">Erreur de connexion au serveur.</div>'; 
+        }
+    }
+
+    function parseVttTime(str) {
+        if (!str) return 0;
+        const parts = str.trim().split(':');
+        if (parts.length === 3) {
+            return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+        } else if (parts.length === 2) {
+            return parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
+        }
+        return 0;
+    }
+
+    async function setupSubtitles(magnet, type) {
+        const subSelect = document.getElementById('subSelect');
+        const subStatus = document.getElementById('sub-status');
+        subSelect.innerHTML = '<option value="-1">Analyse des pistes... ⏳</option>';
+        subStatus.innerText = "";
+
+        try {
+            const res = await fetch('/api/streams?magnet=' + encodeURIComponent(magnet));
+            const info = await res.json();
+            const subTracks = info.subTracks || [];
+
+            subSelect.innerHTML = '';
+            if (subTracks.length === 0) {
+                subSelect.innerHTML = '<option value="-1">Aucun sous-titre intégré</option>';
+                subStatus.innerText = "";
+                return;
+            }
+
+            subTracks.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.index;
+                opt.textContent = t.label;
+                subSelect.appendChild(opt);
+            });
+
+            const optOff = document.createElement('option');
+            optOff.value = "-1";
+            optOff.textContent = "Désactiver les sous-titres";
+            subSelect.appendChild(optOff);
+
+            let chosenIndex = info.subIndex !== null ? info.subIndex : 0;
+            if (type === 'vf' && info.frAudioIndex !== null) {
+                chosenIndex = -1;
+            }
+
+            subSelect.value = chosenIndex;
+            if (chosenIndex !== -1) {
+                streamSubtitlesLive(magnet, chosenIndex);
+            } else {
+                subStatus.innerText = "Sous-titres désactivés";
+                document.getElementById('toggleSubBtn').innerText = "CC OFF";
+                document.getElementById('toggleSubBtn').style.background = "#555";
+            }
+        } catch (err) {
+            subSelect.innerHTML = '<option value="0">Sous-titre 1 (Auto)</option><option value="-1">Désactivés</option>';
+            streamSubtitlesLive(magnet, 0);
+        }
+    }
+
+    async function streamSubtitlesLive(magnet, subIndex) {
+        if (currentSubAbort) {
+            currentSubAbort.abort();
+        }
+        currentSubAbort = new AbortController();
+
+        const subStatus = document.getElementById('sub-status');
+        const toggleBtn = document.getElementById('toggleSubBtn');
+        const video = document.getElementById('videoPlayer');
+
+        subStatus.innerText = "⏳ Chargement des sous-titres...";
+        subStatus.style.color = "#ffa033";
+        toggleBtn.innerText = "CC ON";
+        toggleBtn.style.background = "var(--primary)";
+
+        for (let i = 0; i < video.textTracks.length; i++) {
+            video.textTracks[i].mode = 'disabled';
+        }
+
+        currentTextTrack = video.addTextTrack("subtitles", "Animflix WebVTT", "fr");
+        currentTextTrack.mode = "showing";
+
+        try {
+            const subUrl = '/api/subtitles?magnet=' + encodeURIComponent(magnet) + '&subIndex=' + subIndex;
+            const response = await fetch(subUrl, { signal: currentSubAbort.signal });
+            if (!response.ok || !response.body) {
+                subStatus.innerText = "⚠️ Sous-titres indisponibles";
+                subStatus.style.color = "#ff4444";
+                return;
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            const seenCues = new Set();
+            let cueCount = 0;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+
+                const blocks = buffer.split(/\n\s*\n/);
+                buffer = blocks.pop() || "";
+
+                for (const block of blocks) {
+                    const lines = block.trim().split('\n');
+                    for (let i = 0; i < lines.length; i++) {
+                        const match = lines[i].match(/((?:\d+:)?\d+:\d+\.\d+)\s*-->\s*((?:\d+:)?\d+:\d+\.\d+)/);
+                        if (match) {
+                            const start = parseVttTime(match[1]);
+                            const end = parseVttTime(match[2]);
+                            const cueKey = start + '_' + end;
+                            if (!seenCues.has(cueKey)) {
+                                seenCues.add(cueKey);
+                                const rawTextLines = lines.slice(i + 1);
+                                const text = cleanSubtitleLines(rawTextLines);
+                                if (text && !isNaN(start) && !isNaN(end) && end > start) {
+                                    try {
+                                        const cue = new VTTCue(start, end, text);
+                                        cue.size = 100;
+                                        cue.position = 50;
+                                        cue.align = 'center';
+                                        currentTextTrack.addCue(cue);
+                                        cueCount++;
+                                        if (cueCount === 1) {
+                                            subStatus.innerText = "✅ Sous-titres appliqués dans le lecteur";
+                                            subStatus.style.color = "#46d369";
+                                        }
+                                    } catch(e) {}
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (cueCount > 0) {
+                subStatus.innerText = "✅ Sous-titres synchronisés (" + cueCount + " répliques)";
+                subStatus.style.color = "#46d369";
+            }
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.warn("Erreur streaming sous-titres:", err);
+                subStatus.innerText = "";
+            }
+        }
+    }
+
+    function toggleSubtitles() {
+        const btn = document.getElementById('toggleSubBtn');
+        const subStatus = document.getElementById('sub-status');
+        if (!currentTextTrack) return;
+
+        if (currentTextTrack.mode === 'showing') {
+            currentTextTrack.mode = 'hidden';
+            btn.innerText = "CC OFF";
+            btn.style.background = "#555";
+            subStatus.innerText = "Sous-titres masqués";
+            showToast("Sous-titres masqués");
+        } else {
+            currentTextTrack.mode = 'showing';
+            btn.innerText = "CC ON";
+            btn.style.background = "var(--primary)";
+            subStatus.innerText = "Sous-titres affichés";
+            showToast("Sous-titres affichés");
+        }
+    }
+
+    function onSubtitleChange(val) {
+        const subIndex = parseInt(val, 10);
+        const btn = document.getElementById('toggleSubBtn');
+        const subStatus = document.getElementById('sub-status');
+
+        if (subIndex === -1) {
+            if (currentSubAbort) currentSubAbort.abort();
+            if (currentTextTrack) currentTextTrack.mode = 'hidden';
+            btn.innerText = "CC OFF";
+            btn.style.background = "#555";
+            subStatus.innerText = "Sous-titres désactivés";
+            showToast("Sous-titres désactivés");
+        } else {
+            btn.innerText = "CC ON";
+            btn.style.background = "var(--primary)";
+            if (currentActiveMagnet) {
+                streamSubtitlesLive(currentActiveMagnet, subIndex);
+            }
+        }
+    }
+
+    async function startStreaming(magnet, titre, vlcUrl, type) {
+        currentActiveMagnet = magnet;
+        const streamMode = document.getElementById('streamMode').value;
+        const playerContainer = document.getElementById('player-container');
+        const video = document.getElementById('videoPlayer');
+        const playerStatus = document.getElementById('player-status');
+        const statusText = document.getElementById('status-text');
+
+        playerContainer.style.display = 'flex';
+        document.getElementById('now-playing').innerText = titre;
+        document.getElementById('vlcLink').href = vlcUrl;
+
+        playerStatus.style.display = 'block';
+        statusText.innerText = "Connexion à TorrServer & chargement du flux... ⏳";
+
+        const webUrl = '/play?magnet=' + encodeURIComponent(magnet) + '&mode=' + streamMode + '&type=' + type;
+        video.src = webUrl;
+
+        setupSubtitles(magnet, type);
+
+        video.onplaying = () => {
+            if (streamTimeout) clearTimeout(streamTimeout);
+            playerStatus.style.display = 'none';
+        };
+
+        video.oncanplay = () => {
+            if (streamTimeout) clearTimeout(streamTimeout);
+            playerStatus.style.display = 'none';
+            video.play().catch(() => {});
+        };
+
+        if (streamTimeout) clearTimeout(streamTimeout);
+        streamTimeout = setTimeout(() => {
+            if (playerStatus.style.display !== 'none') {
+                statusText.innerHTML = "⏳ Le flux torrent met du temps à démarrer...<br><span style='font-size:13px; color:#ffa033;'>Cliquez sur <b>Ouvrir dans VLC</b> ci-dessous pour une lecture immédiate et fluide !</span>";
+            }
+        }, 7000);
+
+        video.onerror = () => {
+            if (streamTimeout) clearTimeout(streamTimeout);
+            statusText.innerHTML = "⚠️ Le navigateur ne peut pas lire ce format directement.<br><span style='font-size:13px; color:#ffa033;'>Utilisez le bouton ci-dessous pour le regarder dans <b>VLC</b> !</span>";
+        };
+    }
+
+    function closePlayer() {
+        if (streamTimeout) clearTimeout(streamTimeout);
+        if (currentSubAbort) currentSubAbort.abort();
+        const menu = document.getElementById('subStyleMenu');
+        if (menu) menu.style.display = 'none';
+        document.getElementById('player-container').style.display = 'none';
+        const v = document.getElementById('videoPlayer');
+        v.pause(); 
+        v.src = "";
+        for (let i = 0; i < v.textTracks.length; i++) {
+            v.textTracks[i].mode = 'disabled';
+        }
+        currentTextTrack = null;
+        currentActiveMagnet = null;
+    }
+
+    // Fermeture du menu de style lors d'un clic en dehors
+    document.addEventListener('click', (e) => {
+        const menu = document.getElementById('subStyleMenu');
+        const btn = document.getElementById('subStyleBtn');
+        if (menu && menu.style.display === 'block') {
+            if (!menu.contains(e.target) && (!btn || !btn.contains(e.target))) {
+                menu.style.display = 'none';
+            }
+        }
+    });
+
+    window.addEventListener('keydown', (e) => {
+        const player = document.getElementById('player-container');
+        const isPlaying = player.style.display === 'flex';
+        if (!isPlaying) return;
+
+        const video = document.getElementById('videoPlayer');
+        if (e.key === 'Escape') {
+            const menu = document.getElementById('subStyleMenu');
+            if (menu && menu.style.display === 'block') {
+                menu.style.display = 'none';
+                return;
+            }
+            closePlayer();
+        } else if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+            e.preventDefault();
+            video.paused ? video.play() : video.pause();
+        } else if (e.key.toLowerCase() === 'c' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+            e.preventDefault();
+            toggleSubtitles();
+        } else if (e.key.toLowerCase() === 's' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+            e.preventDefault();
+            toggleSubStyleMenu();
+        } else if (e.key === 'ArrowRight' && e.target.tagName !== 'SELECT') {
+            video.currentTime += 5;
+        } else if (e.key === 'ArrowLeft' && e.target.tagName !== 'SELECT') {
+            video.currentTime -= 5;
+        } else if (e.key.toLowerCase() === 'f' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+            } else {
+                video.requestFullscreen().catch(() => {});
+            }
+        }
+    });
+
+    // Chargement immédiat du style au démarrage
+    loadSavedSubStyle();
+    window.addEventListener('DOMContentLoaded', loadSavedSubStyle);
+  </script>
+</body>
+</html>

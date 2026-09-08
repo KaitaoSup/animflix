@@ -3,274 +3,509 @@ import Parser from 'rss-parser';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const execPromise = promisify(exec);
 
 // --- CONFIGURATION ---
-const TORRSERVER_IP = "192.168.1.55"; 
-const TMDB_API_KEY = "TMDB_API_KEY"; // Remplacez par votre clé TMDB
+const TORRSERVER_LOCAL_URL = "http://127.0.0.1:8090"; // Connexion interne ultra-rapide
+const TMDB_API_KEY = "TMDB API KEY"; // Optionnel : clé TMDB (Kitsu est utilisé en fallback automatique sans clé)
+
+// Dossier de cache persistant pour les sous-titres WebVTT
+const SUB_CACHE_DIR = path.join(process.cwd(), 'cache', 'subtitles');
+if (!fs.existsSync(SUB_CACHE_DIR)) {
+  fs.mkdirSync(SUB_CACHE_DIR, { recursive: true });
+}
+
+// Extraction du hash SHA1 depuis un magnet link
+function getTorrentHash(magnet) {
+  if (!magnet) return 'unknown';
+  const match = magnet.match(/xt=urn:btih:([a-zA-Z0-9]+)/i);
+  if (match) return match[1].toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < magnet.length; i++) {
+    hash = ((hash << 5) - hash) + magnet.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(16);
+}
 
 const parser = new Parser({
   customFields: {
-    item: [['nyaa:seeders', 'seeders'], ['nyaa:size', 'size']],
+    item: [
+      ['nyaa:seeders', 'seeders'],
+      ['nyaa:size', 'size'],
+      ['nyaa:infoHash', 'infoHash']
+    ],
   },
 });
 
+// --- CACHES EN MÉMOIRE (HAUTE PERFORMANCE) ---
+const metadataCache = new Map(); // key: cleanTitle, val: { poster, rating, timestamp }
+const METADATA_TTL = 1000 * 60 * 60 * 24; // 24 heures
+
+const searchCache = new Map(); // key: query+type, val: { results, timestamp }
+const SEARCH_TTL = 1000 * 60 * 5; // 5 minutes
+
+// Nettoyeur intelligent de titre d'anime pour un matching API précis
+function cleanAnimeTitle(raw) {
+  if (!raw) return '';
+  return raw
+    .replace(/\[.*?\]/g, ' ') // Retire [Fansub], [1080p], etc.
+    .replace(/\(.*?\)/g, ' ') // Retire (1080p), (TV), etc.
+    .replace(/\b\d\s*[._]\s*\d\b/g, ' ') // Retire les canaux audio 2.0, 5.1
+    .replace(/\b(1080p|720p|480p|2160p|4k|x264|x265|x\.265|x\.264|hevc|av1|aac|flac|web-dl|webrip|bdrip|bd|bluray|dvd|vostfr|vf|multi|multisubs?|sub|mkv|mp4|avi|cr|crunchyroll|10bit|8bit|remux|uncensored|dual audio|final)\b/gi, ' ')
+    .replace(/\b(s\d+e\d+|s\d+|e\d+|ep\s*\d+|episode\s*\d+|saison\s*\d+|season\s*\d+)\b/gi, ' ')
+    .replace(/\s*-\s*\d{1,4}\b/g, ' ')
+    .replace(/\b\d{1,3}\b(?=\s*$)/g, ' ')
+    .replace(/[._\-\+\/\\:~]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Récupération métadonnées (Affiche & Note) avec mise en cache et double source (TMDB + Kitsu)
+async function getAnimeMetadata(cleanTitle) {
+  if (!cleanTitle) return { poster: null, rating: "N/A" };
+  const key = cleanTitle.toLowerCase();
+
+  const cached = metadataCache.get(key);
+  if (cached && (Date.now() - cached.timestamp < METADATA_TTL)) {
+    return { poster: cached.poster, rating: cached.rating };
+  }
+
+  let poster = null;
+  let rating = "N/A";
+
+  // 1. Essai TMDB si la clé est valide (32 caractères hex)
+  if (TMDB_API_KEY && TMDB_API_KEY.length === 32) {
+    try {
+      const tmdbRes = await axios.get('https://api.themoviedb.org/3/search/multi', {
+        params: { api_key: TMDB_API_KEY, query: cleanTitle, language: 'fr-FR' },
+        timeout: 2500
+      });
+      if (tmdbRes.data?.results?.length > 0) {
+        const info = tmdbRes.data.results[0];
+        if (info.poster_path) poster = `https://image.tmdb.org/t/p/w500${info.poster_path}`;
+        if (info.vote_average) rating = info.vote_average.toFixed(1);
+      }
+    } catch (e) {}
+  }
+
+  // 2. TVMaze API (100% gratuit, ultra-rapide <50ms, sans clé requise)
+  if (!poster) {
+    try {
+      const tvRes = await axios.get('https://api.tvmaze.com/singlesearch/shows', {
+        params: { q: cleanTitle },
+        timeout: 1500
+      });
+      if (tvRes.data) {
+        poster = tvRes.data.image?.medium || tvRes.data.image?.original || null;
+        if (tvRes.data.rating?.average) rating = tvRes.data.rating.average.toFixed(1);
+      }
+    } catch (e) {}
+  }
+
+  // 3. Fallback automatique Kitsu API (spécialisée anime, sans clé requise)
+  if (!poster) {
+    const fetchKitsu = async (queryText) => {
+      try {
+        const kitsuRes = await axios.get('https://kitsu.io/api/edge/anime', {
+          params: { 'filter[text]': queryText, 'page[limit]': 1 },
+          timeout: 2500
+        });
+        return kitsuRes.data?.data?.[0]?.attributes;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    let item = await fetchKitsu(cleanTitle);
+    if (!item && cleanTitle.split(' ').length > 2) {
+      const shortTitle = cleanTitle.split(' ').slice(0, 3).join(' ');
+      item = await fetchKitsu(shortTitle);
+    }
+
+    if (item) {
+      poster = item.posterImage?.medium || item.posterImage?.small || null;
+      if (item.averageRating) rating = (parseFloat(item.averageRating) / 10).toFixed(1);
+    }
+  }
+
+  const result = { poster, rating, timestamp: Date.now() };
+  metadataCache.set(key, result);
+  return { poster, rating };
+}
+
+// Échappement sécurisé pour les filtres FFmpeg
+function escapeFfmpegPath(str) {
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "'\\''")
+    .replace(/:/g, '\\:')
+    .replace(/\[/g, '\\[')
+    .replace(/\]/g, '\\]');
+}
+
+app.use(express.static(__dirname));
+
 app.get('/', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="fr">
-    <head>
-        <meta charset="UTF-8">
-        <title>Mon Netflix Anime 🍿</title>
-        <style>
-            body { background: #0b0b0b; color: white; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
-            .navbar { background: rgba(0,0,0,0.9); padding: 15px 50px; position: fixed; width: 100%; z-index: 100; display: flex; align-items: center; gap: 20px; box-sizing: border-box;}
-            .logo { color: #e50914; font-size: 24px; font-weight: bold; text-decoration: none; }
-            
-            .search-box { display: flex; gap: 10px; }
-            input[type="text"], select { padding: 10px; border-radius: 4px; border: 1px solid #333; background: #222; color: white; outline: none; }
-            button { padding: 10px 20px; background: #e50914; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
-
-            .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 25px; padding: 120px 50px 50px; }
-            .card { cursor: pointer; transition: transform 0.3s; position: relative; border-radius: 8px; overflow: hidden; background: #141414; border: 1px solid #222; }
-            .card:hover { transform: scale(1.05); z-index: 5; border-color: #e50914; }
-            .card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; }
-            .card-info { padding: 12px; font-size: 13px; background: #141414; }
-            .card-title { font-weight: bold; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-            .stats { color: #aaa; font-size: 11px; }
-            .seeders { color: #4caf50; font-weight: bold; }
-            
-            /* LOADER SPÉCIFIQUE FFPROBE */
-            #ffprobe-loader { 
-                position: fixed; inset: 0; background: rgba(0,0,0,0.95); 
-                z-index: 300; display: none; flex-direction: column; 
-                align-items: center; justify-content: center; 
-            }
-            .spinner {
-                width: 60px; height: 60px; border: 6px solid #333;
-                border-top: 6px solid #e50914; border-radius: 50%;
-                animation: spin 1s linear infinite; margin-bottom: 20px;
-            }
-            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-            #player-container { position: fixed; inset: 0; background: #000; z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; }
-            video { width: 85%; max-height: 80vh; border: 1px solid #333; }
-            .close-btn { position: absolute; top: 20px; right: 40px; font-size: 40px; cursor: pointer; color: white; z-index: 210; }
-            .vlc-btn { margin-top: 15px; color: #ff8800; text-decoration: none; font-weight: bold; cursor: pointer; border: 1px solid #ff8800; padding: 10px; border-radius: 5px; }
-        </style>
-    </head>
-    <body>
-      <div id="ffprobe-loader">
-          <div class="spinner"></div>
-          <p id="loader-text" style="font-size: 18px;">Analyse des sous-titres et préparation du flux... ⌛</p>
-          <a id="vlcLink" href="#" class="vlc-btn" onclick="copyToClipboard(this.href); return false;">🟠 Copier le lien brut pour VLC</a>
-      </div>
-
-      <div class="navbar">
-          <a href="/" class="logo">ANIMFLIX</a>
-          <div class="search-box">
-              <input type="text" id="searchInput" placeholder="Nom de l'anime..." onkeypress="if(event.key === 'Enter') searchNyaa()">
-              <select id="searchType">
-                  <option value="vostfr">VOSTFR</option>
-                  <option value="vf">VF</option>
-                  <option value="multisub">Multi-Sub</option>
-                  <option value="sub">VOSTA</option>
-              </select>
-              <button onclick="searchNyaa()">Chercher</button>
-          </div>
-      </div>
-      <div id="results" class="grid"></div>
-
-      <div id="player-container">
-          <span class="close-btn" onclick="closePlayer()">&times;</span>
-          <h2 id="now-playing" style="margin-bottom: 10px;"></h2>
-          <video id="videoPlayer" controls autoplay></video>
-      </div>
-
-      <script>
-        const TORRSERVER_IP = "${TORRSERVER_IP}";
-
-        async function searchNyaa() {
-            const query = document.getElementById('searchInput').value;
-            const type = document.getElementById('searchType').value;
-            const resultsDiv = document.getElementById('results');
-            if (!query) return;
-            resultsDiv.innerHTML = '<p style="padding: 120px">Interrogation de la base de données... ⏳</p>';
-            try {
-                const response = await fetch('/api/search?q=' + encodeURIComponent(query) + '&type=' + type);
-                const torrents = await response.json();
-                resultsDiv.innerHTML = '';
-                torrents.forEach(t => {
-                    const card = document.createElement('div');
-                    card.className = 'card';
-                    const vlcUrl = "http://" + TORRSERVER_IP + ":8090/stream?link=" + encodeURIComponent(t.lienMagnet) + "&index=1&play";
-                    
-                    card.innerHTML = \`
-                        <img src="\${t.poster}" onerror="this.src='https://via.placeholder.com/300x450/111/fff?text=No+Poster'">
-                        <div class="card-info">
-                            <span class="card-title" title="\${t.titre}">\${t.titre}</span>
-                            <div class="stats">
-                                ⭐ \${t.rating} | \${t.taille}<br>
-                                <span class="seeders">Seeders: \${t.seeders}</span>
-                            </div>
-                        </div>\`;
-                    card.onclick = () => startStreaming(t.lienMagnet, t.titre, vlcUrl);
-                    resultsDiv.appendChild(card);
-                });
-            } catch (err) { resultsDiv.innerHTML = '<p style="color:red; padding: 120px">Erreur serveur.</p>'; }
-        }
-
-        async function startStreaming(magnet, titre, vlcUrl) {
-            document.getElementById('ffprobe-loader').style.display = 'flex';
-            const webUrl = '/play?magnet=' + encodeURIComponent(magnet);
-            const video = document.getElementById('videoPlayer');
-            
-            video.src = webUrl;
-            document.getElementById('now-playing').innerText = titre;
-            document.getElementById('vlcLink').href = vlcUrl;
-
-            video.oncanplay = () => {
-                document.getElementById('ffprobe-loader').style.display = 'none';
-                document.getElementById('player-container').style.display = 'flex';
-            };
-
-            video.onerror = () => {
-                alert("Erreur lors du chargement du flux vidéo.");
-                document.getElementById('ffprobe-loader').style.display = 'none';
-            };
-        }
-
-        function closePlayer() {
-            document.getElementById('player-container').style.display = 'none';
-            const v = document.getElementById('videoPlayer');
-            v.pause(); v.src = "";
-        }
-
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => alert("Lien copié ! Colle-le dans VLC (Média > Ouvrir un flux réseau)"));
-        }
-      </script>
-    </body>
-    </html>
-  `);
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// --- API RECHERCHE + TMDB ---
+// --- API RECHERCHE ULTRA-RAPIDE (CACHE + DÉDUPLICATION + POSTER PRIORITAIRE) ---
 app.get('/api/search', async (req, res) => {
-  let query = req.query.q;
+  let query = req.query.q?.trim();
   const type = req.query.type || 'vostfr';
   if (!query) return res.json([]);
 
+  const cacheKey = `${query.toLowerCase()}_${type}`;
+  const cached = searchCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < SEARCH_TTL)) {
+    return res.json(cached.results);
+  }
+
+  let searchQuery = query;
   let category = '1_0';
-  if (type === 'vostfr') { query += ' vostfr'; category = '1_3'; } 
-  else if (type === 'vf') { query += ' vf'; category = '1_3'; } 
-  else if (type === 'multisub') { query += ' multi'; category = '1_2'; } 
+  if (type === 'vostfr') { searchQuery += ' vostfr'; category = '1_3'; } 
+  else if (type === 'vf') { searchQuery += ' vf'; category = '1_3'; } 
+  else if (type === 'multisub') { searchQuery += ' multi'; category = '1_2'; } 
   else if (type === 'sub') { category = '1_2'; }
 
   try {
-    const response = await fetch(`https://nyaa.si/?page=rss&q=${encodeURIComponent(query)}&c=${category}`);
-    const feed = await parser.parseString(await response.text());
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
 
-    const videos = await Promise.all(feed.items.slice(0, 20).map(async (t) => {
-        // Nettoyage de nom pour TMDB
-        const cleanName = t.title.replace(/\[.*?\]/g, '').replace(/[._\-]/g, ' ').split('S0')[0].split('Episode')[0].trim();
-        let poster = null; let rating = "N/A";
-        try {
-            const tmdb = await axios.get('https://api.themoviedb.org/3/search/multi', {
-                params: { api_key: TMDB_API_KEY, query: cleanName, language: 'fr-FR' }, timeout: 2000
-            });
-            if (tmdb.data.results.length > 0) {
-                const info = tmdb.data.results[0];
-                poster = info.poster_path ? `https://image.tmdb.org/t/p/w500${info.poster_path}` : null;
-                rating = info.vote_average ? info.vote_average.toFixed(1) : "N/A";
-            }
-        } catch (e) {}
-        return { titre: t.title, lienMagnet: t.link, taille: t.size, seeders: parseInt(t.seeders, 10) || 0, poster, rating };
-    }));
+    const response = await fetch(`https://nyaa.si/?page=rss&q=${encodeURIComponent(searchQuery)}&c=${category}`, {
+      headers: { 
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36' 
+      },
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    const xmlText = await response.text();
+    const feed = await parser.parseString(xmlText);
+    const items = feed.items?.slice(0, 25) || [];
+
+    if (items.length === 0) {
+      searchCache.set(cacheKey, { results: [], timestamp: Date.now() });
+      return res.json([]);
+    }
+
+    // 1. Récupération prioritaire et ultra-rapide de l'affiche de la franchise
+    const queryClean = cleanAnimeTitle(query) || query;
+    const defaultMeta = await getAnimeMetadata(queryClean);
+
+    // 2. Déduplication des titres nettoyés
+    const titleCleanMap = new Map();
+    items.forEach(t => {
+      const clean = cleanAnimeTitle(t.title);
+      titleCleanMap.set(t.title, clean);
+    });
+
+    const uniqueCleanTitles = [...new Set(Array.from(titleCleanMap.values()))];
+    const metaLookup = new Map();
+
+    // Si defaultMeta a trouvé l'affiche, l'assigner directement pour éviter des dizaines d'appels API Kitsu inutiles
+    if (defaultMeta && defaultMeta.poster) {
+      uniqueCleanTitles.forEach(c => metaLookup.set(c, defaultMeta));
+    } else {
+      // Sinon, récupérer pour un maximum de 3 titres uniques pour ne pas bloquer la recherche
+      const titlesToFetch = uniqueCleanTitles.slice(0, 4);
+      await Promise.all(titlesToFetch.map(async (clean) => {
+        const meta = await getAnimeMetadata(clean);
+        metaLookup.set(clean, meta);
+      }));
+    }
+
+    // 3. Construction des résultats avec vrai lien magnet P2P direct
+    const videos = items.map(t => {
+      const clean = titleCleanMap.get(t.title);
+      const meta = metaLookup.get(clean) || defaultMeta || { poster: null, rating: "N/A" };
+      const infoHash = t.infoHash || '';
+      const magnetLink = infoHash 
+        ? `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(t.title)}&tr=http%3A%2F%2Fnyaa.tracker.wf%3A7777%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce`
+        : t.link;
+
+      return {
+        titre: t.title,
+        cleanTitle: clean,
+        lienMagnet: magnetLink,
+        taille: t.size,
+        seeders: parseInt(t.seeders, 10) || 0,
+        poster: meta.poster,
+        rating: meta.rating
+      };
+    });
+
+    searchCache.set(cacheKey, { results: videos, timestamp: Date.now() });
     res.json(videos);
-  } catch (error) { res.status(500).json([]); }
+  } catch (error) {
+    console.error("⚠️ Erreur API Nyaa:", error.message);
+    res.status(500).json([]);
+  }
 });
 
-// --- ANALYSEUR FFPROBE ---
-async function getSubtitleConfig(videoUrl) {
-    try {
-        console.log("🔍 FFPROBE: Analyse du torrent en cours...");
-        const cmd = `ffprobe -v error -select_streams s -show_entries stream=index:stream_tags=language -of json "${videoUrl}"`;
-        const { stdout } = await execPromise(cmd, { timeout: 20000 });
-        const data = JSON.parse(stdout);
-        const streams = data.streams || [];
-        
-        for (let i = 0; i < streams.length; i++) {
-            const lang = streams[i].tags?.language?.toLowerCase();
-            if (lang === 'fre' || lang === 'fra') {
-                console.log("✅ FFPROBE: Sous-titre FR trouvé à l'index:", i);
-                return i;
-            }
+// --- ANALYSEUR FFPROBE RAPIDE (STREAMS SOUS-TITRES & AUDIO) AVEC CACHE ---
+const streamsCache = new Map(); // key: hash, val: { data, timestamp }
+const STREAMS_CACHE_TTL = 1000 * 60 * 60; // 1 heure
+
+async function analyzeStreams(videoUrl) {
+  try {
+    console.log("🔍 FFPROBE: Analyse rapide des flux...");
+    const cmd = `ffprobe -v error -probesize 4000000 -analyzeduration 4000000 -show_entries stream=index,codec_type,codec_name:stream_tags=language,title -of json "${videoUrl}"`;
+    const { stdout } = await execPromise(cmd, { timeout: 12000 });
+    const data = JSON.parse(stdout);
+    const streams = data.streams || [];
+
+    let subIndex = null;
+    let relativeSubCount = 0;
+    const subTracks = [];
+
+    let frAudioIndex = null;
+    let relativeAudioCount = 0;
+    const audioTracks = [];
+
+    for (const s of streams) {
+      const lang = (s.tags?.language || '').toLowerCase();
+      const title = s.tags?.title || '';
+
+      if (s.codec_type === 'subtitle') {
+        const isFrench = (lang === 'fre' || lang === 'fra' || title.toLowerCase().includes('french') || title.toLowerCase().includes('vostfr') || title.toLowerCase().includes('français') || title.toLowerCase().includes('vf'));
+        let trackLabel = title;
+        if (!trackLabel) {
+          trackLabel = isFrench ? 'Français (VOSTFR)' : (lang ? `Sous-titre (${lang.toUpperCase()})` : `Piste ${relativeSubCount + 1}`);
         }
-        return streams.length > 0 ? 0 : null;
-    } catch (e) { 
-        console.log("⚠️ FFPROBE: Échec ou timeout."); 
-        return 0; 
+
+        subTracks.push({
+          index: relativeSubCount,
+          streamIndex: s.index,
+          lang: lang || 'und',
+          label: trackLabel,
+          isFrench
+        });
+
+        if (subIndex === null && isFrench) {
+          console.log(`✅ FFPROBE: Sous-titre FR trouvé (index relatif : ${relativeSubCount})`);
+          subIndex = relativeSubCount;
+        }
+        relativeSubCount++;
+      } else if (s.codec_type === 'audio') {
+        const isFrench = (lang === 'fre' || lang === 'fra' || title.toLowerCase().includes('french') || title.toLowerCase().includes('vf'));
+        audioTracks.push({
+          index: relativeAudioCount,
+          streamIndex: s.index,
+          lang: lang || 'und',
+          label: title || (isFrench ? 'Français (VF)' : (lang ? `Audio (${lang.toUpperCase()})` : `Audio ${relativeAudioCount + 1}`)),
+          isFrench
+        });
+
+        if (frAudioIndex === null && isFrench) {
+          console.log(`✅ FFPROBE: Audio Français trouvé (index relatif : ${relativeAudioCount})`);
+          frAudioIndex = relativeAudioCount;
+        }
+        relativeAudioCount++;
+      }
     }
+
+    if (subIndex === null && subTracks.length > 0) {
+      console.log("ℹ️ FFPROBE: Pas de piste FR explicite, sélection du premier sous-titre.");
+      subIndex = 0;
+    }
+
+    return { subIndex, subTracks, frAudioIndex, audioTracks };
+  } catch (e) {
+    console.log("⚠️ FFPROBE: Analyse rapide streams terminée avec fallback.");
+    return {
+      subIndex: 0,
+      subTracks: [{ index: 0, lang: 'fre', label: 'Français (VOSTFR)', isFrench: true }],
+      frAudioIndex: null,
+      audioTracks: []
+    };
+  }
 }
 
-// --- TRANSCODEUR FFMPEG ---
-app.get('/play', async (req, res) => {
-    const magnet = req.query.magnet;
-    if (!magnet) return res.status(400).send("Magnet manquant");
-    
-    const torrUrl = `http://${TORRSERVER_IP}:8090/stream?link=${encodeURIComponent(magnet)}&index=1&play`;
-    
-    // Analyse ffprobe
-    const subIndex = await getSubtitleConfig(torrUrl);
+async function getStreamInfo(magnet) {
+  const hash = getTorrentHash(magnet);
+  const cached = streamsCache.get(hash);
+  if (cached && (Date.now() - cached.timestamp < STREAMS_CACHE_TTL)) {
+    return cached.data;
+  }
+  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=1&play`;
+  const data = await analyzeStreams(torrUrl);
+  streamsCache.set(hash, { data, timestamp: Date.now() });
+  return data;
+}
 
-    res.setHeader('Content-Type', 'video/mp4');
-    
-    let ffmpegArgs = ['-re', '-i', torrUrl];
-
-    if (subIndex !== null) {
-        console.log(`🎬 FFmpeg: Incrustation de la piste sous-titre n°${subIndex}`);
-        const escapedUrl = torrUrl.replace(/:/g, '\\:');
-        
-        // Utilisation de filter_complex pour une incrustation propre
-        ffmpegArgs.push(
-            '-filter_complex', `[0:v]subtitles='${escapedUrl}':si=${subIndex}[v]`, 
-            '-map', '[v]',
-            '-map', '0:a:0', 
-            '-c:v', 'libx264',
-            '-preset', 'ultrafast',
-            '-tune', 'zerolatency',
-            '-crf', '26',
-            '-sn'
-        );
-    } else {
-        console.log("🎬 FFmpeg: Pas de sous-titres trouvés, copie directe.");
-        ffmpegArgs.push('-c:v', 'copy');
-    }
-
-    ffmpegArgs.push(
-        '-c:a', 'aac',
-        '-ac', '2',
-        '-movflags', 'frag_keyframe+empty_moov',
-        '-f', 'mp4',
-        'pipe:1'
-    );
-
-    const ffmpeg = spawn('ffmpeg', ffmpegArgs);
-    
-    ffmpeg.stderr.on('data', (data) => {
-        const msg = data.toString();
-        if (msg.includes('Error')) console.log("⚠️ FFmpeg Log:", msg);
-    });
-
-    ffmpeg.stdout.pipe(res);
-    
-    req.on('close', () => {
-        console.log("🛑 Flux arrêté.");
-        ffmpeg.kill('SIGKILL');
-    });
+// --- ROUTE API INFO FLUX (AUDIO & SOUS-TITRES) ---
+app.get('/api/streams', async (req, res) => {
+  const { magnet } = req.query;
+  if (!magnet) return res.status(400).json({ error: "Lien magnet manquant" });
+  try {
+    const info = await getStreamInfo(magnet);
+    res.json(info);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.listen(3000, () => console.log('✅ Serveur Netflix-Torrent Ultime avec FFPROBE Loader prêt !'));
+// --- ROUTE API STREAMING SOUS-TITRES WEBVTT DIRECTS DANS LE SITE ---
+app.get('/api/subtitles', async (req, res) => {
+  const { magnet, subIndex = 0 } = req.query;
+  if (!magnet) return res.status(400).send("Lien magnet manquant");
+
+  const hash = getTorrentHash(magnet);
+  const parsedIndex = parseInt(subIndex, 10) || 0;
+  const cacheKey = `${hash}_${parsedIndex}`;
+  const vttFile = path.join(SUB_CACHE_DIR, `${cacheKey}.vtt`);
+  const tmpFile = path.join(SUB_CACHE_DIR, `${cacheKey}.tmp`);
+
+  // 1. Si déjà entièrement extrait et mis en cache, servir instantanément (< 1ms)
+  if (fs.existsSync(vttFile)) {
+    res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return fs.createReadStream(vttFile).pipe(res);
+  }
+
+  // 2. Sinon, streamer en temps réel avec FFmpeg (flush_packets pour affichage immédiat)
+  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=1&play`;
+
+  res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Transfer-Encoding', 'chunked');
+  res.setHeader('Cache-Control', 'no-cache');
+
+  const ffmpegArgs = [
+    '-v', 'error',
+    '-i', torrUrl,
+    '-map', `0:s:${parsedIndex}`,
+    '-flush_packets', '1',
+    '-f', 'webvtt',
+    'pipe:1'
+  ];
+
+  const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+  const fileOut = fs.createWriteStream(tmpFile);
+
+  ffmpeg.stdout.pipe(res);
+  ffmpeg.stdout.pipe(fileOut);
+
+  let finishedCleanly = false;
+  ffmpeg.on('close', (code) => {
+    fileOut.end();
+    if (code === 0) {
+      finishedCleanly = true;
+      if (fs.existsSync(tmpFile)) {
+        try { fs.renameSync(tmpFile, vttFile); } catch(e) {}
+      }
+    } else {
+      if (fs.existsSync(tmpFile)) {
+        try { fs.unlinkSync(tmpFile); } catch(e) {}
+      }
+    }
+  });
+
+  req.on('close', () => {
+    if (!finishedCleanly) {
+      ffmpeg.kill('SIGKILL');
+      fileOut.end();
+      if (fs.existsSync(tmpFile)) {
+        try { fs.unlinkSync(tmpFile); } catch(e) {}
+      }
+    }
+  });
+});
+
+// --- TRANSCODEUR FFMPEG OPTIMISÉ (ZÉRO LATENCE & MULTITHREAD) ---
+app.get('/play', async (req, res) => {
+  const { magnet, mode, type } = req.query;
+  if (!magnet) return res.status(400).send("Lien magnet manquant");
+
+  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=1&play`;
+
+  res.setHeader('Content-Type', 'video/mp4');
+  res.setHeader('Accept-Ranges', 'none');
+
+  // MODE 1 : LECTURE DIRECTE (0% CPU, STREAM ULTRA-RAPIDE SANS RÉENCODAGE VIDÉO)
+  if (mode === 'direct') {
+    console.log("⚡ Lancement FFmpeg en Mode Direct (Copie vidéo, 0% CPU)");
+    const directArgs = [
+      '-threads', '0',
+      '-i', torrUrl,
+      '-map', '0:v:0',
+      '-c:v', 'copy',
+      '-map', '0:a:0?',
+      '-c:a', 'aac',
+      '-ac', '2',
+      '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+      '-f', 'mp4',
+      'pipe:1'
+    ];
+
+    const ffmpeg = spawn('ffmpeg', directArgs);
+    ffmpeg.stdout.pipe(res);
+
+    req.on('close', () => {
+      console.log("🛑 Client déconnecté (Mode Direct).");
+      ffmpeg.kill('SIGKILL');
+    });
+    return;
+  }
+
+  // MODE 2 : TRANSCODAGE VIDÉO H.264 (POUR NAVIGATEURS OU APPAREILS SANS HEVC)
+  console.log("🔄 Lancement FFmpeg en Mode Transcodage H.264 (Compatibilité standard)");
+  const streamInfo = await getStreamInfo(magnet);
+
+  const ffmpegArgs = [
+    '-threads', '0', // Utilise tous les coeurs CPU disponibles
+    '-i', torrUrl
+  ];
+
+  // Sélection intelligente de la piste audio
+  if (type === 'vf' && streamInfo.frAudioIndex !== null) {
+    ffmpegArgs.push('-map', `0:a:${streamInfo.frAudioIndex}`);
+  } else {
+    ffmpegArgs.push('-map', '0:a:0?');
+  }
+
+  // Encodage H.264 universel ultra-rapide
+  ffmpegArgs.push(
+    '-map', '0:v:0',
+    '-c:v', 'libx264',
+    '-preset', 'ultrafast',
+    '-tune', 'zerolatency',
+    '-crf', '25',
+    '-c:a', 'aac',
+    '-ac', '2',
+    '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+    '-f', 'mp4',
+    'pipe:1'
+  );
+
+  const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+
+  ffmpeg.stderr.on('data', (data) => {
+    const msg = data.toString();
+    if (msg.includes('Error') && !msg.includes('broken pipe')) {
+      console.log("⚠️ FFmpeg Log:", msg.trim());
+    }
+  });
+
+  ffmpeg.stdout.pipe(res);
+
+  req.on('close', () => {
+    console.log("🛑 Client déconnecté, arrêt de FFmpeg.");
+    ffmpeg.kill('SIGKILL');
+  });
+});
+
+app.listen(3000, () => {
+  console.log('✅ Serveur Animflix optimisé prêt sur http://localhost:3000 !');
+});
