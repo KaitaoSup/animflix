@@ -9,7 +9,7 @@ const execPromise = promisify(exec);
 
 // --- CONFIGURATION ---
 const TORRSERVER_IP = "192.168.1.55"; 
-const TMDB_API_KEY = "3fdc6d0d7e26ee891af1f1ba1469a4e8"; 
+const TMDB_API_KEY = "TMDB_API_KEY"; // Remplacez par votre clé TMDB
 
 const parser = new Parser({
   customFields: {
@@ -65,10 +65,11 @@ app.get('/', (req, res) => {
       <div id="ffprobe-loader">
           <div class="spinner"></div>
           <p id="loader-text" style="font-size: 18px;">Analyse des sous-titres et préparation du flux... ⌛</p>
+          <a id="vlcLink" href="#" class="vlc-btn" onclick="copyToClipboard(this.href); return false;">🟠 Copier le lien brut pour VLC</a>
       </div>
 
       <div class="navbar">
-          <a href="/" class="logo">ANIMEFLIX</a>
+          <a href="/" class="logo">ANIMFLIX</a>
           <div class="search-box">
               <input type="text" id="searchInput" placeholder="Nom de l'anime..." onkeypress="if(event.key === 'Enter') searchNyaa()">
               <select id="searchType">
@@ -86,7 +87,6 @@ app.get('/', (req, res) => {
           <span class="close-btn" onclick="closePlayer()">&times;</span>
           <h2 id="now-playing" style="margin-bottom: 10px;"></h2>
           <video id="videoPlayer" controls autoplay></video>
-          <a id="vlcLink" href="#" class="vlc-btn" onclick="copyToClipboard(this.href); return false;">🟠 Copier le lien brut pour VLC</a>
       </div>
 
       <script>
