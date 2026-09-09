@@ -7,10 +7,15 @@
     <style>
         :root {
             --primary: #e50914;
+            --primary-hover: #b80710;
             --bg: #141414;
-            --card-bg: #1f1f1f;
+            --card-bg: #1e1e1e;
+            --card-border: #2e2e2e;
             --text: #ffffff;
             --text-muted: #aaaaaa;
+            --accent-cyan: #00e5ff;
+            --accent-green: #46d369;
+            --accent-gold: #ffc107;
         }
         * { box-sizing: border-box; }
         body { 
@@ -19,9 +24,12 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             margin: 0; 
             padding: 0; 
+            min-height: 100vh;
         }
+
+        /* BARRE DE NAVIGATION */
         .navbar { 
-            background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.7) 70%, transparent 100%); 
+            background: linear-gradient(180deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.75) 75%, transparent 100%); 
             padding: 18px 40px; 
             position: fixed; 
             top: 0; left: 0; right: 0; 
@@ -31,22 +39,25 @@
             justify-content: space-between; 
             gap: 20px; 
             flex-wrap: wrap;
-            backdrop-filter: blur(8px);
+            backdrop-filter: blur(10px);
         }
         .logo { 
             color: var(--primary); 
             font-size: 26px; 
             font-weight: 900; 
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
             text-decoration: none; 
+            cursor: pointer;
+            transition: transform 0.2s;
         }
+        .logo:hover { transform: scale(1.03); }
         .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .search-box { display: flex; gap: 8px; }
+        .search-box { display: flex; gap: 8px; flex-wrap: wrap; }
         input[type="text"], select { 
             padding: 10px 14px; 
             border-radius: 6px; 
             border: 1px solid #333; 
-            background: rgba(30, 30, 30, 0.9); 
+            background: rgba(30, 30, 30, 0.95); 
             color: white; 
             outline: none; 
             font-size: 14px;
@@ -64,29 +75,48 @@
             cursor: pointer; 
             transition: background 0.2s, transform 0.1s;
         }
-        button:hover { background: #b80710; }
+        button:hover { background: var(--primary-hover); }
         button:active { transform: scale(0.98); }
 
-        .container { padding: 110px 40px 40px; max-width: 1600px; margin: 0 auto; }
+        .btn-secondary {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 9px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-secondary:hover { background: #3a3a3a; border-color: #666; }
+
+        /* CONTENEUR PRINCIPAL */
+        .container { padding: 110px 40px 40px; max-width: 1500px; margin: 0 auto; }
+
+        /* --- VUE CATALOGUE / GRILLE DE CARTES --- */
         .grid { 
             display: grid; 
-            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); 
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); 
             gap: 24px; 
         }
         .card { 
             cursor: pointer; 
-            transition: transform 0.25s ease, box-shadow 0.25s ease; 
+            transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease, border-color 0.25s ease; 
             position: relative; 
-            border-radius: 10px; 
+            border-radius: 12px; 
             overflow: hidden; 
             background: var(--card-bg); 
-            border: 1px solid #2a2a2a; 
+            border: 1px solid var(--card-border); 
             display: flex;
             flex-direction: column;
         }
         .card:hover { 
             transform: translateY(-6px) scale(1.02); 
-            box-shadow: 0 12px 24px rgba(0,0,0,0.6);
+            box-shadow: 0 16px 32px rgba(0,0,0,0.7);
             border-color: var(--primary); 
         }
         .card-img-wrap {
@@ -94,51 +124,394 @@
             aspect-ratio: 2/3;
             background: #111;
             overflow: hidden;
+            position: relative;
         }
         .card img { 
             width: 100%; 
             height: 100%; 
             object-fit: cover; 
             display: block; 
-            transition: transform 0.3s;
+            transition: transform 0.35s ease;
         }
-        .card:hover img { transform: scale(1.04); }
-        .card-info { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; flex-grow: 1; }
+        .card:hover img { transform: scale(1.06); }
+
+        .card-overlay-hover {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.85) 100%);
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 16px;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+        .card:hover .card-overlay-hover { opacity: 1; }
+        .btn-play-hover {
+            background: var(--primary);
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(229, 9, 20, 0.5);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card-badges-top {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .badge-tag-mini {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #fff;
+        }
+        .badge-tag-audio {
+            color: var(--accent-green);
+            border-color: rgba(70, 211, 105, 0.35);
+        }
+
+        .card-info { 
+            padding: 14px 14px 12px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 8px; 
+            flex-grow: 1; 
+        }
         .card-title { 
-            font-weight: 600; 
-            font-size: 14px; 
-            line-height: 1.3;
+            font-weight: 700; 
+            font-size: 15px; 
+            line-height: 1.35;
+            color: #fff;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
-        .stats { color: var(--text-muted); font-size: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .seeders { color: #46d369; font-weight: bold; }
+
+        .card-ep-season {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+        .card-season-pill {
+            background: rgba(229, 9, 20, 0.15);
+            color: #ff5e68;
+            border: 1px solid rgba(229, 9, 20, 0.3);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+        .card-episode-pill {
+            background: rgba(0, 229, 255, 0.12);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+
+        .stats { 
+            color: var(--text-muted); 
+            font-size: 12px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-top: auto;
+            padding-top: 6px;
+            border-top: 1px solid #282828;
+        }
+        .seeders { color: var(--accent-green); font-weight: bold; }
         .badge-rating {
             background: rgba(255, 193, 7, 0.15);
-            color: #ffc107;
+            color: var(--accent-gold);
             padding: 2px 6px;
             border-radius: 4px;
             font-weight: bold;
             font-size: 11px;
         }
 
-        .spinner {
-            width: 50px; height: 50px; border: 5px solid #222;
-            border-top: 5px solid var(--primary); border-radius: 50%;
-            animation: spin 0.9s linear infinite; margin-bottom: 20px;
+        /* --- VUE PAGE DE DÉTAIL --- */
+        #detailView {
+            animation: fadeIn 0.25s ease-out;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* LECTEUR VIDÉO PLEIN ÉCRAN */
-        #player-container { 
-            position: fixed; inset: 0; background: #000; z-index: 200; 
-            display: none; flex-direction: column; align-items: center; justify-content: center; 
+        .detail-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+            gap: 12px;
         }
-        video { width: 90%; max-height: 74vh; border-radius: 8px; outline: none; background: #000; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
-        
-        /* STYLISATION HAUTE DÉFINITION DES SOUS-TITRES DIRECTS DANS LE SITE */
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #242424;
+            border: 1px solid #3d3d3d;
+            color: #ffffff;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-back:hover {
+            background: #333333;
+            border-color: var(--primary);
+            color: #ffffff;
+            transform: translateX(-3px);
+        }
+        .detail-breadcrumb {
+            font-size: 13px;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* HERO CARD DE DÉTAIL (JAQUETTE + INFOS) */
+        .detail-hero {
+            display: flex;
+            gap: 32px;
+            background: linear-gradient(135deg, #1d1d1d 0%, #171717 100%);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 32px;
+            box-shadow: 0 16px 36px rgba(0,0,0,0.55);
+            position: relative;
+            overflow: hidden;
+        }
+        .detail-hero::before {
+            content: "";
+            position: absolute;
+            top: 0; right: 0; width: 400px; height: 100%;
+            background: radial-gradient(circle at top right, rgba(229, 9, 20, 0.08), transparent 70%);
+            pointer-events: none;
+        }
+        @media (max-width: 900px) {
+            .detail-hero {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                padding: 20px;
+            }
+        }
+
+        /* JAQUETTE DE L'ANIME */
+        .detail-poster-wrap {
+            width: 230px;
+            min-width: 230px;
+            aspect-ratio: 2/3;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #0d0d0d;
+            box-shadow: 0 14px 30px rgba(0,0,0,0.85);
+            border: 1px solid #383838;
+            position: relative;
+        }
+        .detail-poster-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* INFORMATIONS DE L'ANIME */
+        .detail-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 2;
+        }
+        .detail-title {
+            font-size: 32px;
+            font-weight: 800;
+            margin: 0 0 16px 0;
+            line-height: 1.25;
+            color: #ffffff;
+            letter-spacing: -0.5px;
+        }
+        @media (max-width: 600px) {
+            .detail-title { font-size: 24px; }
+        }
+
+        .detail-badges-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        @media (max-width: 900px) {
+            .detail-badges-row { justify-content: center; }
+        }
+
+        .detail-badge {
+            padding: 7px 15px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            letter-spacing: 0.2px;
+        }
+        .badge-season {
+            background: rgba(229, 9, 20, 0.16);
+            color: #ff525d;
+            border: 1px solid rgba(229, 9, 20, 0.4);
+            box-shadow: 0 2px 8px rgba(229, 9, 20, 0.15);
+        }
+        .badge-episode {
+            background: rgba(0, 229, 255, 0.14);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(0, 229, 255, 0.4);
+            box-shadow: 0 2px 8px rgba(0, 229, 255, 0.15);
+        }
+        .badge-audio {
+            background: rgba(70, 211, 105, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(70, 211, 105, 0.35);
+        }
+        .badge-quality {
+            background: rgba(255, 255, 255, 0.08);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .badge-rating-detail {
+            background: rgba(255, 193, 7, 0.15);
+            color: var(--accent-gold);
+            border: 1px solid rgba(255, 193, 7, 0.35);
+        }
+
+        .detail-meta-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            font-size: 13px;
+            color: #bbb;
+            margin-bottom: 16px;
+            background: rgba(0,0,0,0.3);
+            padding: 12px 18px;
+            border-radius: 8px;
+            border: 1px solid #282828;
+            width: fit-content;
+        }
+        @media (max-width: 900px) {
+            .detail-meta-grid { width: 100%; justify-content: center; }
+        }
+
+        .detail-raw-title-box {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid #2d2d2d;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 22px;
+            word-break: break-all;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        .detail-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+        @media (max-width: 900px) {
+            .detail-actions { justify-content: center; }
+        }
+
+        .detail-mode-select-wrap {
+            display: inline-flex;
+            align-items: center;
+            background: #242424;
+            border: 1px solid #3c3c3c;
+            border-radius: 6px;
+            padding: 0 10px;
+        }
+        .detail-mode-select-wrap select {
+            border: none;
+            background: transparent;
+            padding: 9px 6px;
+            font-size: 13px;
+        }
+
+        /* --- SECTION DU LECTEUR MULTIMÉDIA (ENDROIT DÉDIÉ AU MEDIA PLAYER) --- */
+        .detail-player-section {
+            background: linear-gradient(180deg, #1a1a1a 0%, #151515 100%);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 14px 40px rgba(0,0,0,0.7);
+            margin-bottom: 40px;
+        }
+        .player-area-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+            border-bottom: 1px solid #282828;
+            padding-bottom: 12px;
+        }
+        .player-area-title {
+            font-size: 19px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #ffffff;
+        }
+
+        .player-video-wrapper {
+            position: relative;
+            width: 100%;
+            background: #000000;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #333333;
+            box-shadow: 0 12px 36px rgba(0,0,0,0.9);
+            aspect-ratio: 16 / 9;
+            max-height: 76vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .player-video-wrapper video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            background: #000000;
+            outline: none;
+        }
+
+        /* STYLISATION DES SOUS-TITRES DANS LE SITE */
         video::cue {
             background-color: rgba(0, 0, 0, 0.75) !important;
             color: #ffffff !important;
@@ -157,13 +530,23 @@
             video::cue { font-size: 1rem !important; }
         }
 
-        /* BOUTON & MENU DE PERSONNALISATION DU STYLE DES SOUS-TITRES */
-        .btn-sub-style {
-            padding: 4px 10px; font-size: 12px; background: #2f2f2f; border: 1px solid #444;
-            border-radius: 4px; margin: 0; color: #fff; cursor: pointer; display: inline-flex;
-            align-items: center; gap: 5px; transition: background 0.2s, border-color 0.2s;
+        .player-controls-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 14px;
+            flex-wrap: wrap;
+            gap: 12px;
+            position: relative;
         }
-        .btn-sub-style:hover { background: #3f3f3f; border-color: #666; }
+
+        .btn-sub-style {
+            padding: 5px 12px; font-size: 12px; background: #2a2a2a; border: 1px solid #444;
+            border-radius: 4px; margin: 0; color: #fff; cursor: pointer; display: inline-flex;
+            align-items: center; gap: 6px; transition: background 0.2s, border-color 0.2s;
+        }
+        .btn-sub-style:hover { background: #3a3a3a; border-color: #666; }
+
         .sub-style-popup {
             display: none; position: absolute; bottom: calc(100% + 12px); left: 0;
             background: #181818; border: 1px solid #383838; border-radius: 10px;
@@ -181,38 +564,40 @@
         }
         .sub-style-row select:focus { border-color: var(--primary); }
 
-        .player-header {
-            width: 90%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
-        }
-        .close-btn { font-size: 32px; cursor: pointer; color: #fff; line-height: 1; transition: color 0.2s; }
-        .close-btn:hover { color: var(--primary); }
         .vlc-btn { 
             color: #ffa033; text-decoration: none; font-weight: bold; 
-            cursor: pointer; border: 1px solid #ffa033; padding: 7px 14px; border-radius: 6px; 
+            cursor: pointer; border: 1px solid #ffa033; padding: 8px 14px; border-radius: 6px; 
             font-size: 13px; transition: background 0.2s, color 0.2s; display: inline-flex; align-items: center; gap: 6px;
         }
         .vlc-btn:hover { background: #ffa033; color: #000; }
 
+        .spinner {
+            width: 48px; height: 48px; border: 5px solid #222;
+            border-top: 5px solid var(--primary); border-radius: 50%;
+            animation: spin 0.9s linear infinite; margin-bottom: 16px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
         /* TOAST NOTIFICATION */
         #toast {
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: #333; color: white; padding: 12px 24px; border-radius: 6px;
-            font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 500;
+            background: #292929; border: 1px solid #444; color: white; padding: 12px 24px; border-radius: 8px;
+            font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.7); z-index: 500;
             display: none; animation: fadeIn 0.3s;
         }
         @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
         .empty-state { text-align: center; padding: 100px 20px; color: var(--text-muted); font-size: 16px; }
-        .shortcuts-hint { font-size: 11px; color: #777; margin-top: 8px; }
+        .shortcuts-hint { font-size: 12px; color: #777; margin-top: 12px; }
     </style>
 </head>
 <body>
   <div class="navbar">
-      <a href="/" class="logo">ANIMFLIX</a>
+      <a href="javascript:void(0)" onclick="closeDetailView()" class="logo" title="Retour au catalogue">ANIMFLIX</a>
       <div class="controls">
           <div class="search-box">
-              <input type="text" id="searchInput" placeholder="Nom de l'anime (ex: Frieren)..." onkeypress="if(event.key === 'Enter') searchNyaa()">
-              <select id="searchType" onchange="searchNyaa()">
+              <input type="text" id="searchInput" placeholder="Nom de l'anime (ex: Frieren)..." onkeypress="if(event.key === 'Enter') handleSearchClick()">
+              <select id="searchType" onchange="handleSearchClick()">
                   <option value="vostfr">VOSTFR</option>
                   <option value="vf">VF</option>
                   <option value="multisub">Multi-Sub</option>
@@ -222,151 +607,225 @@
                   <option value="direct" selected>⚡ Lecture Directe (0% CPU, Instantané)</option>
                   <option value="transcode">🔄 Transcodage H.264 (Compatibilité standard)</option>
               </select>
-              <button onclick="searchNyaa()">Chercher</button>
+              <button onclick="handleSearchClick()">Chercher</button>
           </div>
       </div>
   </div>
 
   <div class="container">
-      <div id="results" class="grid">
-          <div class="empty-state" style="grid-column: 1 / -1;">
-              Tapez le nom d'un anime ci-dessus pour lancer la recherche 🍿
-          </div>
-      </div>
-  </div>
-
-  <!-- LECTEUR INTÉGRÉ AVEC SOUS-TITRES DIRECTS ET OPTION VLC -->
-  <div id="player-container">
-      <div class="player-header">
-          <h2 id="now-playing" style="font-size: 18px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%;"></h2>
-          <span class="close-btn" onclick="closePlayer()" title="Fermer (Échap)">&times;</span>
-      </div>
-      
-      <div style="position: relative; width: 90%; display: flex; justify-content: center; align-items: center;">
-          <video id="videoPlayer" controls autoplay style="width: 100%; max-height: 72vh;"></video>
-          
-          <div id="player-status" style="position: absolute; background: rgba(0,0,0,0.85); padding: 25px 35px; border-radius: 10px; text-align: center; border: 1px solid #333; z-index: 10;">
-              <div class="spinner" style="margin: 0 auto 15px; width: 44px; height: 44px;"></div>
-              <div id="status-text" style="font-size: 15px; font-weight: 500;">Connexion au torrent & démarrage du lecteur... ⏳</div>
-          </div>
-      </div>
-
-      <!-- BARRE DE GESTION DES SOUS-TITRES & ACTIONS DU LECTEUR -->
-      <div style="width: 90%; display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: relative;">
-              <div style="display: flex; align-items: center; gap: 6px; background: #1f1f1f; padding: 5px 10px; border-radius: 6px; border: 1px solid #333;">
-                  <span style="font-size: 13px; color: #aaa;">💬 Sous-titres :</span>
-                  <select id="subSelect" onchange="onSubtitleChange(this.value)" style="padding: 4px 8px; font-size: 13px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; color: white;">
-                      <option value="-1">Recherche des pistes... ⏳</option>
-                  </select>
-                  <button id="toggleSubBtn" onclick="toggleSubtitles()" title="Raccourci : [C]" style="padding: 4px 10px; font-size: 12px; background: var(--primary); border-radius: 4px; margin: 0;">CC ON</button>
-                  <button id="subStyleBtn" class="btn-sub-style" onclick="toggleSubStyleMenu(event)" title="Personnaliser l'apparence des sous-titres [S]">
-                      🎨 Style
-                  </button>
+      <!-- VUE 1 : CATALOGUE & RÉSULTATS DE RECHERCHE -->
+      <div id="catalogView">
+          <div id="results" class="grid">
+              <div class="empty-state" style="grid-column: 1 / -1;">
+                  Tapez le nom d'un anime ci-dessus pour lancer la recherche 🍿
               </div>
-              <span id="sub-status" style="font-size: 12px; color: #46d369; font-weight: 500;"></span>
+          </div>
+      </div>
 
-              <!-- POPUP DE MODIFICATION DU STYLE DES SOUS-TITRES -->
-              <div id="subStyleMenu" class="sub-style-popup">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #2e2e2e; padding-bottom: 8px;">
-                      <span style="font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px;">
-                          🎨 Style des sous-titres
-                      </span>
-                      <span onclick="toggleSubStyleMenu(event)" style="cursor: pointer; font-size: 20px; color: #888; line-height: 1;" title="Fermer">&times;</span>
+      <!-- VUE 2 : PAGE DE DÉTAIL DE LA VIDÉO -->
+      <div id="detailView" style="display: none;">
+          <!-- Barre de navigation / Retour -->
+          <div class="detail-nav">
+              <button class="btn-back" onclick="closeDetailView()" title="Retour au catalogue (Échap)">
+                  <span style="font-size: 16px;">←</span> Retour aux résultats
+              </button>
+              <div id="detailBreadcrumb" class="detail-breadcrumb"></div>
+          </div>
+
+          <!-- Fiche d'information principale de l'Anime -->
+          <div class="detail-hero">
+              <!-- Jaquette de l'anime -->
+              <div class="detail-poster-wrap">
+                  <img id="detailPosterImg" src="" alt="Jaquette Anime" loading="eager">
+              </div>
+
+              <!-- Informations : Nom, Saison, Épisode, etc. -->
+              <div class="detail-info">
+                  <div>
+                      <h1 id="detailAnimeName" class="detail-title"></h1>
+                      
+                      <div class="detail-badges-row">
+                          <span id="detailSeasonBadge" class="detail-badge badge-season"></span>
+                          <span id="detailEpisodeBadge" class="detail-badge badge-episode"></span>
+                          <span id="detailAudioBadge" class="detail-badge badge-audio"></span>
+                          <span id="detailQualityBadge" class="detail-badge badge-quality"></span>
+                          <span id="detailRatingBadge" class="detail-badge badge-rating-detail"></span>
+                      </div>
+
+                      <div class="detail-meta-grid">
+                          <div>📦 <b>Taille :</b> <span id="detailSize"></span></div>
+                          <div>🌱 <b>Disponibilité :</b> <span id="detailSeeders" class="seeders"></span></div>
+                      </div>
+
+                      <div>
+                          <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #777; margin-bottom: 4px;">Fichier source :</div>
+                          <div id="detailRawTitle" class="detail-raw-title-box"></div>
+                      </div>
                   </div>
 
-                  <!-- APERÇU EN DIRECT -->
-                  <div style="background: #0d0d0d; border-radius: 6px; padding: 14px 10px; text-align: center; margin-bottom: 12px; border: 1px solid #282828; min-height: 54px; display: flex; flex-direction: column; justify-content: center; align-items: center; background-image: radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px); background-size: 10px 10px;">
-                      <div style="font-size: 10px; color: #777; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Aperçu en direct</div>
-                      <span id="sub-preview-box" style="display: inline-block; padding: 3px 10px; border-radius: 4px; transition: all 0.15s ease;">
-                          Sous-titre VOSTFR d'exemple
-                      </span>
-                  </div>
-
-                  <!-- TAILLE -->
-                  <div class="sub-style-row">
-                      <label for="subStyleSize">Taille :</label>
-                      <select id="subStyleSize" onchange="updateSubStyle()">
-                          <option value="1.0rem">Petite (80%)</option>
-                          <option value="1.3rem" selected>Normale (100%)</option>
-                          <option value="1.65rem">Grande (125%)</option>
-                          <option value="2.0rem">Très grande (150%)</option>
-                      </select>
-                  </div>
-
-                  <!-- COULEUR -->
-                  <div class="sub-style-row">
-                      <label for="subStyleColor">Couleur :</label>
-                      <select id="subStyleColor" onchange="updateSubStyle()">
-                          <option value="#ffffff" selected>⚪ Blanc pur</option>
-                          <option value="#ffeb3b">🟡 Jaune Anime (VOSTFR)</option>
-                          <option value="#00e5ff">🔵 Cyan éclatant</option>
-                          <option value="#69f0ae">🟢 Vert pastel</option>
-                          <option value="#ff80ab">🌸 Rose pastel</option>
-                      </select>
-                  </div>
-
-                  <!-- ARRIÈRE-PLAN -->
-                  <div class="sub-style-row">
-                      <label for="subStyleBg">Arrière-plan :</label>
-                      <select id="subStyleBg" onchange="updateSubStyle()">
-                          <option value="rgba(0, 0, 0, 0.75)" selected>Noir semi-transparent (Défaut)</option>
-                          <option value="rgba(0, 0, 0, 0.95)">Noir opaque</option>
-                          <option value="rgba(20, 20, 35, 0.85)">Bleu nuit semi-transparent</option>
-                          <option value="transparent">Transparent (Aucun fond)</option>
-                      </select>
-                  </div>
-
-                  <!-- EFFET / CONTOUR -->
-                  <div class="sub-style-row">
-                      <label for="subStyleShadow">Contour / Ombre :</label>
-                      <select id="subStyleShadow" onchange="updateSubStyle()">
-                          <option value="shadow" selected>Ombre portée marquée</option>
-                          <option value="outline">Contour net (Outline noir 360°)</option>
-                          <option value="light">Légère</option>
-                          <option value="none">Aucune</option>
-                      </select>
-                  </div>
-
-                  <!-- POLICE -->
-                  <div class="sub-style-row">
-                      <label for="subStyleFont">Police :</label>
-                      <select id="subStyleFont" onchange="updateSubStyle()">
-                          <option value='"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif' selected>Sans-Serif (Moderne)</option>
-                          <option value='Arial, Helvetica, sans-serif'>Arial (Standard)</option>
-                          <option value='"Trebuchet MS", sans-serif'>Trebuchet (Arrondi)</option>
-                          <option value='Impact, "Arial Black", sans-serif'>Impact (Gras)</option>
-                          <option value='"Courier New", monospace'>Monospace (Rétro)</option>
-                      </select>
-                  </div>
-
-                  <!-- DISPOSITION / LIGNES -->
-                  <div class="sub-style-row">
-                      <label for="subStyleLayout">Disposition :</label>
-                      <select id="subStyleLayout" onchange="updateSubStyle()">
-                          <option value="compact" selected>Optimisée (1 ligne max si possible)</option>
-                          <option value="original">Standard (Coupures d'origine)</option>
-                      </select>
-                  </div>
-
-                  <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #2e2e2e; padding-top: 10px; margin-top: 4px;">
-                      <button type="button" onclick="resetSubStyle()" style="background: transparent; border: 1px solid #555; color: #aaa; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s;">
-                          Réinitialiser
+                  <!-- Boutons d'action rapides -->
+                  <div class="detail-actions">
+                      <div class="detail-mode-select-wrap">
+                          <label for="detailStreamMode" style="font-size: 12px; color: #aaa; margin-right: 4px;">Mode :</label>
+                          <select id="detailStreamMode" onchange="onDetailStreamModeChange()">
+                              <option value="direct">⚡ Lecture Directe (0% CPU)</option>
+                              <option value="transcode">🔄 Transcodage H.264</option>
+                          </select>
+                      </div>
+                      <a id="detailVlcBtn" href="#" class="vlc-btn">
+                          🟠 Ouvrir dans VLC
+                      </a>
+                      <button id="detailMagnetBtn" class="btn-secondary" title="Copier le lien magnet P2P">
+                          🧲 Copier Magnet
                       </button>
-                      <button type="button" onclick="toggleSubStyleMenu(event)" style="background: var(--primary); border: none; color: white; padding: 5px 14px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer;">
-                          Fermer
+                      <button onclick="scrollToPlayer()" class="btn-secondary" style="background: #e50914; border-color: #e50914;">
+                          ▶️ Aller au lecteur
                       </button>
                   </div>
               </div>
           </div>
 
-          <div style="display: flex; gap: 12px; align-items: center;">
-              <a id="vlcLink" href="#" class="vlc-btn" onclick="copyVlcLink(this.href); return false;">
-                🟠 Ouvrir dans VLC (Option alternative)
-              </a>
+          <!-- ENDROIT OÙ LE MEDIA PLAYER SERA (ESPACE LECTEUR VIDÉO DÉDIÉ) -->
+          <div id="detailPlayerArea" class="detail-player-section">
+              <div class="player-area-header">
+                  <div class="player-area-title">
+                      <span style="color: var(--primary);">▶</span> Lecteur Multimédia Intégré
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                      <button onclick="togglePlayerFullscreen()" class="btn-sub-style" title="Plein écran [F]">
+                          ⛶ Plein écran
+                      </button>
+                  </div>
+              </div>
+
+              <!-- Écran vidéo -->
+              <div class="player-video-wrapper">
+                  <video id="videoPlayer" controls autoplay></video>
+                  
+                  <div id="player-status" style="position: absolute; background: rgba(12,12,12,0.92); backdrop-filter: blur(8px); padding: 25px 35px; border-radius: 12px; text-align: center; border: 1px solid #333; z-index: 10; max-width: 85%;">
+                      <div class="spinner" style="margin: 0 auto 15px; width: 44px; height: 44px;"></div>
+                      <div id="status-text" style="font-size: 15px; font-weight: 500;">Connexion à TorrServer & démarrage du lecteur... ⏳</div>
+                  </div>
+              </div>
+
+              <!-- Barre de contrôle des sous-titres et options -->
+              <div class="player-controls-bar">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: relative;">
+                      <div style="display: flex; align-items: center; gap: 6px; background: #1f1f1f; padding: 6px 12px; border-radius: 6px; border: 1px solid #333;">
+                          <span style="font-size: 13px; color: #aaa;">💬 Sous-titres :</span>
+                          <select id="subSelect" onchange="onSubtitleChange(this.value)" style="padding: 4px 8px; font-size: 13px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; color: white;">
+                              <option value="-1">Recherche des pistes... ⏳</option>
+                          </select>
+                          <button id="toggleSubBtn" onclick="toggleSubtitles()" title="Raccourci : [C]" style="padding: 4px 10px; font-size: 12px; background: var(--primary); border-radius: 4px; margin: 0;">CC ON</button>
+                          <button id="subStyleBtn" class="btn-sub-style" onclick="toggleSubStyleMenu(event)" title="Personnaliser l'apparence des sous-titres [S]">
+                              🎨 Style
+                          </button>
+                      </div>
+                      <span id="sub-status" style="font-size: 12px; color: #46d369; font-weight: 500;"></span>
+
+                      <!-- POPUP DE MODIFICATION DU STYLE DES SOUS-TITRES -->
+                      <div id="subStyleMenu" class="sub-style-popup">
+                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #2e2e2e; padding-bottom: 8px;">
+                              <span style="font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+                                  🎨 Style des sous-titres
+                              </span>
+                              <span onclick="toggleSubStyleMenu(event)" style="cursor: pointer; font-size: 20px; color: #888; line-height: 1;" title="Fermer">&times;</span>
+                          </div>
+
+                          <!-- APERÇU EN DIRECT -->
+                          <div style="background: #0d0d0d; border-radius: 6px; padding: 14px 10px; text-align: center; margin-bottom: 12px; border: 1px solid #282828; min-height: 54px; display: flex; flex-direction: column; justify-content: center; align-items: center; background-image: radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px); background-size: 10px 10px;">
+                              <div style="font-size: 10px; color: #777; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Aperçu en direct</div>
+                              <span id="sub-preview-box" style="display: inline-block; padding: 3px 10px; border-radius: 4px; transition: all 0.15s ease;">
+                                  Sous-titre VOSTFR d'exemple
+                              </span>
+                          </div>
+
+                          <!-- TAILLE -->
+                          <div class="sub-style-row">
+                              <label for="subStyleSize">Taille :</label>
+                              <select id="subStyleSize" onchange="updateSubStyle()">
+                                  <option value="1.0rem">Petite (80%)</option>
+                                  <option value="1.3rem" selected>Normale (100%)</option>
+                                  <option value="1.65rem">Grande (125%)</option>
+                                  <option value="2.0rem">Très grande (150%)</option>
+                              </select>
+                          </div>
+
+                          <!-- COULEUR -->
+                          <div class="sub-style-row">
+                              <label for="subStyleColor">Couleur :</label>
+                              <select id="subStyleColor" onchange="updateSubStyle()">
+                                  <option value="#ffffff" selected>⚪ Blanc pur</option>
+                                  <option value="#ffeb3b">🟡 Jaune Anime (VOSTFR)</option>
+                                  <option value="#00e5ff">🔵 Cyan éclatant</option>
+                                  <option value="#69f0ae">🟢 Vert pastel</option>
+                                  <option value="#ff80ab">🌸 Rose pastel</option>
+                              </select>
+                          </div>
+
+                          <!-- ARRIÈRE-PLAN -->
+                          <div class="sub-style-row">
+                              <label for="subStyleBg">Arrière-plan :</label>
+                              <select id="subStyleBg" onchange="updateSubStyle()">
+                                  <option value="rgba(0, 0, 0, 0.75)" selected>Noir semi-transparent (Défaut)</option>
+                                  <option value="rgba(0, 0, 0, 0.95)">Noir opaque</option>
+                                  <option value="rgba(20, 20, 35, 0.85)">Bleu nuit semi-transparent</option>
+                                  <option value="transparent">Transparent (Aucun fond)</option>
+                              </select>
+                          </div>
+
+                          <!-- EFFET / CONTOUR -->
+                          <div class="sub-style-row">
+                              <label for="subStyleShadow">Contour / Ombre :</label>
+                              <select id="subStyleShadow" onchange="updateSubStyle()">
+                                  <option value="shadow" selected>Ombre portée marquée</option>
+                                  <option value="outline">Contour net (Outline noir 360°)</option>
+                                  <option value="light">Légère</option>
+                                  <option value="none">Aucune</option>
+                              </select>
+                          </div>
+
+                          <!-- POLICE -->
+                          <div class="sub-style-row">
+                              <label for="subStyleFont">Police :</label>
+                              <select id="subStyleFont" onchange="updateSubStyle()">
+                                  <option value='"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif' selected>Sans-Serif (Moderne)</option>
+                                  <option value='Arial, Helvetica, sans-serif'>Arial (Standard)</option>
+                                  <option value='"Trebuchet MS", sans-serif'>Trebuchet (Arrondi)</option>
+                                  <option value='Impact, "Arial Black", sans-serif'>Impact (Gras)</option>
+                                  <option value='"Courier New", monospace'>Monospace (Rétro)</option>
+                              </select>
+                          </div>
+
+                          <!-- DISPOSITION / LIGNES -->
+                          <div class="sub-style-row">
+                              <label for="subStyleLayout">Disposition :</label>
+                              <select id="subStyleLayout" onchange="updateSubStyle()">
+                                  <option value="compact" selected>Optimisée (1 ligne max si possible)</option>
+                                  <option value="original">Standard (Coupures d'origine)</option>
+                              </select>
+                          </div>
+
+                          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #2e2e2e; padding-top: 10px; margin-top: 4px;">
+                              <button type="button" onclick="resetSubStyle()" style="background: transparent; border: 1px solid #555; color: #aaa; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s;">
+                                  Réinitialiser
+                              </button>
+                              <button type="button" onclick="toggleSubStyleMenu(event)" style="background: var(--primary); border: none; color: white; padding: 5px 14px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                                  Fermer
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div style="display: flex; gap: 10px; align-items: center;">
+                      <a id="vlcLink" href="#" class="vlc-btn" onclick="copyVlcLink(this.href); return false;">
+                          🟠 Ouvrir dans VLC (Secours)
+                      </a>
+                  </div>
+              </div>
+              <div class="shortcuts-hint">Raccourcis : [Espace] Pause | [C] Sous-titres | [S] Style | [F] Plein écran | [Échap] Retour catalogue | [← / →] -5s / +5s</div>
           </div>
       </div>
-      <div class="shortcuts-hint">Raccourcis : [Espace] Pause | [C] Sous-titres | [S] Style | [F] Plein écran | [Échap] Quitter | [← / →] -5s / +5s</div>
   </div>
 
   <div id="toast"></div>
@@ -377,195 +836,234 @@
     let currentActiveMagnet = null;
     let currentSubAbort = null;
     let currentTextTrack = null;
+    let currentAnimeItem = null;
 
-    // --- GESTION ET PERSONNALISATION DU STYLE DES SOUS-TITRES ---
-    const defaultSubStyle = {
-        size: '1.3rem',
-        color: '#ffffff',
-        bg: 'rgba(0, 0, 0, 0.75)',
-        shadow: 'shadow',
-        font: '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif',
-        layout: 'compact'
-    };
-
-    let currentSubStyle = { ...defaultSubStyle };
-
-    function cleanSubtitleLines(rawLines) {
-        if (!rawLines || rawLines.length === 0) return "";
-        if (currentSubStyle.layout === 'original' || rawLines.length === 1) {
-            return rawLines.join('\n').trim();
+    // --- ANALYSEUR LOCAL DE TITRE (FALLBACK & FORMATAGE) ---
+    function parseAnimeDetails(rawTitle) {
+        if (!rawTitle) {
+            return { animeName: 'Anime', season: 'Saison 1', episode: 'Épisode 1', resolution: '1080p Full HD', audioLang: 'VOSTFR' };
         }
+        let resolution = '1080p Full HD';
+        if (/2160p|4k\b/i.test(rawTitle)) resolution = '4K Ultra HD';
+        else if (/1080p/i.test(rawTitle)) resolution = '1080p Full HD';
+        else if (/720p/i.test(rawTitle)) resolution = '720p HD';
+        else if (/480p/i.test(rawTitle)) resolution = '480p SD';
 
-        const result = [];
-        for (let idx = 0; idx < rawLines.length; idx++) {
-            let line = rawLines[idx].trim();
-            if (!line) continue;
-            line = line.replace(/\\h/gi, ' ').replace(/\\N/g, ' ');
+        let audioLang = 'VOSTFR';
+        if (/multi/i.test(rawTitle)) audioLang = 'MULTI (VF / VOSTFR)';
+        else if (/\bvf\b/i.test(rawTitle)) audioLang = 'VF';
+        else if (/vostfr/i.test(rawTitle)) audioLang = 'VOSTFR';
+        else if (/vosta|sub\b/i.test(rawTitle)) audioLang = 'VOSTA';
 
-            if (result.length === 0) {
-                result.push(line);
-                continue;
-            }
-
-            const prev = result[result.length - 1];
-            const cleanPrev = prev.replace(/<[^>]*>/g, '').trim();
-            const cleanCurrent = line.replace(/<[^>]*>/g, '').trim();
-
-            const isDialogue = /^[-—–]/.test(cleanCurrent);
-            const prevIsDialogue = /^[-—–]/.test(cleanPrev);
-            const isMusic = /^[♪♫♩]/.test(cleanCurrent) || /[♪♫♩]$/.test(cleanPrev);
-
-            // Conserver le retour à la ligne pour dialogues distincts ou paroles musicales
-            if (isDialogue || (prevIsDialogue && !cleanPrev.endsWith(',')) || isMusic) {
-                result.push(line);
+        let season = null;
+        const sMultiMatch = rawTitle.match(/S(\d{1,2})\s*[-+&]\s*S?(\d{1,2})/i) || 
+                            rawTitle.match(/Saisons?\s*(\d{1,2})\s*[-+&]\s*(\d{1,2})/i);
+        if (sMultiMatch) {
+            const separator = /[-~]/.test(sMultiMatch[0]) ? ' à ' : ' & ';
+            season = `Saisons ${parseInt(sMultiMatch[1], 10)}${separator}${parseInt(sMultiMatch[2], 10)}`;
+        } else {
+            const seMatch = rawTitle.match(/\bS0*(\d{1,2})E\d+/i);
+            if (seMatch) {
+                season = `Saison ${parseInt(seMatch[1], 10)}`;
             } else {
-                // Pour une même phrase coupée artificiellement, fusionner si elle rentre sur l'écran
-                const combinedClean = cleanPrev + ' ' + cleanCurrent;
-                if (combinedClean.length <= 110) {
-                    result[result.length - 1] = prev + ' ' + line;
-                } else {
-                    result.push(line);
+                const sMatch = rawTitle.match(/\bS(?:aison|eason)?\s*0*(\d{1,2})(?=[^\w]|$)/i) ||
+                               rawTitle.match(/\b(\d{1,2})(?:st|nd|rd|th)\s+Season\b/i) ||
+                               rawTitle.match(/\bSeason\s*0*(\d{1,2})\b/i) ||
+                               rawTitle.match(/\bSaison\s*0*(\d{1,2})\b/i);
+                if (sMatch) {
+                    season = `Saison ${parseInt(sMatch[1], 10)}`;
                 }
             }
         }
-        return result.join('\n');
-    }
+        if (!season) season = 'Saison 1';
 
-    function loadSavedSubStyle() {
-        try {
-            const saved = localStorage.getItem('animflix_sub_style');
-            if (saved) {
-                currentSubStyle = Object.assign({}, defaultSubStyle, JSON.parse(saved));
-            }
-        } catch (e) {}
-
-        const sizeEl = document.getElementById('subStyleSize');
-        const colorEl = document.getElementById('subStyleColor');
-        const bgEl = document.getElementById('subStyleBg');
-        const shadowEl = document.getElementById('subStyleShadow');
-        const fontEl = document.getElementById('subStyleFont');
-        const layoutEl = document.getElementById('subStyleLayout');
-
-        if (sizeEl) sizeEl.value = currentSubStyle.size;
-        if (colorEl) colorEl.value = currentSubStyle.color;
-        if (bgEl) bgEl.value = currentSubStyle.bg;
-        if (shadowEl) shadowEl.value = currentSubStyle.shadow;
-        if (fontEl) fontEl.value = currentSubStyle.font;
-        if (layoutEl) layoutEl.value = currentSubStyle.layout || 'compact';
-
-        applySubStyle();
-    }
-
-    function updateSubStyle() {
-        const sizeEl = document.getElementById('subStyleSize');
-        const colorEl = document.getElementById('subStyleColor');
-        const bgEl = document.getElementById('subStyleBg');
-        const shadowEl = document.getElementById('subStyleShadow');
-        const fontEl = document.getElementById('subStyleFont');
-        const layoutEl = document.getElementById('subStyleLayout');
-
-        if (sizeEl) currentSubStyle.size = sizeEl.value;
-        if (colorEl) currentSubStyle.color = colorEl.value;
-        if (bgEl) currentSubStyle.bg = bgEl.value;
-        if (shadowEl) currentSubStyle.shadow = shadowEl.value;
-        if (fontEl) currentSubStyle.font = fontEl.value;
-        if (layoutEl) currentSubStyle.layout = layoutEl.value;
-
-        try {
-            localStorage.setItem('animflix_sub_style', JSON.stringify(currentSubStyle));
-        } catch (e) {}
-
-        applySubStyle();
-    }
-
-    function resetSubStyle() {
-        currentSubStyle = { ...defaultSubStyle };
-        try {
-            localStorage.removeItem('animflix_sub_style');
-        } catch (e) {}
-        loadSavedSubStyle();
-        showToast("Style des sous-titres réinitialisé");
-    }
-
-    function applySubStyle() {
-        let shadowCss = '0 2px 4px rgba(0, 0, 0, 0.95), 0 0 8px #000000';
-        if (currentSubStyle.shadow === 'outline') {
-            shadowCss = '-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 2px 5px rgba(0,0,0,0.95)';
-        } else if (currentSubStyle.shadow === 'light') {
-            shadowCss = '0 1px 2px rgba(0,0,0,0.8)';
-        } else if (currentSubStyle.shadow === 'none') {
-            shadowCss = 'none';
-        }
-
-        let styleEl = document.getElementById('dynamic-sub-style');
-        if (!styleEl) {
-            styleEl = document.createElement('style');
-            styleEl.id = 'dynamic-sub-style';
-            document.head.appendChild(styleEl);
-        }
-
-        styleEl.textContent = `
-            video::cue {
-                background-color: ${currentSubStyle.bg} !important;
-                color: ${currentSubStyle.color} !important;
-                font-family: ${currentSubStyle.font} !important;
-                font-size: ${currentSubStyle.size} !important;
-                font-weight: 600 !important;
-                line-height: 1.35 !important;
-                text-shadow: ${shadowCss} !important;
-                padding: 3px 10px !important;
-                border-radius: 4px !important;
-                white-space: pre-line !important;
-                max-width: 96% !important;
-                text-align: center !important;
-            }
-            @media (max-width: 768px) {
-                video::cue {
-                    font-size: calc(${currentSubStyle.size} * 0.8) !important;
+        let episode = null;
+        const epMultiMatch = rawTitle.match(/\b(?:E|EP|Episode|Épisode)\s*0*(\d{1,4})\s*[-~]\s*0*(\d{1,4})\b/i) ||
+                             rawTitle.match(/[-_]\s*0*(\d{1,4})\s*[-~]\s*0*(\d{1,4})\b/);
+        if (epMultiMatch) {
+            episode = `Épisodes ${parseInt(epMultiMatch[1], 10)}-${parseInt(epMultiMatch[2], 10)}`;
+        } else {
+            const seMatch = rawTitle.match(/S\d{1,2}\s*E0*(\d{1,4})\b/i);
+            if (seMatch) {
+                episode = `Épisode ${parseInt(seMatch[1], 10)}`;
+            } else {
+                const epMatch = rawTitle.match(/\b(?:E|EP|Episode|Épisode)\s*0*(\d{1,4})\b/i) ||
+                                rawTitle.match(/\s-\s0*(\d{1,4})(?:v\d+)?(?:\s|$|\[|\()/);
+                if (epMatch) {
+                    episode = `Épisode ${parseInt(epMatch[1], 10)}`;
                 }
             }
-        `;
+        }
 
-        const preview = document.getElementById('sub-preview-box');
-        if (preview) {
-            preview.style.backgroundColor = currentSubStyle.bg;
-            preview.style.color = currentSubStyle.color;
-            preview.style.fontFamily = currentSubStyle.font;
-            preview.style.fontSize = currentSubStyle.size;
-            preview.style.fontWeight = "600";
-            preview.style.textShadow = shadowCss;
-            if (currentSubStyle.layout === 'original') {
-                preview.innerHTML = "Sous-titre d'exemple<br>sur deux lignes";
+        if (!episode) {
+            if (/complete|intégrale|integrale|batch|s\d+[-+]s\d+/i.test(rawTitle)) {
+                episode = 'Intégrale / Pack';
+            } else if (/\bmovie\b|\bfilm\b/i.test(rawTitle)) {
+                episode = 'Film';
+            } else if (season && season !== 'Saison 1') {
+                episode = 'Saison Complète';
             } else {
-                preview.innerHTML = "Sous-titre VOSTFR d'exemple sur une seule ligne";
+                episode = 'Épisode 1';
             }
         }
+
+        let name = rawTitle.replace(/^\[.*?\]\s*/g, '');
+        const cutPattern = /(\bS\d+|\bSeason\s*\d+|\bSaison\s*\d+|\b\d+(?:st|nd|rd|th)\s+Season|\s-\s\d+|\bE\d{1,4}\b|\bEP\s*\d+|\bEpisode\s*\d+|\bÉpisode\s*\d+|\b1080p\b|\b720p\b|\b4k\b|\b2160p\b|\bVOSTFR\b|\bVF\b|\bMULTI\b)/i;
+        const matchCut = name.search(cutPattern);
+        if (matchCut > 2) {
+            name = name.substring(0, matchCut);
+        }
+        name = name
+            .replace(/\(.*?\)/g, ' ')
+            .replace(/\[.*?\]/g, ' ')
+            .replace(/[-_.~]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (!name || name.length < 2) {
+            name = 'Anime';
+        }
+
+        return { animeName: name, season, episode, resolution, audioLang };
     }
 
-    function toggleSubStyleMenu(e) {
-        if (e && e.stopPropagation) e.stopPropagation();
+    // --- NAVIGATION ET REDIRECTION VERS LA PAGE DE DÉTAIL ---
+    function openAnimeDetail(anime) {
+        currentAnimeItem = anime;
+
+        // Bascule des vues
+        document.getElementById('catalogView').style.display = 'none';
+        const detailView = document.getElementById('detailView');
+        detailView.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        // Mise à jour de l'historique d'URL
+        window.location.hash = 'detail';
+
+        // Extraction et assignation des métadonnées
+        const parsed = parseAnimeDetails(anime.titre);
+        const animeName = anime.animeName || parsed.animeName || anime.cleanTitle || 'Anime';
+        const season = anime.season || parsed.season || 'Saison 1';
+        const episode = anime.episode || parsed.episode || 'Épisode 1';
+        const resolution = anime.resolution || parsed.resolution || '1080p Full HD';
+        const audioLang = anime.audioLang || parsed.audioLang || 'VOSTFR';
+        const posterSrc = anime.poster || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(animeName);
+
+        // Mise à jour du fil d'Ariane
+        document.getElementById('detailBreadcrumb').innerText = `Animflix > ${animeName} > ${season} > ${episode}`;
+
+        // Remplissage des éléments de la page de détail
+        document.getElementById('detailAnimeName').innerText = animeName;
+        document.getElementById('detailSeasonBadge').innerText = '🏷️ ' + season;
+        document.getElementById('detailEpisodeBadge').innerText = '🎬 ' + episode;
+        document.getElementById('detailAudioBadge').innerText = '🎧 ' + audioLang;
+        document.getElementById('detailQualityBadge').innerText = '📺 ' + resolution;
+        document.getElementById('detailRatingBadge').innerText = '⭐ ' + (anime.rating || 'N/A') + ' / 10';
+        document.getElementById('detailSize').innerText = anime.taille || 'N/A';
+        document.getElementById('detailSeeders').innerText = (anime.seeders || 0) + ' seeders actifs';
+        document.getElementById('detailRawTitle').innerText = anime.titre;
+
+        const posterImg = document.getElementById('detailPosterImg');
+        posterImg.src = posterSrc;
+        posterImg.onerror = function() {
+            this.src = 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(animeName);
+        };
+
+        // Configuration des liens VLC et Magnet
+        const vlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(anime.lienMagnet) + "&index=1&play";
+        document.getElementById('detailVlcBtn').href = vlcUrl;
+        document.getElementById('detailVlcBtn').onclick = (e) => {
+            e.preventDefault();
+            copyVlcLink(vlcUrl);
+        };
+
+        document.getElementById('detailMagnetBtn').onclick = () => {
+            navigator.clipboard.writeText(anime.lienMagnet).then(() => {
+                showToast("🧲 Lien Magnet copié dans le presse-papier !");
+            });
+        };
+
+        // Synchronisation du mode de lecture de la fiche
+        const streamModeSelect = document.getElementById('detailStreamMode');
+        if (streamModeSelect) {
+            streamModeSelect.value = document.getElementById('streamMode').value || 'direct';
+        }
+
+        // Lancement immédiat de la vidéo dans l'espace media player
+        startStreamingInPlayer(anime.lienMagnet, anime.titre, vlcUrl);
+    }
+
+    function closeDetailView() {
+        if (streamTimeout) clearTimeout(streamTimeout);
+        if (currentSubAbort) currentSubAbort.abort();
+        
         const menu = document.getElementById('subStyleMenu');
-        if (!menu) return;
-        const isVisible = menu.style.display === 'block';
-        menu.style.display = isVisible ? 'none' : 'block';
-        if (!isVisible) {
-            applySubStyle();
+        if (menu) menu.style.display = 'none';
+
+        const video = document.getElementById('videoPlayer');
+        video.pause();
+        video.src = "";
+        for (let i = 0; i < video.textTracks.length; i++) {
+            video.textTracks[i].mode = 'disabled';
+        }
+        currentTextTrack = null;
+        currentActiveMagnet = null;
+        currentAnimeItem = null;
+
+        document.getElementById('detailView').style.display = 'none';
+        document.getElementById('catalogView').style.display = 'block';
+
+        if (window.location.hash === '#detail') {
+            history.replaceState(null, '', window.location.pathname + window.location.search);
         }
     }
 
-    function showToast(msg) {
-        const t = document.getElementById('toast');
-        t.innerText = msg;
-        t.style.display = 'block';
-        setTimeout(() => { t.style.display = 'none'; }, 3000);
+    function scrollToPlayer() {
+        const playerArea = document.getElementById('detailPlayerArea');
+        if (playerArea) {
+            playerArea.scrollIntoView({ behavior: 'smooth' });
+        }
     }
 
-    function copyVlcLink(url) {
-        navigator.clipboard.writeText(url).then(() => {
-            showToast("✅ Lien copié ! Ouvrez VLC > Média > Ouvrir un flux réseau (Ctrl+N)");
-        });
+    function togglePlayerFullscreen() {
+        const video = document.getElementById('videoPlayer');
+        if (!video) return;
+        if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+        } else {
+            video.requestFullscreen().catch(() => {});
+        }
     }
 
+    function onDetailStreamModeChange() {
+        if (!currentAnimeItem) return;
+        const newMode = document.getElementById('detailStreamMode').value;
+        document.getElementById('streamMode').value = newMode;
+        const vlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(currentAnimeItem.lienMagnet) + "&index=1&play";
+        startStreamingInPlayer(currentAnimeItem.lienMagnet, currentAnimeItem.titre, vlcUrl);
+        showToast("Mode de lecture mis à jour : " + (newMode === 'direct' ? '⚡ Direct' : '🔄 Transcodage'));
+    }
+
+    function handleSearchClick() {
+        // Si l'utilisateur est sur la page de détail, revenir au catalogue pour afficher les nouveaux résultats
+        const detailView = document.getElementById('detailView');
+        if (detailView && detailView.style.display === 'block') {
+            closeDetailView();
+        }
+        searchNyaa();
+    }
+
+    // Gestion du bouton précédent du navigateur
+    window.addEventListener('popstate', () => {
+        if (window.location.hash !== '#detail') {
+            const detailView = document.getElementById('detailView');
+            if (detailView && detailView.style.display === 'block') {
+                closeDetailView();
+            }
+        }
+    });
+
+    // --- RECHERCHE SUR NYAA ---
     async function searchNyaa() {
         const query = document.getElementById('searchInput').value.trim();
         const type = document.getElementById('searchType').value;
@@ -585,24 +1083,42 @@
 
             resultsDiv.innerHTML = '';
             torrents.forEach(t => {
+                const parsed = parseAnimeDetails(t.titre);
+                const animeName = t.animeName || parsed.animeName || t.cleanTitle || 'Anime';
+                const season = t.season || parsed.season || 'Saison 1';
+                const episode = t.episode || parsed.episode || 'Épisode 1';
+                const resolution = (t.resolution || parsed.resolution || '1080p').split(' ')[0];
+                const audioLang = t.audioLang || parsed.audioLang || 'VOSTFR';
+                const posterSrc = t.poster || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(animeName);
+                
                 const card = document.createElement('div');
                 card.className = 'card';
-                const vlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(t.lienMagnet) + "&index=1&play";
-                const posterSrc = t.poster || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(t.cleanTitle || 'Anime');
-                
                 card.innerHTML = `
                     <div class="card-img-wrap">
-                        <img src="${posterSrc}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                        <img src="${posterSrc}" loading="lazy" alt="${animeName}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                        <div class="card-overlay-hover">
+                            <span class="btn-play-hover">▶ Voir la fiche & Regarder</span>
+                        </div>
+                        <div class="card-badges-top">
+                            <span class="badge-tag-mini">${resolution}</span>
+                            <span class="badge-tag-mini badge-tag-audio">${audioLang.includes('MULTI') ? 'MULTI' : (audioLang.includes('VF') ? 'VF' : 'VOSTFR')}</span>
+                        </div>
                     </div>
                     <div class="card-info">
-                        <span class="card-title" title="${t.titre}">${t.titre}</span>
+                        <span class="card-title" title="${t.titre}">${animeName}</span>
+                        <div class="card-ep-season">
+                            <span class="card-season-pill">${season}</span>
+                            <span class="card-episode-pill">${episode}</span>
+                        </div>
                         <div class="stats">
-                            <span class="badge-rating">⭐ ${t.rating}</span>
+                            <span class="badge-rating">⭐ ${t.rating || 'N/A'}</span>
                             <span>${t.taille}</span>
                             <span class="seeders">🌱 ${t.seeders}</span>
                         </div>
                     </div>`;
-                card.onclick = () => startStreaming(t.lienMagnet, t.titre, vlcUrl, type);
+                
+                // Redirection vers la page de détail au clic
+                card.onclick = () => openAnimeDetail(t);
                 resultsDiv.appendChild(card);
             });
         } catch (err) { 
@@ -610,6 +1126,50 @@
         }
     }
 
+    // --- LECTEUR VIDÉO ET STREAMING ---
+    async function startStreamingInPlayer(magnet, titre, vlcUrl) {
+        currentActiveMagnet = magnet;
+        const streamMode = document.getElementById('detailStreamMode') ? document.getElementById('detailStreamMode').value : 'direct';
+        const type = document.getElementById('searchType').value || 'vostfr';
+        const video = document.getElementById('videoPlayer');
+        const playerStatus = document.getElementById('player-status');
+        const statusText = document.getElementById('status-text');
+
+        document.getElementById('vlcLink').href = vlcUrl;
+
+        playerStatus.style.display = 'block';
+        statusText.innerText = "Connexion à TorrServer & chargement du flux... ⏳";
+
+        const webUrl = '/play?magnet=' + encodeURIComponent(magnet) + '&mode=' + streamMode + '&type=' + type;
+        video.src = webUrl;
+
+        setupSubtitles(magnet, type);
+
+        video.onplaying = () => {
+            if (streamTimeout) clearTimeout(streamTimeout);
+            playerStatus.style.display = 'none';
+        };
+
+        video.oncanplay = () => {
+            if (streamTimeout) clearTimeout(streamTimeout);
+            playerStatus.style.display = 'none';
+            video.play().catch(() => {});
+        };
+
+        if (streamTimeout) clearTimeout(streamTimeout);
+        streamTimeout = setTimeout(() => {
+            if (playerStatus.style.display !== 'none') {
+                statusText.innerHTML = "⏳ Le flux torrent met du temps à démarrer...<br><span style='font-size:13px; color:#ffa033;'>Cliquez sur <b>Ouvrir dans VLC</b> ci-dessous pour une lecture immédiate et fluide !</span>";
+            }
+        }, 7000);
+
+        video.onerror = () => {
+            if (streamTimeout) clearTimeout(streamTimeout);
+            statusText.innerHTML = "⚠️ Le navigateur ne peut pas lire ce format directement.<br><span style='font-size:13px; color:#ffa033;'>Utilisez le bouton ci-dessous pour le regarder dans <b>VLC</b> !</span>";
+        };
+    }
+
+    // --- GESTION DES SOUS-TITRES DIRECTS WEBVTT ---
     function parseVttTime(str) {
         if (!str) return 0;
         const parts = str.trim().split(':');
@@ -801,64 +1361,190 @@
         }
     }
 
-    async function startStreaming(magnet, titre, vlcUrl, type) {
-        currentActiveMagnet = magnet;
-        const streamMode = document.getElementById('streamMode').value;
-        const playerContainer = document.getElementById('player-container');
-        const video = document.getElementById('videoPlayer');
-        const playerStatus = document.getElementById('player-status');
-        const statusText = document.getElementById('status-text');
+    // --- STYLE ET PERSONNALISATION DES SOUS-TITRES ---
+    const defaultSubStyle = {
+        size: '1.3rem',
+        color: '#ffffff',
+        bg: 'rgba(0, 0, 0, 0.75)',
+        shadow: 'shadow',
+        font: '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif',
+        layout: 'compact'
+    };
 
-        playerContainer.style.display = 'flex';
-        document.getElementById('now-playing').innerText = titre;
-        document.getElementById('vlcLink').href = vlcUrl;
+    let currentSubStyle = { ...defaultSubStyle };
 
-        playerStatus.style.display = 'block';
-        statusText.innerText = "Connexion à TorrServer & chargement du flux... ⏳";
+    function cleanSubtitleLines(rawLines) {
+        if (!rawLines || rawLines.length === 0) return "";
+        if (currentSubStyle.layout === 'original' || rawLines.length === 1) {
+            return rawLines.join('\n').trim();
+        }
 
-        const webUrl = '/play?magnet=' + encodeURIComponent(magnet) + '&mode=' + streamMode + '&type=' + type;
-        video.src = webUrl;
+        const result = [];
+        for (let idx = 0; idx < rawLines.length; idx++) {
+            let line = rawLines[idx].trim();
+            if (!line) continue;
+            line = line.replace(/\\h/gi, ' ').replace(/\\N/g, ' ');
 
-        setupSubtitles(magnet, type);
-
-        video.onplaying = () => {
-            if (streamTimeout) clearTimeout(streamTimeout);
-            playerStatus.style.display = 'none';
-        };
-
-        video.oncanplay = () => {
-            if (streamTimeout) clearTimeout(streamTimeout);
-            playerStatus.style.display = 'none';
-            video.play().catch(() => {});
-        };
-
-        if (streamTimeout) clearTimeout(streamTimeout);
-        streamTimeout = setTimeout(() => {
-            if (playerStatus.style.display !== 'none') {
-                statusText.innerHTML = "⏳ Le flux torrent met du temps à démarrer...<br><span style='font-size:13px; color:#ffa033;'>Cliquez sur <b>Ouvrir dans VLC</b> ci-dessous pour une lecture immédiate et fluide !</span>";
+            if (result.length === 0) {
+                result.push(line);
+                continue;
             }
-        }, 7000);
 
-        video.onerror = () => {
-            if (streamTimeout) clearTimeout(streamTimeout);
-            statusText.innerHTML = "⚠️ Le navigateur ne peut pas lire ce format directement.<br><span style='font-size:13px; color:#ffa033;'>Utilisez le bouton ci-dessous pour le regarder dans <b>VLC</b> !</span>";
-        };
+            const prev = result[result.length - 1];
+            const cleanPrev = prev.replace(/<[^>]*>/g, '').trim();
+            const cleanCurrent = line.replace(/<[^>]*>/g, '').trim();
+
+            const isDialogue = /^[-—–]/.test(cleanCurrent);
+            const prevIsDialogue = /^[-—–]/.test(cleanPrev);
+            const isMusic = /^[♪♫♩]/.test(cleanCurrent) || /[♪♫♩]$/.test(cleanPrev);
+
+            if (isDialogue || (prevIsDialogue && !cleanPrev.endsWith(',')) || isMusic) {
+                result.push(line);
+            } else {
+                const combinedClean = cleanPrev + ' ' + cleanCurrent;
+                if (combinedClean.length <= 110) {
+                    result[result.length - 1] = prev + ' ' + line;
+                } else {
+                    result.push(line);
+                }
+            }
+        }
+        return result.join('\n');
     }
 
-    function closePlayer() {
-        if (streamTimeout) clearTimeout(streamTimeout);
-        if (currentSubAbort) currentSubAbort.abort();
-        const menu = document.getElementById('subStyleMenu');
-        if (menu) menu.style.display = 'none';
-        document.getElementById('player-container').style.display = 'none';
-        const v = document.getElementById('videoPlayer');
-        v.pause(); 
-        v.src = "";
-        for (let i = 0; i < v.textTracks.length; i++) {
-            v.textTracks[i].mode = 'disabled';
+    function loadSavedSubStyle() {
+        try {
+            const saved = localStorage.getItem('animflix_sub_style');
+            if (saved) {
+                currentSubStyle = Object.assign({}, defaultSubStyle, JSON.parse(saved));
+            }
+        } catch (e) {}
+
+        const sizeEl = document.getElementById('subStyleSize');
+        const colorEl = document.getElementById('subStyleColor');
+        const bgEl = document.getElementById('subStyleBg');
+        const shadowEl = document.getElementById('subStyleShadow');
+        const fontEl = document.getElementById('subStyleFont');
+        const layoutEl = document.getElementById('subStyleLayout');
+
+        if (sizeEl) sizeEl.value = currentSubStyle.size;
+        if (colorEl) colorEl.value = currentSubStyle.color;
+        if (bgEl) bgEl.value = currentSubStyle.bg;
+        if (shadowEl) shadowEl.value = currentSubStyle.shadow;
+        if (fontEl) fontEl.value = currentSubStyle.font;
+        if (layoutEl) layoutEl.value = currentSubStyle.layout || 'compact';
+
+        applySubStyle();
+    }
+
+    function updateSubStyle() {
+        const sizeEl = document.getElementById('subStyleSize');
+        const colorEl = document.getElementById('subStyleColor');
+        const bgEl = document.getElementById('subStyleBg');
+        const shadowEl = document.getElementById('subStyleShadow');
+        const fontEl = document.getElementById('subStyleFont');
+        const layoutEl = document.getElementById('subStyleLayout');
+
+        if (sizeEl) currentSubStyle.size = sizeEl.value;
+        if (colorEl) currentSubStyle.color = colorEl.value;
+        if (bgEl) currentSubStyle.bg = bgEl.value;
+        if (shadowEl) currentSubStyle.shadow = shadowEl.value;
+        if (fontEl) currentSubStyle.font = fontEl.value;
+        if (layoutEl) currentSubStyle.layout = layoutEl.value;
+
+        try {
+            localStorage.setItem('animflix_sub_style', JSON.stringify(currentSubStyle));
+        } catch (e) {}
+
+        applySubStyle();
+    }
+
+    function resetSubStyle() {
+        currentSubStyle = { ...defaultSubStyle };
+        try {
+            localStorage.removeItem('animflix_sub_style');
+        } catch (e) {}
+        loadSavedSubStyle();
+        showToast("Style des sous-titres réinitialisé");
+    }
+
+    function applySubStyle() {
+        let shadowCss = '0 2px 4px rgba(0, 0, 0, 0.95), 0 0 8px #000000';
+        if (currentSubStyle.shadow === 'outline') {
+            shadowCss = '-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 2px 5px rgba(0,0,0,0.95)';
+        } else if (currentSubStyle.shadow === 'light') {
+            shadowCss = '0 1px 2px rgba(0,0,0,0.8)';
+        } else if (currentSubStyle.shadow === 'none') {
+            shadowCss = 'none';
         }
-        currentTextTrack = null;
-        currentActiveMagnet = null;
+
+        let styleEl = document.getElementById('dynamic-sub-style');
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'dynamic-sub-style';
+            document.head.appendChild(styleEl);
+        }
+
+        styleEl.textContent = `
+            video::cue {
+                background-color: ${currentSubStyle.bg} !important;
+                color: ${currentSubStyle.color} !important;
+                font-family: ${currentSubStyle.font} !important;
+                font-size: ${currentSubStyle.size} !important;
+                font-weight: 600 !important;
+                line-height: 1.35 !important;
+                text-shadow: ${shadowCss} !important;
+                padding: 3px 10px !important;
+                border-radius: 4px !important;
+                white-space: pre-line !important;
+                max-width: 96% !important;
+                text-align: center !important;
+            }
+            @media (max-width: 768px) {
+                video::cue {
+                    font-size: calc(${currentSubStyle.size} * 0.8) !important;
+                }
+            }
+        `;
+
+        const preview = document.getElementById('sub-preview-box');
+        if (preview) {
+            preview.style.backgroundColor = currentSubStyle.bg;
+            preview.style.color = currentSubStyle.color;
+            preview.style.fontFamily = currentSubStyle.font;
+            preview.style.fontSize = currentSubStyle.size;
+            preview.style.fontWeight = "600";
+            preview.style.textShadow = shadowCss;
+            if (currentSubStyle.layout === 'original') {
+                preview.innerHTML = "Sous-titre d'exemple<br>sur deux lignes";
+            } else {
+                preview.innerHTML = "Sous-titre VOSTFR d'exemple sur une seule ligne";
+            }
+        }
+    }
+
+    function toggleSubStyleMenu(e) {
+        if (e && e.stopPropagation) e.stopPropagation();
+        const menu = document.getElementById('subStyleMenu');
+        if (!menu) return;
+        const isVisible = menu.style.display === 'block';
+        menu.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+            applySubStyle();
+        }
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    function copyVlcLink(url) {
+        navigator.clipboard.writeText(url).then(() => {
+            showToast("✅ Lien copié ! Ouvrez VLC > Média > Ouvrir un flux réseau (Ctrl+N)");
+        });
     }
 
     // Fermeture du menu de style lors d'un clic en dehors
@@ -872,20 +1558,31 @@
         }
     });
 
+    // Gestion des raccourcis clavier
     window.addEventListener('keydown', (e) => {
-        const player = document.getElementById('player-container');
-        const isPlaying = player.style.display === 'flex';
-        if (!isPlaying) return;
+        const detailView = document.getElementById('detailView');
+        const isDetailActive = detailView && detailView.style.display === 'block';
 
-        const video = document.getElementById('videoPlayer');
         if (e.key === 'Escape') {
             const menu = document.getElementById('subStyleMenu');
             if (menu && menu.style.display === 'block') {
                 menu.style.display = 'none';
                 return;
             }
-            closePlayer();
-        } else if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+                return;
+            }
+            if (isDetailActive) {
+                closeDetailView();
+            }
+            return;
+        }
+
+        if (!isDetailActive) return;
+
+        const video = document.getElementById('videoPlayer');
+        if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
             e.preventDefault();
             video.paused ? video.play() : video.pause();
         } else if (e.key.toLowerCase() === 'c' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {

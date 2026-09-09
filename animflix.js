@@ -198,6 +198,107 @@ app.get('/api/search', async (req, res) => {
       return res.json([]);
     }
 
+// Analyse détaillée des métadonnées Anime (Nom, Saison, Épisode, Résolution, Audio)
+function parseAnimeDetails(rawTitle) {
+  if (!rawTitle) {
+    return {
+      animeName: 'Anime',
+      season: 'Saison 1',
+      episode: 'Épisode 1',
+      resolution: '1080p Full HD',
+      audioLang: 'VOSTFR'
+    };
+  }
+
+  // 1. Détection de la résolution
+  let resolution = '1080p Full HD';
+  if (/2160p|4k\b/i.test(rawTitle)) resolution = '4K Ultra HD';
+  else if (/1080p/i.test(rawTitle)) resolution = '1080p Full HD';
+  else if (/720p/i.test(rawTitle)) resolution = '720p HD';
+  else if (/480p/i.test(rawTitle)) resolution = '480p SD';
+
+  // 2. Détection de la langue / audio
+  let audioLang = 'VOSTFR';
+  if (/multi/i.test(rawTitle)) audioLang = 'MULTI (VF / VOSTFR)';
+  else if (/\bvf\b/i.test(rawTitle)) audioLang = 'VF';
+  else if (/vostfr/i.test(rawTitle)) audioLang = 'VOSTFR';
+  else if (/vosta|sub\b/i.test(rawTitle)) audioLang = 'VOSTA';
+
+  // 3. Détection de la Saison
+  let season = null;
+  const sMultiMatch = rawTitle.match(/S(\d{1,2})\s*[-+&]\s*S?(\d{1,2})/i) || 
+                      rawTitle.match(/Saisons?\s*(\d{1,2})\s*[-+&]\s*(\d{1,2})/i);
+  if (sMultiMatch) {
+    const separator = /[-~]/.test(sMultiMatch[0]) ? ' à ' : ' & ';
+    season = `Saisons ${parseInt(sMultiMatch[1], 10)}${separator}${parseInt(sMultiMatch[2], 10)}`;
+  } else {
+    const seMatch = rawTitle.match(/\bS0*(\d{1,2})E\d+/i);
+    if (seMatch) {
+      season = `Saison ${parseInt(seMatch[1], 10)}`;
+    } else {
+      const sMatch = rawTitle.match(/\bS(?:aison|eason)?\s*0*(\d{1,2})(?=[^\w]|$)/i) ||
+                     rawTitle.match(/\b(\d{1,2})(?:st|nd|rd|th)\s+Season\b/i) ||
+                     rawTitle.match(/\bSeason\s*0*(\d{1,2})\b/i) ||
+                     rawTitle.match(/\bSaison\s*0*(\d{1,2})\b/i);
+      if (sMatch) {
+        season = `Saison ${parseInt(sMatch[1], 10)}`;
+      }
+    }
+  }
+  if (!season) season = 'Saison 1';
+
+  // 4. Détection de l'Épisode
+  let episode = null;
+  const epMultiMatch = rawTitle.match(/\b(?:E|EP|Episode|Épisode)\s*0*(\d{1,4})\s*[-~]\s*0*(\d{1,4})\b/i) ||
+                       rawTitle.match(/[-_]\s*0*(\d{1,4})\s*[-~]\s*0*(\d{1,4})\b/);
+  if (epMultiMatch) {
+    episode = `Épisodes ${parseInt(epMultiMatch[1], 10)}-${parseInt(epMultiMatch[2], 10)}`;
+  } else {
+    const seMatch = rawTitle.match(/S\d{1,2}\s*E0*(\d{1,4})\b/i);
+    if (seMatch) {
+      episode = `Épisode ${parseInt(seMatch[1], 10)}`;
+    } else {
+      const epMatch = rawTitle.match(/\b(?:E|EP|Episode|Épisode)\s*0*(\d{1,4})\b/i) ||
+                      rawTitle.match(/\s-\s0*(\d{1,4})(?:v\d+)?(?:\s|$|\[|\()/);
+      if (epMatch) {
+        episode = `Épisode ${parseInt(epMatch[1], 10)}`;
+      }
+    }
+  }
+
+  if (!episode) {
+    if (/complete|intégrale|integrale|batch|s\d+[-+]s\d+/i.test(rawTitle)) {
+      episode = 'Intégrale / Pack';
+    } else if (/\bmovie\b|\bfilm\b/i.test(rawTitle)) {
+      episode = 'Film';
+    } else if (season && season !== 'Saison 1') {
+      episode = 'Saison Complète';
+    } else {
+      episode = 'Épisode 1';
+    }
+  }
+
+  // 5. Extraction du Nom de l'Anime
+  let name = rawTitle.replace(/^\[.*?\]\s*/g, '');
+  const cutPattern = /(\bS\d+|\bSeason\s*\d+|\bSaison\s*\d+|\b\d+(?:st|nd|rd|th)\s+Season|\s-\s\d+|\bE\d{1,4}\b|\bEP\s*\d+|\bEpisode\s*\d+|\bÉpisode\s*\d+|\b1080p\b|\b720p\b|\b4k\b|\b2160p\b|\bVOSTFR\b|\bVF\b|\bMULTI\b)/i;
+  const matchCut = name.search(cutPattern);
+  if (matchCut > 2) {
+    name = name.substring(0, matchCut);
+  }
+  name = name
+    .replace(/\(.*?\)/g, ' ')
+    .replace(/\[.*?\]/g, ' ')
+    .replace(/[-_.~]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!name || name.length < 2) {
+    name = cleanAnimeTitle(rawTitle) || 'Anime';
+  }
+
+  return { animeName: name, season, episode, resolution, audioLang };
+}
+
     // 1. Récupération prioritaire et ultra-rapide de l'affiche de la franchise
     const queryClean = cleanAnimeTitle(query) || query;
     const defaultMeta = await getAnimeMetadata(queryClean);
@@ -224,10 +325,11 @@ app.get('/api/search', async (req, res) => {
       }));
     }
 
-    // 3. Construction des résultats avec vrai lien magnet P2P direct
+    // 3. Construction des résultats avec métadonnées enrichies et lien magnet direct
     const videos = items.map(t => {
-      const clean = titleCleanMap.get(t.title);
-      const meta = metaLookup.get(clean) || defaultMeta || { poster: null, rating: "N/A" };
+      const details = parseAnimeDetails(t.title);
+      const clean = titleCleanMap.get(t.title) || details.animeName;
+      const meta = metaLookup.get(clean) || metaLookup.get(details.animeName) || defaultMeta || { poster: null, rating: "N/A" };
       const infoHash = t.infoHash || '';
       const magnetLink = infoHash 
         ? `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(t.title)}&tr=http%3A%2F%2Fnyaa.tracker.wf%3A7777%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce`
@@ -236,6 +338,11 @@ app.get('/api/search', async (req, res) => {
       return {
         titre: t.title,
         cleanTitle: clean,
+        animeName: details.animeName,
+        season: details.season,
+        episode: details.episode,
+        resolution: details.resolution,
+        audioLang: details.audioLang,
         lienMagnet: magnetLink,
         taille: t.size,
         seeders: parseInt(t.seeders, 10) || 0,
