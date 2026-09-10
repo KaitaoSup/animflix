@@ -15,7 +15,7 @@ const execPromise = promisify(exec);
 
 // --- CONFIGURATION ---
 const TORRSERVER_LOCAL_URL = "http://127.0.0.1:8090"; // Connexion interne ultra-rapide
-const TMDB_API_KEY = "TMDB API KEY"; // Optionnel : clé TMDB (Kitsu est utilisé en fallback automatique sans clé)
+const TMDB_API_KEY = "3fdc6d0d7e26ee891af1f1ba1469a4e8"; // Optionnel : clé TMDB (Kitsu est utilisé en fallback automatique sans clé)
 
 // Dossier de cache persistant pour les sous-titres WebVTT
 const SUB_CACHE_DIR = path.join(process.cwd(), 'cache', 'subtitles');
@@ -152,6 +152,8 @@ function escapeFfmpegPath(str) {
     .replace(/\]/g, '\\]');
 }
 
+app.use(express.json());
+
 app.use((req, res, next) => {
   if (req.path === '/' || req.path.endsWith('.html') || req.path.endsWith('.js')) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -162,6 +164,45 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(__dirname, { etag: false, maxAge: 0 }));
+
+// --- API ANILIST PROXY GRAPHQL ---
+app.post('/api/anilist/graphql', async (req, res) => {
+  const { query, variables } = req.body;
+  if (!query) return res.status(400).json({ error: "GraphQL query is required" });
+
+  const authHeader = req.headers.authorization;
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'User-Agent': 'Animflix/1.0'
+  };
+  if (authHeader) {
+    headers['Authorization'] = authHeader;
+  }
+
+  try {
+    const response = await axios.post('https://graphql.anilist.co', {
+      query,
+      variables
+    }, {
+      headers,
+      timeout: 12000
+    });
+    return res.status(response.status).json(response.data);
+  } catch (error) {
+    if (error.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    console.error("⚠️ AniList proxy error:", error.message);
+    return res.status(500).json({ error: "Erreur de communication avec AniList", details: error.message });
+  }
+});
+
+app.get('/api/anilist/config', (req, res) => {
+  res.json({
+    clientId: process.env.ANILIST_CLIENT_ID || null
+  });
+});
 
 app.get('/', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');

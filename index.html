@@ -19,6 +19,11 @@
             --accent-cyan: #00e5ff;
             --accent-green: #46d369;
             --accent-gold: #ffc107;
+            --anilist-blue: #02a9ff;
+            --anilist-blue-hover: #0098e6;
+            --anilist-dark: #0e1622;
+            --anilist-card: #152232;
+            --anilist-border: #1e334d;
         }
         * { box-sizing: border-box; }
         body { 
@@ -592,6 +597,389 @@
 
         .empty-state { text-align: center; padding: 100px 20px; color: var(--text-muted); font-size: 16px; }
         .shortcuts-hint { font-size: 12px; color: #777; margin-top: 12px; }
+
+        /* --- STYLES ANILIST TRACKING --- */
+        .btn-anilist-nav {
+            background: linear-gradient(135deg, #02a9ff 0%, #0072b0 100%);
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 9px 15px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(2, 169, 255, 0.35);
+            transition: all 0.2s ease;
+        }
+        .btn-anilist-nav:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(2, 169, 255, 0.5);
+            background: linear-gradient(135deg, #1ab3ff 0%, #0084cc 100%);
+        }
+        .anilist-user-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            background: #182330;
+            border: 1px solid #23374d;
+            border-radius: 24px;
+            padding: 4px 12px 4px 5px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .anilist-user-badge:hover {
+            background: #203144;
+            border-color: var(--anilist-blue);
+        }
+        .anilist-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1.5px solid var(--anilist-blue);
+            background: #000;
+        }
+        .anilist-username {
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+            max-width: 130px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .anilist-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            background: #152232;
+            border: 1px solid #22374e;
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.85);
+            z-index: 200;
+            width: 220px;
+            animation: fadeIn 0.15s ease-out;
+            cursor: default;
+        }
+        /* Pont invisible pour préserver le hover continu sans rupture */
+        .anilist-dropdown::before {
+            content: "";
+            position: absolute;
+            top: -10px;
+            left: 0;
+            right: 0;
+            height: 10px;
+        }
+        .anilist-user-badge:hover .anilist-dropdown,
+        .anilist-user-badge.active .anilist-dropdown {
+            display: block !important;
+        }
+        .anilist-dropdown a, .anilist-dropdown button {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            font-size: 13px;
+            border-radius: 6px;
+            color: #ddd;
+            text-decoration: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.15s;
+            box-sizing: border-box;
+        }
+        .anilist-dropdown a:hover, .anilist-dropdown button:hover {
+            background: rgba(2, 169, 255, 0.15);
+            color: #fff;
+        }
+
+        /* SECTION SUIVI ANILIST DANS LA FICHE DE L'ANIME */
+        .anilist-track-section {
+            background: linear-gradient(135deg, #111a26 0%, #0c141e 100%);
+            border: 1px solid var(--anilist-border);
+            border-radius: 14px;
+            padding: 20px 24px;
+            margin-bottom: 28px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+            position: relative;
+            overflow: hidden;
+        }
+        .anilist-track-section::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; bottom: 0; width: 4px;
+            background: linear-gradient(180deg, var(--anilist-blue), #0077b6);
+        }
+        .anilist-track-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            padding-bottom: 12px;
+        }
+        .anilist-track-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .anilist-track-actions-top {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .btn-anilist-link {
+            background: rgba(2, 169, 255, 0.12);
+            border: 1px solid rgba(2, 169, 255, 0.35);
+            color: var(--anilist-blue);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-anilist-link:hover {
+            background: rgba(2, 169, 255, 0.25);
+            border-color: var(--anilist-blue);
+        }
+        .anilist-track-body {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .anilist-progress-wrap {
+            flex: 1;
+            min-width: 280px;
+        }
+        .anilist-progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .anilist-progress-bar-bg {
+            width: 100%;
+            height: 10px;
+            background: #192738;
+            border-radius: 5px;
+            overflow: hidden;
+            border: 1px solid #23374d;
+        }
+        .anilist-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #02a9ff 0%, #00d2ff 100%);
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+        .anilist-stepper {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #162436;
+            border: 1px solid #243a54;
+            border-radius: 8px;
+            padding: 4px 6px;
+        }
+        .anilist-btn-step {
+            background: #1f334d;
+            border: 1px solid #2f4b70;
+            color: #fff;
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 15px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            padding: 0;
+        }
+        .anilist-btn-step:hover:not(:disabled) {
+            background: var(--anilist-blue);
+            border-color: var(--anilist-blue);
+            color: #fff;
+        }
+        .anilist-btn-step:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .anilist-badge-status {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .status-CURRENT { background: rgba(2, 169, 255, 0.15); color: #02a9ff; border: 1px solid rgba(2, 169, 255, 0.35); }
+        .status-COMPLETED { background: rgba(70, 211, 105, 0.15); color: #46d369; border: 1px solid rgba(70, 211, 105, 0.35); }
+        .status-PLANNING { background: rgba(255, 193, 7, 0.15); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.35); }
+        .status-PAUSED { background: rgba(255, 152, 0, 0.15); color: #ff9800; border: 1px solid rgba(255, 152, 0, 0.35); }
+        .status-DROPPED { background: rgba(229, 9, 20, 0.15); color: #ff525d; border: 1px solid rgba(229, 9, 20, 0.35); }
+        .status-NOT_IN_LIST { background: rgba(255, 255, 255, 0.08); color: #aaa; border: 1px solid rgba(255, 255, 255, 0.15); }
+
+        .btn-anilist-quick-ep {
+            background: #02a9ff;
+            color: #ffffff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 12px rgba(2, 169, 255, 0.3);
+        }
+        .btn-anilist-quick-ep:hover {
+            background: #0093de;
+            box-shadow: 0 6px 16px rgba(2, 169, 255, 0.45);
+        }
+        .btn-anilist-quick-ep.synced {
+            background: #144026;
+            color: #46d369;
+            border: 1px solid #46d369;
+            cursor: default;
+            box-shadow: none;
+        }
+
+        /* BOUTON DANS LE LECTEUR VIDÉO */
+        .btn-anilist-player {
+            background: #10263d;
+            border: 1px solid #02a9ff;
+            color: #02a9ff;
+            padding: 7px 13px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-anilist-player:hover {
+            background: #02a9ff;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(2, 169, 255, 0.4);
+        }
+        .btn-anilist-player.synced {
+            background: #133820;
+            border-color: #46d369;
+            color: #46d369;
+        }
+
+        /* MODALES ANILIST */
+        .anilist-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.82);
+            backdrop-filter: blur(6px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .anilist-modal-content {
+            background: #131a24;
+            border: 1px solid #203146;
+            border-radius: 14px;
+            width: 100%;
+            max-width: 520px;
+            padding: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.85);
+            animation: fadeIn 0.2s ease-out;
+            color: #fff;
+            position: relative;
+        }
+        .anilist-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #1f2e42;
+            padding-bottom: 12px;
+        }
+        .anilist-modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+        }
+        .anilist-modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .anilist-modal-close:hover { color: #fff; }
+        .anilist-auth-section {
+            background: #182230;
+            border: 1px solid #22344a;
+            border-radius: 10px;
+            padding: 16px;
+        }
+        .anilist-section-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+        .anilist-candidate-item {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: #16202c;
+            border: 1px solid #203042;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .anilist-candidate-item:hover {
+            background: #1e2c3d;
+            border-color: var(--anilist-blue);
+        }
+        .anilist-candidate-thumb {
+            width: 42px;
+            height: 60px;
+            border-radius: 4px;
+            object-fit: cover;
+            background: #000;
+        }
     </style>
 </head>
 <body>
@@ -612,6 +1000,8 @@
               </select>
               <button onclick="handleSearchClick()">Chercher</button>
           </div>
+          <!-- PROFIL / BOUTON CONNEXION ANILIST -->
+          <div id="anilistNavContainer"></div>
       </div>
   </div>
 
@@ -693,6 +1083,9 @@
                   </div>
               </div>
           </div>
+
+          <!-- SECTION DE SUIVI & SYNCHRONISATION ANILIST -->
+          <div id="detailAnilistSection" class="anilist-track-section"></div>
 
           <!-- ENDROIT OÙ LE MEDIA PLAYER SERA (ESPACE LECTEUR VIDÉO DÉDIÉ) -->
           <div id="detailPlayerArea" class="detail-player-section">
@@ -827,6 +1220,9 @@
                   </div>
 
                   <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                      <button id="playerTrackBtn" class="btn-anilist-player" onclick="trackCurrentPlayingEpisode()" title="Enregistrer le visionnage de cet épisode sur AniList">
+                          ⚡ Tracker sur AniList
+                      </button>
                       <a id="vlcLink" href="#" class="vlc-btn" target="_blank" title="Ouvrir le flux vidéo dans VLC">
                           🟠 Ouvrir dans VLC (Secours)
                       </a>
@@ -836,6 +1232,85 @@
                   </div>
               </div>
               <div class="shortcuts-hint">Raccourcis : [Espace] Pause | [C] Sous-titres | [S] Style | [F] Plein écran | [Échap] Retour catalogue | [← / →] -5s / +5s</div>
+          </div>
+      </div>
+  </div>
+
+  <!-- MODAL DE CONNEXION ANILIST -->
+  <div id="anilistAuthModal" class="anilist-modal-overlay" onclick="if(event.target === this) closeAnilistAuthModal()">
+      <div class="anilist-modal-content">
+          <div class="anilist-modal-header">
+              <div class="anilist-modal-title">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="vertical-align: middle;">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09h-2.82l.83-2.5h1.16l.83 2.5zm1.5-4.5h-4.32l2.16-6.5 2.16 6.5z" fill="#02a9ff"/>
+                  </svg>
+                  <span>Connexion à AniList</span>
+              </div>
+              <button class="anilist-modal-close" onclick="closeAnilistAuthModal()">&times;</button>
+          </div>
+          <div class="anilist-modal-body">
+              <p style="color: #bbb; font-size: 13.5px; margin-top: 0; line-height: 1.5;">
+                  Connectez votre compte AniList pour synchroniser automatiquement vos épisodes visionnés et suivre votre progression en temps réel.
+              </p>
+
+              <!-- OPTION 1: OAUTH CLIENT ID -->
+              <div class="anilist-auth-section">
+                  <div class="anilist-section-title">🚀 Option 1 : Connexion en 1 clic (OAuth)</div>
+                  <div style="font-size: 12.5px; color: #999; margin-bottom: 10px;">
+                      Entrez votre <b>Client ID</b> AniList :
+                  </div>
+                  <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                      <input type="text" id="anilistClientIdInput" placeholder="Ex: 24891" style="flex: 1;">
+                      <button onclick="loginWithAnilistOAuth()" style="background: var(--anilist-blue); white-space: nowrap;">
+                          Se connecter
+                      </button>
+                  </div>
+                  <details style="font-size: 12px; color: #888; background: #141c27; padding: 10px 12px; border-radius: 6px; border: 1px solid #1f2e42;">
+                      <summary style="cursor: pointer; color: var(--anilist-blue); font-weight: 600;">Comment obtenir votre Client ID gratuit (30s) ?</summary>
+                      <ol style="margin: 8px 0 4px 18px; padding: 0; line-height: 1.7;">
+                          <li>Rendez-vous sur <a href="https://anilist.co/settings/developer" target="_blank" style="color: #02a9ff; text-decoration: underline;">AniList > Paramètres > Developer</a></li>
+                          <li>Cliquez sur <b>Create New Client</b></li>
+                          <li>Nom : <code>Animflix</code></li>
+                          <li>Redirect URL : <code id="anilistRedirectUrlHint">http://localhost:3000</code></li>
+                          <li>Enregistrez et copiez le <b>Client ID</b> généré !</li>
+                      </ol>
+                  </details>
+              </div>
+
+              <!-- OPTION 2: JETON DIRECT (TOKEN) -->
+              <div class="anilist-auth-section" style="margin-top: 16px;">
+                  <div class="anilist-section-title">🔑 Option 2 : Jeton d'accès direct (Token)</div>
+                  <div style="font-size: 12.5px; color: #999; margin-bottom: 10px;">
+                      Vous possédez déjà un jeton d'accès AniList ? Collez-le directement :
+                  </div>
+                  <div style="display: flex; gap: 8px;">
+                      <input type="password" id="anilistTokenInput" placeholder="Collez votre access_token..." style="flex: 1;">
+                      <button onclick="saveAnilistTokenManual()" style="background: #253346; border: 1px solid #3c4f6b;">
+                          Valider
+                      </button>
+                  </div>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- MODAL DE RECHERCHE / ASSOCIATION ANILIST -->
+  <div id="anilistSearchModal" class="anilist-modal-overlay" onclick="if(event.target === this) closeAnilistSearchModal()">
+      <div class="anilist-modal-content" style="max-width: 600px;">
+          <div class="anilist-modal-header">
+              <div class="anilist-modal-title">
+                  <span>🔍 Associer cet anime sur AniList</span>
+              </div>
+              <button class="anilist-modal-close" onclick="closeAnilistSearchModal()">&times;</button>
+          </div>
+          <div class="anilist-modal-body">
+              <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+                  <input type="text" id="anilistSearchQueryInput" placeholder="Rechercher sur AniList (ex: Frieren)..." style="flex: 1;" onkeypress="if(event.key === 'Enter') searchAnilistCandidates()">
+                  <button onclick="searchAnilistCandidates()" style="background: var(--anilist-blue);">Rechercher</button>
+              </div>
+              <div id="anilistCandidatesList" style="max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                  <!-- Rempli dynamiquement -->
+              </div>
           </div>
       </div>
   </div>
@@ -1040,6 +1515,9 @@
             streamModeSelect.value = document.getElementById('streamMode').value || 'direct';
         }
 
+        // Synchronisation du suivi de progression AniList
+        syncAnilistForDetail(anime);
+
         // Lancement immédiat de la vidéo dans l'espace media player
         startStreamingInPlayer(anime.lienMagnet, anime.titre, vlcUrl);
     }
@@ -1060,6 +1538,8 @@
         currentTextTrack = null;
         currentActiveMagnet = null;
         currentAnimeItem = null;
+        currentAnilistMedia = null;
+        hasAutoTrackedCurrentEpisode = false;
 
         document.getElementById('detailView').style.display = 'none';
         document.getElementById('catalogView').style.display = 'block';
@@ -1180,6 +1660,8 @@
     // --- LECTEUR VIDÉO ET STREAMING ---
     async function startStreamingInPlayer(magnet, titre, vlcUrl) {
         currentActiveMagnet = magnet;
+        hasAutoTrackedCurrentEpisode = false;
+        updatePlayerTrackButton();
         const streamMode = document.getElementById('detailStreamMode') ? document.getElementById('detailStreamMode').value : 'direct';
         const type = document.getElementById('searchType').value || 'vostfr';
         const video = document.getElementById('videoPlayer');
@@ -1642,7 +2124,7 @@
         showToast("✅ Lien copié ! Ouvrez VLC > Média > Ouvrir un flux réseau (Ctrl+N)");
     }
 
-    // Fermeture du menu de style lors d'un clic en dehors
+    // Fermeture des menus lors d'un clic en dehors
     document.addEventListener('click', (e) => {
         const menu = document.getElementById('subStyleMenu');
         const btn = document.getElementById('subStyleBtn');
@@ -1651,10 +2133,21 @@
                 menu.style.display = 'none';
             }
         }
+
+        const anilistBadge = document.getElementById('anilistUserBadge');
+        if (anilistBadge && !anilistBadge.contains(e.target)) {
+            anilistBadge.classList.remove('active');
+        }
     });
 
     // Gestion des raccourcis clavier
     window.addEventListener('keydown', (e) => {
+        const anilistBadge = document.getElementById('anilistUserBadge');
+        if (e.key === 'Escape' && anilistBadge && anilistBadge.classList.contains('active')) {
+            anilistBadge.classList.remove('active');
+            return;
+        }
+
         const detailView = document.getElementById('detailView');
         const isDetailActive = detailView && detailView.style.display === 'block';
 
@@ -1699,9 +2192,662 @@
         }
     });
 
-    // Chargement immédiat du style au démarrage
+    // =========================================================================
+    // --- INTÉGRATION & SUIVI ANILIST API ---
+    // =========================================================================
+
+    let currentAnilistUser = null;
+    let currentAnilistMedia = null;
+    let currentDetectedEpisode = 1;
+    let hasAutoTrackedCurrentEpisode = false;
+
+    // Détection avancée du numéro d'épisode depuis le tag épisode ou le titre
+    function extractEpisodeNumber(episodeStr, titleStr) {
+        if (episodeStr) {
+            const m = episodeStr.match(/Épisode\s*0*(\d+)/i);
+            if (m) return parseInt(m[1], 10);
+            const mMulti = episodeStr.match(/Épisodes?\s*0*(\d+)\s*[-~]\s*0*(\d+)/i);
+            if (mMulti) return parseInt(mMulti[2], 10);
+        }
+        if (titleStr) {
+            const mSe = titleStr.match(/S\d{1,2}\s*E0*(\d{1,4})\b/i);
+            if (mSe) return parseInt(mSe[1], 10);
+            const mEp = titleStr.match(/\b(?:E|EP|Episode|Épisode)\s*0*(\d{1,4})\b/i) ||
+                        titleStr.match(/\s-\s0*(\d{1,4})(?:v\d+)?(?:\s|$|\[|\()/);
+            if (mEp) return parseInt(mEp[1], 10);
+        }
+        return 1;
+    }
+
+    // Appel GraphQL via proxy interne
+    async function callAnilistGraphQL(query, variables = {}) {
+        const token = localStorage.getItem('anilist_token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+        }
+        const res = await fetch('/api/anilist/graphql', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ query, variables })
+        });
+        const data = await res.json();
+        if (!res.ok || data.errors) {
+            const msg = data.errors?.[0]?.message || 'Erreur AniList';
+            throw new Error(msg);
+        }
+        return data.data;
+    }
+
+    // Initialisation session AniList
+    async function initAnilistSession() {
+        checkUrlForAnilistToken();
+        const token = localStorage.getItem('anilist_token');
+        renderAnilistNav();
+
+        // Récupérer éventuel Client ID pré-configuré par le serveur
+        fetch('/api/anilist/config')
+            .then(r => r.json())
+            .then(data => {
+                if (data && data.clientId && !localStorage.getItem('anilist_client_id')) {
+                    localStorage.setItem('anilist_client_id', data.clientId);
+                }
+            })
+            .catch(() => {});
+
+        if (!token) return;
+
+        try {
+            const query = `
+                query {
+                    Viewer {
+                        id
+                        name
+                        avatar { large medium }
+                        siteUrl
+                    }
+                }
+            `;
+            const data = await callAnilistGraphQL(query);
+            if (data && data.Viewer) {
+                currentAnilistUser = data.Viewer;
+                localStorage.setItem('anilist_user', JSON.stringify(currentAnilistUser));
+                renderAnilistNav();
+            }
+        } catch(err) {
+            console.warn("AniList session validation:", err.message);
+            if (err.message && (err.message.toLowerCase().includes('token') || err.message.toLowerCase().includes('auth'))) {
+                logoutAnilist(false);
+                showToast("⚠️ Votre session AniList a expiré.");
+            }
+        }
+    }
+
+    // Récupération automatique du token OAuth dans le hash de l'URL (#access_token=...)
+    function checkUrlForAnilistToken() {
+        const hash = window.location.hash;
+        if (hash && hash.includes('access_token=')) {
+            const params = new URLSearchParams(hash.substring(1));
+            const token = params.get('access_token');
+            if (token) {
+                localStorage.setItem('anilist_token', token);
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+                showToast("🎉 Connecté avec succès à AniList !");
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function toggleAnilistDropdown(e) {
+        if (e) e.stopPropagation();
+        const badge = document.getElementById('anilistUserBadge');
+        if (badge) {
+            badge.classList.toggle('active');
+        }
+    }
+
+    // Rendu du composant de profil ou connexion dans la barre de navigation
+    function renderAnilistNav() {
+        const container = document.getElementById('anilistNavContainer');
+        if (!container) return;
+
+        const token = localStorage.getItem('anilist_token');
+        if (token && currentAnilistUser) {
+            const avatarUrl = currentAnilistUser.avatar?.medium || currentAnilistUser.avatar?.large || 'https://anilist.co/img/icons/icon.svg';
+            container.innerHTML = `
+                <div id="anilistUserBadge" class="anilist-user-badge" onclick="toggleAnilistDropdown(event)" tabindex="0" title="Connecté à AniList : ${currentAnilistUser.name}">
+                    <img class="anilist-avatar" src="${avatarUrl}" alt="${currentAnilistUser.name}" onerror="this.src='https://anilist.co/img/icons/icon.svg'">
+                    <span class="anilist-username">${currentAnilistUser.name}</span>
+                    <span style="font-size: 10px; color: #888;">▼</span>
+                    <div class="anilist-dropdown" onclick="event.stopPropagation()">
+                        <div style="padding: 4px 10px 8px; border-bottom: 1px solid #23374d; margin-bottom: 6px;">
+                            <div style="font-size: 11px; color: #888;">Connecté en tant que</div>
+                            <div style="font-weight: bold; color: #fff;">${currentAnilistUser.name}</div>
+                        </div>
+                        <a href="${currentAnilistUser.siteUrl || 'https://anilist.co'}" target="_blank" rel="noopener">
+                            🔗 Profil AniList
+                        </a>
+                        <button onclick="logoutAnilist(true)">
+                            🚪 Se déconnecter
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <button class="btn-anilist-nav" onclick="openAnilistAuthModal()" title="Connecter votre compte AniList">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09h-2.82l.83-2.5h1.16l.83 2.5zm1.5-4.5h-4.32l2.16-6.5 2.16 6.5z"/>
+                    </svg>
+                    <span>Connexion AniList</span>
+                </button>
+            `;
+        }
+    }
+
+    // Gestion de la modale d'authentification
+    function openAnilistAuthModal() {
+        const modal = document.getElementById('anilistAuthModal');
+        if (!modal) return;
+        const clientIdInput = document.getElementById('anilistClientIdInput');
+        const redirectHint = document.getElementById('anilistRedirectUrlHint');
+        if (redirectHint) redirectHint.innerText = window.location.origin;
+        if (clientIdInput) {
+            clientIdInput.value = localStorage.getItem('anilist_client_id') || '';
+        }
+        modal.style.display = 'flex';
+    }
+
+    function closeAnilistAuthModal() {
+        const modal = document.getElementById('anilistAuthModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function loginWithAnilistOAuth() {
+        const clientId = document.getElementById('anilistClientIdInput').value.trim();
+        if (!clientId) {
+            showToast("⚠️ Veuillez entrer un Client ID AniList.");
+            return;
+        }
+        localStorage.setItem('anilist_client_id', clientId);
+        const oauthUrl = `https://anilist.co/api/v2/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token`;
+        window.location.href = oauthUrl;
+    }
+
+    async function saveAnilistTokenManual() {
+        const token = document.getElementById('anilistTokenInput').value.trim();
+        if (!token) {
+            showToast("⚠️ Veuillez renseigner un jeton d'accès.");
+            return;
+        }
+        localStorage.setItem('anilist_token', token);
+        showToast("Vérification du compte AniList... ⏳");
+        try {
+            const query = `query { Viewer { id name avatar { large medium } siteUrl } }`;
+            const data = await callAnilistGraphQL(query);
+            if (data && data.Viewer) {
+                currentAnilistUser = data.Viewer;
+                localStorage.setItem('anilist_user', JSON.stringify(currentAnilistUser));
+                closeAnilistAuthModal();
+                renderAnilistNav();
+                if (currentAnimeItem) syncAnilistForDetail(currentAnimeItem);
+                showToast(`🎉 Bienvenue ${currentAnilistUser.name} !`);
+            }
+        } catch(err) {
+            localStorage.removeItem('anilist_token');
+            showToast("❌ Jeton invalide : " + err.message);
+        }
+    }
+
+    function logoutAnilist(notify = true) {
+        localStorage.removeItem('anilist_token');
+        localStorage.removeItem('anilist_user');
+        currentAnilistUser = null;
+        currentAnilistMedia = null;
+        renderAnilistNav();
+        if (currentAnimeItem) renderAnilistDetailCard();
+        updatePlayerTrackButton();
+        if (notify) showToast("🚪 Vous êtes déconnecté d'AniList.");
+    }
+
+    // Synchronisation AniList pour la fiche détail
+    async function syncAnilistForDetail(anime) {
+        const container = document.getElementById('detailAnilistSection');
+        if (!container) return;
+
+        hasAutoTrackedCurrentEpisode = false;
+        currentAnilistMedia = null;
+
+        const parsed = parseAnimeDetails(anime.titre);
+        const animeName = anime.animeName || parsed.animeName || anime.cleanTitle || 'Anime';
+        currentDetectedEpisode = extractEpisodeNumber(anime.episode || parsed.episode, anime.titre);
+
+        renderAnilistDetailCard(true);
+
+        const token = localStorage.getItem('anilist_token');
+        if (!token) {
+            renderAnilistDetailCard();
+            updatePlayerTrackButton();
+            return;
+        }
+
+        try {
+            const customId = localStorage.getItem('anilist_map_' + animeName.toLowerCase());
+            let query, variables;
+            if (customId) {
+                query = `
+                    query ($id: Int) {
+                        Media(id: $id, type: ANIME) {
+                            id
+                            idMal
+                            title { romaji english native userPreferred }
+                            episodes
+                            status
+                            format
+                            siteUrl
+                            coverImage { large medium }
+                            mediaListEntry { id status progress score }
+                        }
+                    }
+                `;
+                variables = { id: parseInt(customId, 10) };
+            } else {
+                query = `
+                    query ($search: String) {
+                        Media(search: $search, type: ANIME) {
+                            id
+                            idMal
+                            title { romaji english native userPreferred }
+                            episodes
+                            status
+                            format
+                            siteUrl
+                            coverImage { large medium }
+                            mediaListEntry { id status progress score }
+                        }
+                    }
+                `;
+                variables = { search: animeName };
+            }
+
+            const data = await callAnilistGraphQL(query, variables);
+            currentAnilistMedia = data?.Media || null;
+            renderAnilistDetailCard();
+            updatePlayerTrackButton();
+        } catch (err) {
+            console.warn("Recherche AniList:", err.message);
+            renderAnilistDetailCard();
+            updatePlayerTrackButton();
+        }
+    }
+
+    // Affichage de la carte de tracking AniList
+    function renderAnilistDetailCard(isLoading = false) {
+        const container = document.getElementById('detailAnilistSection');
+        if (!container) return;
+
+        const token = localStorage.getItem('anilist_token');
+        if (!token) {
+            container.innerHTML = `
+                <div class="anilist-track-header">
+                    <div class="anilist-track-title-wrap">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="#02a9ff">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09h-2.82l.83-2.5h1.16l.83 2.5zm1.5-4.5h-4.32l2.16-6.5 2.16 6.5z"/>
+                        </svg>
+                        <span>Suivi de progression AniList</span>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+                    <div style="font-size: 13.5px; color: #bbb;">
+                        Connectez votre compte AniList pour synchroniser automatiquement vos épisodes visionnés.
+                    </div>
+                    <button class="btn-anilist-nav" onclick="openAnilistAuthModal()">
+                        🔗 Se connecter à AniList
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        if (isLoading) {
+            container.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 12px; color: #bbb; font-size: 13.5px;">
+                    <div class="spinner" style="width: 20px; height: 20px; border-width: 3px; margin: 0;"></div>
+                    <span>Synchronisation avec AniList en cours... ⏳</span>
+                </div>
+            `;
+            return;
+        }
+
+        if (!currentAnilistMedia) {
+            container.innerHTML = `
+                <div class="anilist-track-header">
+                    <div class="anilist-track-title-wrap">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="#02a9ff">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09h-2.82l.83-2.5h1.16l.83 2.5zm1.5-4.5h-4.32l2.16-6.5 2.16 6.5z"/>
+                        </svg>
+                        <span>Suivi AniList</span>
+                    </div>
+                    <div class="anilist-track-actions-top">
+                        <button class="btn-secondary" onclick="openAnilistSearchModal()" style="font-size: 12px; padding: 5px 10px;">
+                            🔍 Associer manuellement
+                        </button>
+                    </div>
+                </div>
+                <div style="font-size: 13px; color: #888;">
+                    Aucune correspondance trouvée automatiquement sur AniList. Cliquez sur <b>Associer manuellement</b> pour rechercher le titre exact.
+                </div>
+            `;
+            return;
+        }
+
+        const entry = currentAnilistMedia.mediaListEntry;
+        const currentProgress = entry ? (entry.progress || 0) : 0;
+        const totalEpisodes = currentAnilistMedia.episodes || null;
+        const progressPercent = totalEpisodes ? Math.min(100, Math.round((currentProgress / totalEpisodes) * 100)) : (currentProgress > 0 ? 50 : 0);
+        const mediaTitle = currentAnilistMedia.title?.userPreferred || currentAnilistMedia.title?.romaji || currentAnilistMedia.title?.english || 'Anime';
+        const status = entry ? entry.status : 'NOT_IN_LIST';
+
+        const statusLabels = {
+            'CURRENT': '📺 En cours',
+            'COMPLETED': '✅ Terminé',
+            'PLANNING': '📋 À voir',
+            'PAUSED': '⏸️ En pause',
+            'DROPPED': '❌ Abandonné',
+            'NOT_IN_LIST': '➕ Non listé'
+        };
+
+        const isCurrentEpWatched = currentProgress >= currentDetectedEpisode;
+
+        container.innerHTML = `
+            <div class="anilist-track-header">
+                <div class="anilist-track-title-wrap">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="#02a9ff">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09h-2.82l.83-2.5h1.16l.83 2.5zm1.5-4.5h-4.32l2.16-6.5 2.16 6.5z"/>
+                    </svg>
+                    <span>AniList :</span>
+                    <span style="color: #fff; font-weight: 600;">${mediaTitle}</span>
+                    <span class="anilist-badge-status status-${status}">${statusLabels[status] || status}</span>
+                </div>
+                <div class="anilist-track-actions-top">
+                    <a href="${currentAnilistMedia.siteUrl}" target="_blank" rel="noopener" class="btn-anilist-link">
+                        ↗ Ouvrir sur AniList
+                    </a>
+                    <button class="btn-secondary" onclick="openAnilistSearchModal()" style="font-size: 12px; padding: 5px 10px;" title="Associer à une autre fiche si besoin">
+                        🔍 Changer d'anime
+                    </button>
+                </div>
+            </div>
+
+            <div class="anilist-track-body">
+                <!-- BARRE DE PROGRESSION -->
+                <div class="anilist-progress-wrap">
+                    <div class="anilist-progress-header">
+                        <span>
+                            Progression : <b style="color: var(--anilist-blue); font-size: 16px;">Épisode ${currentProgress}</b> / ${totalEpisodes ? totalEpisodes : '?'}
+                        </span>
+                        <span style="color: #888; font-size: 12.5px;">${totalEpisodes ? progressPercent + '%' : ''}</span>
+                    </div>
+                    <div class="anilist-progress-bar-bg">
+                        <div class="anilist-progress-fill" style="width: ${progressPercent}%;"></div>
+                    </div>
+                </div>
+
+                <!-- ACTIONS RAPIDES DE TRACKING -->
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <div class="anilist-stepper">
+                        <button class="anilist-btn-step" onclick="changeAnilistProgress(-1)" ${currentProgress <= 0 ? 'disabled' : ''} title="Épisode précédent">-</button>
+                        <span style="font-weight: 700; font-size: 14px; min-width: 24px; text-align: center;">${currentProgress}</span>
+                        <button class="anilist-btn-step" onclick="changeAnilistProgress(1)" ${(totalEpisodes && currentProgress >= totalEpisodes) ? 'disabled' : ''} title="Épisode suivant">+</button>
+                    </div>
+
+                    <button onclick="setAnilistProgress(${currentDetectedEpisode})" class="btn-anilist-quick-ep ${isCurrentEpWatched ? 'synced' : ''}" title="Mettre à jour au numéro de l'épisode en cours">
+                        ${isCurrentEpWatched ? '✓ Épisode ' + currentDetectedEpisode + ' vu' : '✅ Marquer Ép. ' + currentDetectedEpisode + ' vu'}
+                    </button>
+
+                    <select onchange="changeAnilistStatus(this.value)" style="padding: 7px 10px; font-size: 12px; background: #182330; border: 1px solid #283e58; border-radius: 6px;">
+                        <option value="CURRENT" ${status === 'CURRENT' ? 'selected' : ''}>En cours</option>
+                        <option value="COMPLETED" ${status === 'COMPLETED' ? 'selected' : ''}>Terminé</option>
+                        <option value="PLANNING" ${status === 'PLANNING' ? 'selected' : ''}>À voir</option>
+                        <option value="PAUSED" ${status === 'PAUSED' ? 'selected' : ''}>En pause</option>
+                        <option value="DROPPED" ${status === 'DROPPED' ? 'selected' : ''}>Abandonné</option>
+                    </select>
+                </div>
+            </div>
+        `;
+    }
+
+    // Incrément / Décrément manuel
+    async function changeAnilistProgress(delta) {
+        if (!currentAnilistMedia) return;
+        const entry = currentAnilistMedia.mediaListEntry;
+        const cur = entry ? (entry.progress || 0) : 0;
+        const nextVal = Math.max(0, cur + delta);
+        await setAnilistProgress(nextVal);
+    }
+
+    // Définir la progression sur AniList
+    async function setAnilistProgress(targetProgress) {
+        if (!currentAnilistMedia) return;
+        const mediaId = currentAnilistMedia.id;
+        const total = currentAnilistMedia.episodes;
+        let newStatus = currentAnilistMedia.mediaListEntry?.status || 'CURRENT';
+        if (total && targetProgress >= total) {
+            newStatus = 'COMPLETED';
+        }
+
+        try {
+            const mutation = `
+                mutation ($mediaId: Int, $progress: Int, $status: MediaListStatus) {
+                    SaveMediaListEntry(mediaId: $mediaId, progress: $progress, status: $status) {
+                        id
+                        mediaId
+                        status
+                        progress
+                    }
+                }
+            `;
+            const data = await callAnilistGraphQL(mutation, {
+                mediaId,
+                progress: targetProgress,
+                status: newStatus
+            });
+
+            if (data?.SaveMediaListEntry) {
+                if (!currentAnilistMedia.mediaListEntry) {
+                    currentAnilistMedia.mediaListEntry = {};
+                }
+                currentAnilistMedia.mediaListEntry.progress = data.SaveMediaListEntry.progress;
+                currentAnilistMedia.mediaListEntry.status = data.SaveMediaListEntry.status;
+                renderAnilistDetailCard();
+                updatePlayerTrackButton();
+                showToast(`🎉 AniList synchronisé : Épisode ${targetProgress} enregistré !`);
+            }
+        } catch(err) {
+            showToast("⚠️ Échec mise à jour AniList : " + err.message);
+        }
+    }
+
+    // Changer le statut sur AniList
+    async function changeAnilistStatus(newStatus) {
+        if (!currentAnilistMedia) return;
+        const mediaId = currentAnilistMedia.id;
+        try {
+            const mutation = `
+                mutation ($mediaId: Int, $status: MediaListStatus) {
+                    SaveMediaListEntry(mediaId: $mediaId, status: $status) {
+                        id
+                        mediaId
+                        status
+                        progress
+                    }
+                }
+            `;
+            const data = await callAnilistGraphQL(mutation, { mediaId, status: newStatus });
+            if (data?.SaveMediaListEntry) {
+                if (!currentAnilistMedia.mediaListEntry) currentAnilistMedia.mediaListEntry = {};
+                currentAnilistMedia.mediaListEntry.status = data.SaveMediaListEntry.status;
+                renderAnilistDetailCard();
+                showToast(`✅ Statut AniList : ${newStatus}`);
+            }
+        } catch(err) {
+            showToast("⚠️ Échec mise à jour statut : " + err.message);
+        }
+    }
+
+    // Mise à jour du bouton de tracking dans le lecteur vidéo
+    function updatePlayerTrackButton() {
+        const btn = document.getElementById('playerTrackBtn');
+        if (!btn) return;
+        if (!currentAnilistMedia || !localStorage.getItem('anilist_token')) {
+            btn.style.display = 'none';
+            return;
+        }
+        btn.style.display = 'inline-flex';
+        const curWatched = currentAnilistMedia.mediaListEntry?.progress || 0;
+        if (curWatched >= currentDetectedEpisode) {
+            btn.innerText = `✓ Ép. ${currentDetectedEpisode} suivi sur AniList`;
+            btn.classList.add('synced');
+        } else {
+            btn.innerText = `⚡ Tracker Ép. ${currentDetectedEpisode} sur AniList`;
+            btn.classList.remove('synced');
+        }
+    }
+
+    // Action du bouton Tracker dans le lecteur vidéo
+    async function trackCurrentPlayingEpisode(isAuto = false) {
+        if (!currentAnilistMedia) {
+            showToast("⚠️ Aucun anime AniList associé.");
+            return;
+        }
+        const token = localStorage.getItem('anilist_token');
+        if (!token) {
+            openAnilistAuthModal();
+            return;
+        }
+        await setAnilistProgress(currentDetectedEpisode);
+        if (isAuto) {
+            showToast(`🎉 Progression automatique : Épisode ${currentDetectedEpisode} vu sur AniList !`);
+        }
+    }
+
+    // Écouteur automatique sur le lecteur vidéo (85% de visionnage ou fin de vidéo)
+    function setupVideoPlayerTracking() {
+        const video = document.getElementById('videoPlayer');
+        if (!video) return;
+
+        video.addEventListener('timeupdate', () => {
+            if (!hasAutoTrackedCurrentEpisode && currentAnilistMedia && localStorage.getItem('anilist_token')) {
+                if (video.duration && isFinite(video.duration) && video.duration > 60) {
+                    const percent = (video.currentTime / video.duration) * 100;
+                    if (percent >= 85) {
+                        hasAutoTrackedCurrentEpisode = true;
+                        trackCurrentPlayingEpisode(true);
+                    }
+                }
+            }
+        });
+
+        video.addEventListener('ended', () => {
+            if (!hasAutoTrackedCurrentEpisode && currentAnilistMedia && localStorage.getItem('anilist_token')) {
+                hasAutoTrackedCurrentEpisode = true;
+                trackCurrentPlayingEpisode(true);
+            }
+        });
+    }
+
+    // Recherche et association manuelle d'un anime AniList
+    function openAnilistSearchModal() {
+        const modal = document.getElementById('anilistSearchModal');
+        if (!modal) return;
+        const queryInput = document.getElementById('anilistSearchQueryInput');
+        if (currentAnimeItem) {
+            const parsed = parseAnimeDetails(currentAnimeItem.titre);
+            queryInput.value = currentAnimeItem.animeName || parsed.animeName || currentAnimeItem.cleanTitle || '';
+        }
+        modal.style.display = 'flex';
+        searchAnilistCandidates();
+    }
+
+    function closeAnilistSearchModal() {
+        const modal = document.getElementById('anilistSearchModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function searchAnilistCandidates() {
+        const query = document.getElementById('anilistSearchQueryInput').value.trim();
+        const list = document.getElementById('anilistCandidatesList');
+        if (!query) return;
+
+        list.innerHTML = '<div style="color: #888; font-size: 13px; text-align: center; padding: 20px;">Recherche sur AniList... ⏳</div>';
+
+        try {
+            const gql = `
+                query ($search: String) {
+                    Page(page: 1, perPage: 8) {
+                        media(search: $search, type: ANIME) {
+                            id
+                            title { romaji english native userPreferred }
+                            episodes
+                            format
+                            status
+                            coverImage { medium }
+                        }
+                    }
+                }
+            `;
+            const data = await callAnilistGraphQL(gql, { search: query });
+            const items = data?.Page?.media || [];
+            if (items.length === 0) {
+                list.innerHTML = '<div style="color: #888; font-size: 13px; text-align: center; padding: 20px;">Aucun résultat trouvé sur AniList.</div>';
+                return;
+            }
+
+            list.innerHTML = '';
+            items.forEach(it => {
+                const title = it.title?.userPreferred || it.title?.romaji || it.title?.english || 'Anime';
+                const itemEl = document.createElement('div');
+                itemEl.className = 'anilist-candidate-item';
+                itemEl.innerHTML = `
+                    <img class="anilist-candidate-thumb" src="${it.coverImage?.medium || ''}" alt="${title}">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 700; font-size: 14px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${title}</div>
+                        <div style="font-size: 12px; color: #888; margin-top: 3px;">
+                            ${it.format || 'TV'} • ${it.episodes ? it.episodes + ' épisodes' : 'Épisodes en cours'} • ${it.status}
+                        </div>
+                    </div>
+                    <button class="btn-anilist-quick-ep" style="padding: 6px 12px; font-size: 12px;">Associer</button>
+                `;
+                itemEl.onclick = () => selectAnilistCandidate(it);
+                list.appendChild(itemEl);
+            });
+        } catch(err) {
+            list.innerHTML = `<div style="color: #ff4444; font-size: 13px; text-align: center; padding: 20px;">Erreur : ${err.message}</div>`;
+        }
+    }
+
+    async function selectAnilistCandidate(candidate) {
+        if (!currentAnimeItem) return;
+        const parsed = parseAnimeDetails(currentAnimeItem.titre);
+        const animeName = currentAnimeItem.animeName || parsed.animeName || currentAnimeItem.cleanTitle || 'Anime';
+
+        localStorage.setItem('anilist_map_' + animeName.toLowerCase(), candidate.id);
+        closeAnilistSearchModal();
+        showToast(`✅ Associé à : ${candidate.title?.userPreferred || candidate.title?.romaji}`);
+        await syncAnilistForDetail(currentAnimeItem);
+    }
+
+    // Chargement immédiat du style et initialisation session AniList au démarrage
     loadSavedSubStyle();
-    window.addEventListener('DOMContentLoaded', loadSavedSubStyle);
+    initAnilistSession();
+    setupVideoPlayerTracking();
+
+    window.addEventListener('DOMContentLoaded', () => {
+        loadSavedSubStyle();
+        initAnilistSession();
+        setupVideoPlayerTracking();
+    });
   </script>
 </body>
 </html>

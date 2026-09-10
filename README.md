@@ -176,6 +176,15 @@ Si vous souhaitez simplement tester l'application dans votre terminal sans insta
 7. **Lecture VLC (Alternative)** :
    - Si vous préférez utiliser votre lecteur externe dédié (pour bénéficier des polices ou effets graphiques ASS exotiques), cliquez sur **🟠 Ouvrir dans VLC** (le lien réseau est automatiquement copié dans votre presse-papiers).
    - Dans VLC : `Média > Ouvrir un flux réseau (Ctrl+N)` et collez l'URL.
+8. **Synchronisation & Suivi AniList** :
+   - **Connexion en 1 clic (OAuth)** ou via un **jeton d'accès personnel** directement depuis la barre de navigation.
+   - **Suivi automatique** : dès que vous regardez au moins 85% d'un épisode (ou à la fin de la vidéo), Animflix met automatiquement à jour votre progression sur votre compte AniList !
+   - **Widget interactif dans la fiche de l'anime** :
+     - Statut en temps réel (*En cours*, *Terminé*, *À voir*, *En pause*, *Abandonné*).
+     - Barre de progression visuelle avec compteur d'épisodes et boutons pas à pas `[-]` / `[+]`.
+     - Bouton rapide pour marquer immédiatement l'épisode sélectionné comme vu.
+     - Bouton dans la barre de contrôle du lecteur : `⚡ Tracker sur AniList`.
+     - Outil d'association manuelle `🔍 Changer d'anime` si le titre Nyaa diffère de la fiche officielle AniList.
 
 ---
 
