@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Animflix 🍿</title>
     <style>
         :root {
@@ -672,11 +675,17 @@
                               <option value="transcode">🔄 Transcodage H.264</option>
                           </select>
                       </div>
-                      <a id="detailVlcBtn" href="#" class="vlc-btn">
+                      <a id="detailVlcBtn" href="#" class="vlc-btn" target="_blank" title="Lancer le flux dans VLC">
                           🟠 Ouvrir dans VLC
                       </a>
-                      <button id="detailMagnetBtn" class="btn-secondary" title="Copier le lien magnet P2P">
-                          🧲 Copier Magnet
+                      <button id="detailCopyVlcBtn" class="btn-secondary" title="Copier le lien réseau pour VLC">
+                          📋 Copier flux
+                      </button>
+                      <a id="detailMagnetBtn" href="#" class="btn-secondary" title="Ouvrir directement dans le client torrent">
+                          🧲 Ouvrir Magnet
+                      </a>
+                      <button id="detailCopyMagnetBtn" class="btn-secondary" title="Copier le lien magnet P2P">
+                          📋 Copier
                       </button>
                       <button onclick="scrollToPlayer()" class="btn-secondary" style="background: #e50914; border-color: #e50914;">
                           ▶️ Aller au lecteur
@@ -817,10 +826,13 @@
                       </div>
                   </div>
 
-                  <div style="display: flex; gap: 10px; align-items: center;">
-                      <a id="vlcLink" href="#" class="vlc-btn" onclick="copyVlcLink(this.href); return false;">
+                  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                      <a id="vlcLink" href="#" class="vlc-btn" target="_blank" title="Ouvrir le flux vidéo dans VLC">
                           🟠 Ouvrir dans VLC (Secours)
                       </a>
+                      <button id="playerCopyVlcBtn" class="btn-secondary" style="padding: 7px 12px; font-size: 12px;" title="Copier le lien du flux">
+                          📋 Copier lien
+                      </button>
                   </div>
               </div>
               <div class="shortcuts-hint">Raccourcis : [Espace] Pause | [C] Sous-titres | [S] Style | [F] Plein écran | [Échap] Retour catalogue | [← / →] -5s / +5s</div>
@@ -971,17 +983,56 @@
 
         // Configuration des liens VLC et Magnet
         const vlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(anime.lienMagnet) + "&index=1&play";
-        document.getElementById('detailVlcBtn').href = vlcUrl;
-        document.getElementById('detailVlcBtn').onclick = (e) => {
-            e.preventDefault();
-            copyVlcLink(vlcUrl);
-        };
+        
+        // 1. Bouton VLC principal
+        const detailVlcBtn = document.getElementById('detailVlcBtn');
+        if (detailVlcBtn) {
+            detailVlcBtn.href = vlcUrl;
+            detailVlcBtn.onclick = (e) => {
+                openInVlc(vlcUrl);
+            };
+        }
+        const detailCopyVlcBtn = document.getElementById('detailCopyVlcBtn');
+        if (detailCopyVlcBtn) {
+            detailCopyVlcBtn.onclick = (e) => {
+                if (e) e.preventDefault();
+                copyVlcLink(vlcUrl);
+            };
+        }
 
-        document.getElementById('detailMagnetBtn').onclick = () => {
-            navigator.clipboard.writeText(anime.lienMagnet).then(() => {
-                showToast("🧲 Lien Magnet copié dans le presse-papier !");
-            });
-        };
+        // 2. Bouton Magnet (vrai lien magnet: avec copie simultanée)
+        const detailMagnetBtn = document.getElementById('detailMagnetBtn');
+        if (detailMagnetBtn) {
+            detailMagnetBtn.href = anime.lienMagnet;
+            detailMagnetBtn.onclick = () => {
+                copyToClipboard(anime.lienMagnet);
+                showToast("🧲 Ouverture du torrent & lien copié !");
+            };
+        }
+        const detailCopyMagnetBtn = document.getElementById('detailCopyMagnetBtn');
+        if (detailCopyMagnetBtn) {
+            detailCopyMagnetBtn.onclick = (e) => {
+                if (e) e.preventDefault();
+                copyToClipboard(anime.lienMagnet);
+                showToast("📋 Lien Magnet copié dans le presse-papier !");
+            };
+        }
+
+        // 3. Boutons VLC du lecteur
+        const vlcLink = document.getElementById('vlcLink');
+        if (vlcLink) {
+            vlcLink.href = vlcUrl;
+            vlcLink.onclick = (e) => {
+                openInVlc(vlcUrl);
+            };
+        }
+        const playerCopyVlcBtn = document.getElementById('playerCopyVlcBtn');
+        if (playerCopyVlcBtn) {
+            playerCopyVlcBtn.onclick = (e) => {
+                if (e) e.preventDefault();
+                copyVlcLink(vlcUrl);
+            };
+        }
 
         // Synchronisation du mode de lecture de la fiche
         const streamModeSelect = document.getElementById('detailStreamMode');
@@ -1134,9 +1185,6 @@
         const video = document.getElementById('videoPlayer');
         const playerStatus = document.getElementById('player-status');
         const statusText = document.getElementById('status-text');
-
-        document.getElementById('vlcLink').href = vlcUrl;
-
         playerStatus.style.display = 'block';
         statusText.innerText = "Connexion à TorrServer & chargement du flux... ⏳";
 
@@ -1541,10 +1589,57 @@
         setTimeout(() => { t.style.display = 'none'; }, 3000);
     }
 
+    function copyToClipboard(text) {
+        if (!text) return false;
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                navigator.clipboard.writeText(text).catch(() => fallbackCopyText(text));
+                return true;
+            } catch (e) {
+                return fallbackCopyText(text);
+            }
+        }
+        return fallbackCopyText(text);
+    }
+
+    function fallbackCopyText(text) {
+        try {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            textArea.setAttribute("readonly", "");
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            const successful = document.execCommand('copy');
+            textArea.remove();
+            return successful;
+        } catch (err) {
+            console.warn("Échec copie fallback:", err);
+            return false;
+        }
+    }
+
+    function openInVlc(vlcUrl) {
+        copyToClipboard(vlcUrl);
+        showToast("🟠 Lancement de VLC... (Lien copié dans le presse-papier !)");
+        try {
+            const a = document.createElement('a');
+            a.href = "vlc://" + vlcUrl;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => a.remove(), 1000);
+        } catch(err) {
+            console.warn("Erreur protocole vlc://", err);
+        }
+    }
+
     function copyVlcLink(url) {
-        navigator.clipboard.writeText(url).then(() => {
-            showToast("✅ Lien copié ! Ouvrez VLC > Média > Ouvrir un flux réseau (Ctrl+N)");
-        });
+        copyToClipboard(url);
+        showToast("✅ Lien copié ! Ouvrez VLC > Média > Ouvrir un flux réseau (Ctrl+N)");
     }
 
     // Fermeture du menu de style lors d'un clic en dehors
