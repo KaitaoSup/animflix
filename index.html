@@ -980,11 +980,296 @@
             object-fit: cover;
             background: #000;
         }
+
+        /* --- ACCUEIL : ANIMES EN COURS (ANILIST) --- */
+        .home-watching-section {
+            margin-bottom: 30px;
+            animation: fadeIn 0.3s ease-out;
+        }
+        .home-watching-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #242424;
+        }
+        .home-watching-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .home-watching-title {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 800;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: 0.3px;
+        }
+        .home-watching-badge {
+            background: rgba(2, 169, 255, 0.15);
+            color: var(--anilist-blue);
+            border: 1px solid rgba(2, 169, 255, 0.35);
+            font-size: 12px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 12px;
+        }
+        .home-watching-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .btn-refresh-watching {
+            background: #182330;
+            border: 1px solid #23374d;
+            color: #d0def0;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            transition: all 0.2s;
+        }
+        .btn-refresh-watching:hover {
+            background: #22354c;
+            border-color: var(--anilist-blue);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+        .card-watching {
+            cursor: pointer;
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+        .card-watching:hover {
+            transform: translateY(-5px);
+            border-color: rgba(2, 169, 255, 0.5);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 16px rgba(2, 169, 255, 0.2);
+        }
+        .card-watching-progress-bar-wrap {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 3;
+        }
+        .card-watching-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--anilist-blue), #00e5ff);
+            box-shadow: 0 0 8px rgba(2, 169, 255, 0.7);
+            border-radius: 0 3px 3px 0;
+        }
+        .card-watching-meta {
+            font-size: 12.5px;
+            color: #aaa;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .card-ep-progress-text {
+            color: #ddd;
+            font-size: 12px;
+        }
+        .card-ep-progress-text b {
+            color: #fff;
+        }
+        .card-next-ep-btn-pill {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: linear-gradient(135deg, rgba(229, 9, 20, 0.2), rgba(2, 169, 255, 0.2));
+            border: 1px solid rgba(2, 169, 255, 0.4);
+            color: #fff;
+            padding: 7px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin-top: auto;
+            transition: all 0.2s;
+        }
+        .card-watching:hover .card-next-ep-btn-pill {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(229, 9, 20, 0.5);
+        }
+        .badge-tag-airing-timer {
+            background: rgba(255, 153, 0, 0.25) !important;
+            border-color: rgba(255, 153, 0, 0.55) !important;
+            color: #ffb84d !important;
+            font-weight: 800 !important;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            animation: pulseGlow 2s infinite ease-in-out;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.72; }
+        }
+        .card-next-ep-pill-airing {
+            background: linear-gradient(135deg, rgba(255, 153, 0, 0.18), rgba(229, 9, 20, 0.15)) !important;
+            border: 1px solid rgba(255, 153, 0, 0.45) !important;
+            color: #ffc266 !important;
+        }
+        .card-watching:hover .card-next-ep-pill-airing {
+            background: linear-gradient(135deg, #e67300, #cc3300) !important;
+            border-color: #ff9900 !important;
+            color: #fff !important;
+            box-shadow: 0 4px 12px rgba(255, 153, 0, 0.4) !important;
+        }
+        .home-watching-error {
+            background: #1c1515;
+            border: 1px solid #4a2323;
+            border-radius: 12px;
+            padding: 30px 20px;
+            text-align: center;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        .anilist-home-connect-promo {
+            background: linear-gradient(135deg, #101924 0%, #152438 100%);
+            border: 1px solid var(--anilist-border);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 620px;
+            margin: 25px auto 0;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+        .anilist-home-connect-icon {
+            width: 46px;
+            height: 46px;
+            margin-bottom: 12px;
+        }
+        .anilist-home-connect-promo h3 {
+            margin: 0 0 8px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+        }
+        .anilist-home-connect-promo p {
+            margin: 0 0 18px;
+            font-size: 13.5px;
+            color: #a0aec0;
+            line-height: 1.55;
+        }
+        /* --- BANNIÈRE DE CIBLAGE PROCHAIN ÉPISODE --- */
+        .next-ep-target-banner {
+            background: linear-gradient(135deg, #101a26 0%, #162436 100%);
+            border: 1px solid var(--anilist-border);
+            border-left: 4px solid var(--anilist-blue);
+            border-radius: 10px;
+            padding: 14px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 14px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+            animation: fadeIn 0.25s ease-out;
+        }
+        .next-ep-banner-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .btn-back-watching {
+            background: #1a2738;
+            border: 1px solid #2d425f;
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-back-watching:hover {
+            background: #243850;
+            border-color: var(--anilist-blue);
+        }
+        .next-ep-banner-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .next-ep-banner-anime {
+            font-size: 17px;
+            font-weight: 800;
+            color: #fff;
+        }
+        .next-ep-banner-subtitle {
+            font-size: 13.5px;
+            color: #aaa;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .next-ep-badge-highlight {
+            background: rgba(70, 211, 105, 0.2);
+            border: 1px solid rgba(70, 211, 105, 0.5);
+            color: #5eff88;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12.5px;
+        }
+        .btn-play-target-direct {
+            background: linear-gradient(135deg, var(--primary) 0%, #ff2a3b 100%);
+            color: white;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 13.5px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 14px rgba(229, 9, 20, 0.45);
+            transition: transform 0.15s, box-shadow 0.2s;
+        }
+        .btn-play-target-direct:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(229, 9, 20, 0.65);
+        }
+        .card-target-highlight {
+            border: 2px solid var(--accent-green) !important;
+            box-shadow: 0 0 18px rgba(70, 211, 105, 0.35) !important;
+        }
+        .badge-target-direct-match {
+            background: rgba(70, 211, 105, 0.9) !important;
+            color: #000 !important;
+            font-weight: 800 !important;
+            border-color: #5eff88 !important;
+        }
+        .badge-target-pack-match {
+            background: rgba(0, 229, 255, 0.85) !important;
+            color: #000 !important;
+            font-weight: 800 !important;
+        }
     </style>
 </head>
 <body>
   <div class="navbar">
-      <a href="javascript:void(0)" onclick="closeDetailView()" class="logo" title="Retour au catalogue">ANIMFLIX</a>
+      <a href="javascript:void(0)" onclick="handleLogoClick()" class="logo" title="Retour à l'accueil">ANIMFLIX</a>
       <div class="controls">
           <div class="search-box">
               <input type="text" id="searchInput" placeholder="Nom de l'anime (ex: Frieren)..." onkeypress="if(event.key === 'Enter') handleSearchClick()">
@@ -1008,10 +1293,19 @@
   <div class="container">
       <!-- VUE 1 : CATALOGUE & RÉSULTATS DE RECHERCHE -->
       <div id="catalogView">
-          <div id="results" class="grid">
-              <div class="empty-state" style="grid-column: 1 / -1;">
-                  Tapez le nom d'un anime ci-dessus pour lancer la recherche 🍿
+          <!-- VUE ACCUEIL : ANIMES EN COURS (SI CONNECTÉ) OU MESSAGE D'INVITATION -->
+          <div id="homeView">
+              <div id="homeWatchingContainer">
+                  <div class="empty-state" style="grid-column: 1 / -1;">
+                      Tapez le nom d'un anime ci-dessus pour lancer la recherche 🍿
+                  </div>
               </div>
+          </div>
+
+          <!-- VUE RECHERCHE : BANNIÈRE DE CIBLAGE PROCHAIN ÉPISODE ET RÉSULTATS -->
+          <div id="searchView" style="display: none;">
+              <div id="searchTargetBanner" style="display: none;"></div>
+              <div id="results" class="grid"></div>
           </div>
       </div>
 
@@ -1547,6 +1841,11 @@
         if (window.location.hash === '#detail') {
             history.replaceState(null, '', window.location.pathname + window.location.search);
         }
+
+        const query = document.getElementById('searchInput')?.value.trim();
+        if (!query) {
+            showHomeScreen();
+        }
     }
 
     function scrollToPlayer() {
@@ -1575,13 +1874,43 @@
         showToast("Mode de lecture mis à jour : " + (newMode === 'direct' ? '⚡ Direct' : '🔄 Transcodage'));
     }
 
+    function handleLogoClick() {
+        closeDetailView();
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = '';
+        showHomeScreen();
+    }
+
+    function showHomeScreen() {
+        const homeView = document.getElementById('homeView');
+        const searchView = document.getElementById('searchView');
+        const targetBanner = document.getElementById('searchTargetBanner');
+        const searchInput = document.getElementById('searchInput');
+        if (homeView) homeView.style.display = 'block';
+        if (searchView) searchView.style.display = 'none';
+        if (targetBanner) targetBanner.style.display = 'none';
+        if (searchInput) searchInput.value = '';
+        currentTargetNextEpisode = null;
+        renderHomeScreen();
+    }
+
     function handleSearchClick() {
         // Si l'utilisateur est sur la page de détail, revenir au catalogue pour afficher les nouveaux résultats
         const detailView = document.getElementById('detailView');
         if (detailView && detailView.style.display === 'block') {
             closeDetailView();
         }
-        searchNyaa();
+        const query = document.getElementById('searchInput').value.trim();
+        if (!query) {
+            showHomeScreen();
+            return;
+        }
+        if (currentTargetNextEpisode && currentTargetNextEpisode.animeName.toLowerCase().includes(query.toLowerCase())) {
+            executeSearchForAnime(query, currentTargetNextEpisode);
+        } else {
+            currentTargetNextEpisode = null;
+            executeSearchForAnime(query, null);
+        }
     }
 
     // Gestion du bouton précédent du navigateur
@@ -1594,66 +1923,240 @@
         }
     });
 
-    // --- RECHERCHE SUR NYAA ---
+    // --- RECHERCHE SUR NYAA & CIBLAGE D'ÉPISODE ---
     async function searchNyaa() {
         const query = document.getElementById('searchInput').value.trim();
-        const type = document.getElementById('searchType').value;
-        const resultsDiv = document.getElementById('results');
-        if (!query) return;
+        if (!query) {
+            showHomeScreen();
+            return;
+        }
+        executeSearchForAnime(query, currentTargetNextEpisode);
+    }
 
-        resultsDiv.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;"><div class="spinner" style="margin: 0 auto 20px;"></div>Recherche en cours... ⏳</div>';
-        
+    function playTargetEpisodeDirectly() {
+        if (window._currentExactMatchTorrent) {
+            openAnimeDetail(window._currentExactMatchTorrent);
+        }
+    }
+
+    async function executeSearchForAnime(searchTitle, targetInfo = null) {
+        const homeView = document.getElementById('homeView');
+        const searchView = document.getElementById('searchView');
+        const targetBanner = document.getElementById('searchTargetBanner');
+        const resultsDiv = document.getElementById('results');
+
+        if (homeView) homeView.style.display = 'none';
+        if (searchView) searchView.style.display = 'block';
+
+        const type = document.getElementById('searchType')?.value || 'vostfr';
+        const nextEp = targetInfo ? targetInfo.nextEp : null;
+        const animeDisplayName = targetInfo ? targetInfo.animeName : searchTitle;
+
+        // Mise à jour de la bannière de ciblage
+        if (targetInfo && targetBanner) {
+            targetBanner.style.display = 'block';
+            if (targetInfo.isNextEpUnreleased) {
+                targetBanner.innerHTML = `
+                    <div class="next-ep-target-banner" style="border-left-color: #f59e0b;">
+                        <div class="next-ep-banner-left">
+                            <button class="btn-back-watching" onclick="showHomeScreen()" title="Revenir aux animes en cours">
+                                ← Mes animes en cours
+                            </button>
+                            <div class="next-ep-banner-info">
+                                <div class="next-ep-banner-anime">🍿 ${escapeHtml(animeDisplayName)}</div>
+                                <div class="next-ep-banner-subtitle">
+                                    ⏳ Épisode <b>${nextEp}</b> pas encore sorti (diffusion dans : 
+                                    <span class="next-ep-badge-highlight" style="background:rgba(245,158,11,0.2);border-color:rgba(245,158,11,0.5);color:#fbbf24;" data-airing-at="${targetInfo.airingTimestamp}">
+                                        ${targetInfo.airingCountdownStr}
+                                    </span>)
+                                    <span style="font-size:12.5px;color:#888;">— Épisodes précédents ci-dessous :</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="next-ep-banner-right" id="targetEpDirectAction"></div>
+                    </div>
+                `;
+                startAiringCountdownTicker();
+            } else {
+                targetBanner.innerHTML = `
+                    <div class="next-ep-target-banner">
+                        <div class="next-ep-banner-left">
+                            <button class="btn-back-watching" onclick="showHomeScreen()" title="Revenir aux animes en cours">
+                                ← Mes animes en cours
+                            </button>
+                            <div class="next-ep-banner-info">
+                                <div class="next-ep-banner-anime">🍿 ${escapeHtml(animeDisplayName)}</div>
+                                <div class="next-ep-banner-subtitle">
+                                    Prochain épisode à visionner : 
+                                    <span class="next-ep-badge-highlight">Épisode ${nextEp}</span>
+                                    ${targetInfo.totalEpisodes ? `<span style="color:#888;">(sur ${targetInfo.totalEpisodes})</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="next-ep-banner-right" id="targetEpDirectAction"></div>
+                    </div>
+                `;
+            }
+        } else if (targetBanner) {
+            targetBanner.style.display = 'none';
+        }
+
+        resultsDiv.innerHTML = `
+            <div class="empty-state" style="grid-column: 1 / -1;">
+                <div class="spinner" style="margin: 0 auto 20px;"></div>
+                Recherche des vidéos pour "<b>${escapeHtml(animeDisplayName)}</b>"${nextEp ? ` (Épisode ${nextEp})` : ''}... ⏳
+            </div>
+        `;
+
         try {
-            const response = await fetch('/api/search?q=' + encodeURIComponent(query) + '&type=' + type);
-            const torrents = await response.json();
-            
+            let response = await fetch('/api/search?q=' + encodeURIComponent(searchTitle) + '&type=' + type);
+            let torrents = await response.json();
+
+            // Fallback éventuel sur le titre anglais si aucun résultat avec le romaji
+            if ((!torrents || torrents.length === 0) && targetInfo?.english && targetInfo.english !== searchTitle) {
+                const fallbackQuery = targetInfo.english.replace(/[:]/g, ' ').replace(/\s+/g, ' ').trim();
+                const fallbackRes = await fetch('/api/search?q=' + encodeURIComponent(fallbackQuery) + '&type=' + type);
+                const fallbackTorrents = await fallbackRes.json();
+                if (fallbackTorrents && fallbackTorrents.length > 0) {
+                    torrents = fallbackTorrents;
+                }
+            }
+
             if (!torrents || torrents.length === 0) {
-                resultsDiv.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;">Aucun torrent trouvé pour "' + query + '".</div>';
+                resultsDiv.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        Aucun torrent trouvé pour "${escapeHtml(searchTitle)}".<br>
+                        <span style="font-size: 13.5px; color: #888; margin-top: 8px; display: inline-block;">
+                            Essayez de changer de langue (ex: VF ou Multi-Sub) ci-dessus.
+                        </span>
+                        <div style="margin-top: 18px;">
+                            <button class="btn-secondary" onclick="showHomeScreen()">← Revenir à mes animes en cours</button>
+                        </div>
+                    </div>
+                `;
                 return;
             }
 
+            // Traitement et classification des torrents pour l'épisode ciblé
+            let exactMatchTorrent = null;
+            const mappedTorrents = torrents.map(t => {
+                let matchType = null;
+                if (nextEp) {
+                    const epNum = extractEpisodeNumber(t.episode, t.titre);
+                    if (epNum === nextEp) {
+                        matchType = 'exact';
+                    } else {
+                        const isPack = /integrale|intégrale|pack|batch|saison complète|complete/i.test(t.episode || '') ||
+                                       /integrale|intégrale|pack|batch|complete|s\d+[-+]s\d+/i.test(t.titre || '');
+                        const rangeMatch = (t.episode || '').match(/Épisodes?\s*0*(\d+)\s*[-~]\s*0*(\d+)/i) ||
+                                           (t.titre || '').match(/\b(?:E|EP|Épisode|Episode)\s*0*(\d+)\s*[-~]\s*0*(\d+)\b/i);
+                        if (rangeMatch) {
+                            const start = parseInt(rangeMatch[1], 10);
+                            const end = parseInt(rangeMatch[2], 10);
+                            if (nextEp >= start && nextEp <= end) matchType = 'pack';
+                        } else if (isPack) {
+                            matchType = 'batch';
+                        }
+                    }
+                }
+                return { torrent: t, matchType };
+            });
+
+            // Tri : exacts en tête, puis packs/batchs, puis les autres (par seeders)
+            if (nextEp) {
+                mappedTorrents.sort((a, b) => {
+                    const rank = (m) => (m === 'exact' ? 3 : (m === 'pack' || m === 'batch' ? 2 : 1));
+                    const rankDiff = rank(b.matchType) - rank(a.matchType);
+                    if (rankDiff !== 0) return rankDiff;
+                    return (b.torrent.seeders || 0) - (a.torrent.seeders || 0);
+                });
+                const firstExact = mappedTorrents.find(m => m.matchType === 'exact');
+                if (firstExact) exactMatchTorrent = firstExact.torrent;
+            }
+
+            // Bouton d'action directe dans la bannière supérieure
+            const directActionContainer = document.getElementById('targetEpDirectAction');
+            if (directActionContainer) {
+                if (exactMatchTorrent) {
+                    window._currentExactMatchTorrent = exactMatchTorrent;
+                    directActionContainer.innerHTML = `
+                        <button class="btn-play-target-direct" onclick="playTargetEpisodeDirectly()">
+                            ▶ Lancer l'Épisode ${nextEp} direct
+                        </button>
+                    `;
+                } else {
+                    directActionContainer.innerHTML = '';
+                }
+            }
+
+            // Rendu des cartes de torrents
             resultsDiv.innerHTML = '';
-            torrents.forEach(t => {
+            mappedTorrents.forEach(({ torrent: t, matchType }) => {
                 const parsed = parseAnimeDetails(t.titre);
                 const animeName = t.animeName || parsed.animeName || t.cleanTitle || 'Anime';
                 const season = t.season || parsed.season || 'Saison 1';
                 const episode = t.episode || parsed.episode || 'Épisode 1';
                 const resolution = (t.resolution || parsed.resolution || '1080p').split(' ')[0];
                 const audioLang = t.audioLang || parsed.audioLang || 'VOSTFR';
-                const posterSrc = t.poster || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(animeName);
-                
+                const posterSrc = t.poster || (targetInfo?.coverImage) || ('https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(animeName));
+
+                const isTargetMatch = matchType === 'exact';
+                const isPackMatch = matchType === 'pack' || matchType === 'batch';
+
                 const card = document.createElement('div');
-                card.className = 'card';
+                card.className = 'card' + (isTargetMatch ? ' card-target-highlight' : '');
+                
+                let highlightBadgeHtml = '';
+                if (isTargetMatch) {
+                    highlightBadgeHtml = `<span class="badge-tag-mini badge-target-direct-match">⭐ ÉPISODE ${nextEp}</span>`;
+                } else if (isPackMatch) {
+                    highlightBadgeHtml = `<span class="badge-tag-mini badge-target-pack-match">📦 PACK (ÉP. ${nextEp})</span>`;
+                }
+
                 card.innerHTML = `
                     <div class="card-img-wrap">
-                        <img src="${posterSrc}" loading="lazy" alt="${animeName}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                        <img src="${escapeHtml(posterSrc)}" loading="lazy" alt="${escapeHtml(animeName)}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
                         <div class="card-overlay-hover">
-                            <span class="btn-play-hover">▶ Voir la fiche & Regarder</span>
+                            <span class="btn-play-hover" style="${isTargetMatch ? 'background:var(--accent-green);color:#000;font-weight:800;' : ''}">
+                                ▶ ${isTargetMatch ? `Regarder l'Épisode ${nextEp}` : 'Voir la fiche & Regarder'}
+                            </span>
                         </div>
                         <div class="card-badges-top">
-                            <span class="badge-tag-mini">${resolution}</span>
-                            <span class="badge-tag-mini badge-tag-audio">${audioLang.includes('MULTI') ? 'MULTI' : (audioLang.includes('VF') ? 'VF' : 'VOSTFR')}</span>
+                            <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                                <span class="badge-tag-mini">${resolution}</span>
+                                <span class="badge-tag-mini badge-tag-audio">${audioLang.includes('MULTI') ? 'MULTI' : (audioLang.includes('VF') ? 'VF' : 'VOSTFR')}</span>
+                            </div>
+                            ${highlightBadgeHtml}
                         </div>
                     </div>
                     <div class="card-info">
-                        <span class="card-title" title="${t.titre}">${animeName}</span>
+                        <span class="card-title" title="${escapeHtml(t.titre)}">${escapeHtml(animeName)}</span>
                         <div class="card-ep-season">
-                            <span class="card-season-pill">${season}</span>
-                            <span class="card-episode-pill">${episode}</span>
+                            <span class="card-season-pill">${escapeHtml(season)}</span>
+                            <span class="card-episode-pill" style="${isTargetMatch ? 'background:rgba(70,211,105,0.2);color:#5eff88;border-color:rgba(70,211,105,0.5);font-weight:bold;' : ''}">
+                                ${escapeHtml(episode)}
+                            </span>
                         </div>
                         <div class="stats">
                             <span class="badge-rating">⭐ ${t.rating || 'N/A'}</span>
                             <span>${t.taille}</span>
                             <span class="seeders">🌱 ${t.seeders}</span>
                         </div>
-                    </div>`;
-                
-                // Redirection vers la page de détail au clic
+                    </div>
+                `;
+
                 card.onclick = () => openAnimeDetail(t);
                 resultsDiv.appendChild(card);
             });
         } catch (err) { 
-            resultsDiv.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1; color:#ff4444;">Erreur de connexion au serveur.</div>'; 
+            resultsDiv.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1; color:#ff4444;">
+                    Erreur de connexion au serveur : ${escapeHtml(err.message)}
+                    <div style="margin-top: 15px;">
+                        <button class="btn-secondary" onclick="showHomeScreen()">← Revenir à mes animes en cours</button>
+                    </div>
+                </div>
+            `; 
         }
     }
 
@@ -2197,9 +2700,591 @@
     // =========================================================================
 
     let currentAnilistUser = null;
+    try {
+        const savedUser = localStorage.getItem('anilist_user');
+        if (savedUser) currentAnilistUser = JSON.parse(savedUser);
+    } catch(e) {}
+    let anilistWatchingList = [];
+    try {
+        const savedWatching = localStorage.getItem('anilist_watching_cache');
+        if (savedWatching) anilistWatchingList = JSON.parse(savedWatching);
+    } catch(e) {}
+    let currentTargetNextEpisode = null;
     let currentAnilistMedia = null;
     let currentDetectedEpisode = 1;
     let hasAutoTrackedCurrentEpisode = false;
+    let isLoadingWatchingList = false;
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Formatage compte à rebours de sortie d'épisode
+    function formatAiringCountdown(diffMs) {
+        if (diffMs <= 0) return 'Disponible ! 🚀';
+        const totalSec = Math.floor(diffMs / 1000);
+        const days = Math.floor(totalSec / 86400);
+        const hours = Math.floor((totalSec % 86400) / 3600);
+        const minutes = Math.floor((totalSec % 3600) / 60);
+        const seconds = totalSec % 60;
+
+        if (days > 0) {
+            return `${days}j ${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`;
+        } else if (hours > 0) {
+            return `${hours}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+        } else {
+            return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+        }
+    }
+
+    // Ticker d'actualisation en temps réel (seconde par seconde)
+    let airingCountdownInterval = null;
+    function startAiringCountdownTicker() {
+        if (airingCountdownInterval) clearInterval(airingCountdownInterval);
+        airingCountdownInterval = setInterval(() => {
+            const countdownEls = document.querySelectorAll('[data-airing-at]');
+            if (countdownEls.length === 0) return;
+            const now = Date.now();
+            countdownEls.forEach(el => {
+                const timestamp = parseInt(el.getAttribute('data-airing-at'), 10);
+                if (!timestamp) return;
+                const diffMs = (timestamp * 1000) - now;
+                const formatted = formatAiringCountdown(diffMs);
+                const epNum = el.getAttribute('data-ep');
+                if (el.classList.contains('badge-tag-airing-timer')) {
+                    el.innerText = `⏳ Ép. ${epNum ? epNum + ' : ' : ''}${formatted}`;
+                } else if (el.classList.contains('airing-countdown-text')) {
+                    el.innerText = formatted;
+                } else {
+                    el.innerText = formatted;
+                }
+            });
+        }, 1000);
+    }
+
+    // Rendu de l'écran d'accueil
+    function renderHomeScreen() {
+        const homeView = document.getElementById('homeView');
+        if (!homeView) return;
+
+        const token = localStorage.getItem('anilist_token');
+        if (token && currentAnilistUser) {
+            if (anilistWatchingList && anilistWatchingList.length > 0) {
+                renderWatchingListHtml(homeView, anilistWatchingList);
+            } else {
+                let cached = null;
+                try {
+                    const raw = localStorage.getItem('anilist_watching_cache');
+                    if (raw) cached = JSON.parse(raw);
+                } catch(e) {}
+
+                if (cached && cached.length > 0) {
+                    anilistWatchingList = cached;
+                    renderWatchingListHtml(homeView, anilistWatchingList);
+                } else if (isLoadingWatchingList) {
+                    renderWatchingEmptyOrLoading(homeView);
+                } else {
+                    renderWatchingEmptyList(homeView);
+                }
+            }
+        } else {
+            renderLoggedOutHomeHtml(homeView);
+        }
+    }
+
+    function renderWatchingListHtml(container, list) {
+        let cardsHtml = '';
+        list.forEach((entry, idx) => {
+            const media = entry.media || {};
+            const title = media.title?.userPreferred || media.title?.romaji || media.title?.english || 'Anime';
+            const progress = entry.progress || 0;
+            const total = media.episodes || null;
+            const nextEp = progress + 1;
+            const isCompleted = total && progress >= total;
+            const progressPct = total ? Math.min(100, Math.round((progress / total) * 100)) : (progress > 0 ? 50 : 0);
+            const poster = media.coverImage?.large || media.coverImage?.extraLarge || media.coverImage?.medium || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(title);
+            const score = media.averageScore ? (media.averageScore / 10).toFixed(1) : null;
+            const format = media.format || 'TV';
+
+            // Vérification si le prochain épisode n'est pas encore sorti (AniList airing schedule)
+            const nextAiring = media.nextAiringEpisode;
+            let isNextEpUnreleased = false;
+            let airingCountdownStr = '';
+            let airingTimestamp = null;
+            if (nextAiring && nextAiring.airingAt && nextEp >= nextAiring.episode) {
+                const diffMs = (nextAiring.airingAt * 1000) - Date.now();
+                if (diffMs > 0) {
+                    isNextEpUnreleased = true;
+                    airingTimestamp = nextAiring.airingAt;
+                    airingCountdownStr = formatAiringCountdown(diffMs);
+                }
+            }
+
+            let badgesTopHtml = '';
+            let overlayBtnHtml = '';
+            let actionPillHtml = '';
+
+            if (isNextEpUnreleased) {
+                badgesTopHtml = `
+                    ${score ? `<span class="badge-tag-mini" style="background:rgba(255,193,7,0.2);color:#ffc107;border-color:rgba(255,193,7,0.4);">⭐ ${score}</span>` : `<span class="badge-tag-mini">${format}</span>`}
+                    <span class="badge-tag-mini badge-tag-airing-timer" data-airing-at="${airingTimestamp}" data-ep="${nextAiring.episode}" title="Sortie prévue le ${new Date(airingTimestamp * 1000).toLocaleString('fr-FR')}">
+                        ⏳ Ép. ${nextAiring.episode} : ${airingCountdownStr}
+                    </span>
+                `;
+                overlayBtnHtml = `<span class="btn-play-hover" style="background:#d97706;">⏳ Ép. ${nextAiring.episode} à venir (Voir vidéos)</span>`;
+                actionPillHtml = `
+                    <div class="card-next-ep-btn-pill card-next-ep-pill-airing" title="L'épisode ${nextAiring.episode} n'est pas encore sorti. Cliquer pour chercher les vidéos disponibles.">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>Ép. <b>${nextAiring.episode}</b> dans <b class="airing-countdown-text" data-airing-at="${airingTimestamp}">${airingCountdownStr}</b></span>
+                    </div>
+                `;
+            } else {
+                badgesTopHtml = `
+                    ${score ? `<span class="badge-tag-mini" style="background:rgba(255,193,7,0.2);color:#ffc107;border-color:rgba(255,193,7,0.4);">⭐ ${score}</span>` : `<span class="badge-tag-mini">${format}</span>`}
+                    <span class="badge-tag-mini badge-tag-ep" style="background:rgba(2,169,255,0.25);border-color:rgba(2,169,255,0.4);color:#02a9ff;">
+                        ${isCompleted ? 'Terminé' : `Ép. ${progress}${total ? '/' + total : ''}`}
+                    </span>
+                `;
+                overlayBtnHtml = `<span class="btn-play-hover">▶ ${isCompleted ? 'Revoir un épisode' : 'Visionner Ép. ' + nextEp}</span>`;
+                actionPillHtml = `
+                    <div class="card-next-ep-btn-pill">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        <span>${isCompleted ? 'Rechercher les vidéos' : `Prochain : <b>Épisode ${nextEp}</b>`}</span>
+                    </div>
+                `;
+            }
+
+            cardsHtml += `
+                <div class="card card-watching" onclick="watchAnimeNextEpisode(${idx})" title="${isNextEpUnreleased ? `Épisode ${nextAiring.episode} pas encore sorti. Cliquer pour chercher les vidéos disponibles.` : `Cliquer pour chercher les vidéos de l'épisode ${nextEp}`}">
+                    <div class="card-img-wrap">
+                        <img src="${escapeHtml(poster)}" loading="lazy" alt="${escapeHtml(title)}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                        <div class="card-overlay-hover">
+                            ${overlayBtnHtml}
+                        </div>
+                        <div class="card-badges-top">
+                            ${badgesTopHtml}
+                        </div>
+                        <div class="card-watching-progress-bar-wrap">
+                            <div class="card-watching-progress-bar" style="width: ${progressPct}%;"></div>
+                        </div>
+                    </div>
+                    <div class="card-info">
+                        <span class="card-title" title="${escapeHtml(title)}">${escapeHtml(title)}</span>
+                        <div class="card-watching-meta">
+                            <span class="card-ep-progress-text">
+                                ${isCompleted ? `✅ Tous les ${total} épisodes vus` : `Visionné : <b>Épisode ${progress}</b> ${total ? '<span style="color:#777;">/ ' + total + '</span>' : ''}`}
+                            </span>
+                        </div>
+                        ${actionPillHtml}
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = `
+            <div class="home-watching-section">
+                <div class="home-watching-header">
+                    <div class="home-watching-title-group">
+                        <h2 class="home-watching-title">
+                            <span style="font-size: 24px;">🍿</span>
+                            En cours de visionnage
+                        </h2>
+                        <span class="home-watching-badge">${list.length} anime${list.length > 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="home-watching-actions">
+                        <span id="homeWatchingSubtitle" style="font-size: 13px; color: #888;">
+                            Synchronisé avec AniList (${escapeHtml(currentAnilistUser.name)})
+                        </span>
+                        <button class="btn-refresh-watching" onclick="loadAnilistWatchingList(true)" title="Actualiser la liste depuis AniList">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            <span>Actualiser</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="grid home-watching-grid">
+                    ${cardsHtml}
+                </div>
+            </div>
+        `;
+
+        startAiringCountdownTicker();
+    }
+
+    function renderLoggedOutHomeHtml(container) {
+        container.innerHTML = `
+            <div class="empty-state" style="grid-column: 1 / -1; margin-bottom: 20px;">
+                Tapez le nom d'un anime ci-dessus pour lancer la recherche 🍿
+            </div>
+            <div class="anilist-home-connect-promo">
+                <svg class="anilist-home-connect-icon" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09h-2.82l.83-2.5h1.16l.83 2.5zm1.5-4.5h-4.32l2.16-6.5 2.16 6.5z" fill="#02a9ff"/>
+                </svg>
+                <h3>Retrouvez vos animes en cours en 1 clic</h3>
+                <p>
+                    Connectez votre compte <b>AniList</b> pour afficher ici votre liste d'animes en cours de visionnage et lancer directement la recherche du prochain épisode à regarder !
+                </p>
+                <button class="btn-anilist-nav" onclick="openAnilistAuthModal()" style="font-size: 14px; padding: 11px 22px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09h-2.82l.83-2.5h1.16l.83 2.5zm1.5-4.5h-4.32l2.16-6.5 2.16 6.5z"/>
+                    </svg>
+                    <span>Connexion AniList</span>
+                </button>
+            </div>
+        `;
+    }
+
+    function renderWatchingEmptyOrLoading(container) {
+        container.innerHTML = `
+            <div class="home-watching-section">
+                <div class="home-watching-header">
+                    <div class="home-watching-title-group">
+                        <h2 class="home-watching-title">
+                            <span style="font-size: 24px;">🍿</span>
+                            En cours de visionnage
+                        </h2>
+                    </div>
+                </div>
+                <div class="empty-state" style="padding: 60px 20px;">
+                    <div class="spinner" style="margin: 0 auto 20px;"></div>
+                    Chargement de vos animes en cours depuis AniList... ⏳
+                </div>
+            </div>
+        `;
+    }
+
+    function renderWatchingEmptyList(container) {
+        container.innerHTML = `
+            <div class="home-watching-section">
+                <div class="home-watching-header">
+                    <div class="home-watching-title-group">
+                        <h2 class="home-watching-title">
+                            <span style="font-size: 24px;">🍿</span>
+                            En cours de visionnage
+                        </h2>
+                    </div>
+                </div>
+                <div class="empty-state" style="padding: 50px 20px;">
+                    <div style="font-size: 38px; margin-bottom: 12px;">📺</div>
+                    <div style="font-size: 16px; font-weight: bold; color: #fff; margin-bottom: 8px;">
+                        Aucun anime marqué comme "En cours" sur AniList
+                    </div>
+                    <div style="font-size: 13.5px; color: #aaa; margin-bottom: 20px;">
+                        Ajoutez des animes à votre liste "Watching" sur AniList ou utilisez la barre de recherche ci-dessus !
+                    </div>
+                    <button class="btn-refresh-watching" onclick="loadAnilistWatchingList(true)">
+                        🔄 Actualiser
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderHomeScreenError(errorMsg) {
+        const homeView = document.getElementById('homeView');
+        if (!homeView) return;
+        homeView.innerHTML = `
+            <div class="home-watching-section">
+                <div class="home-watching-header">
+                    <div class="home-watching-title-group">
+                        <h2 class="home-watching-title">
+                            <span style="font-size: 24px;">🍿</span>
+                            En cours de visionnage
+                        </h2>
+                    </div>
+                </div>
+                <div class="home-watching-error">
+                    <div style="font-size: 36px; margin-bottom: 12px;">⚠️</div>
+                    <div style="font-size: 16px; font-weight: bold; color: #fff; margin-bottom: 8px;">
+                        Impossible de synchroniser vos animes en cours pour l'instant
+                    </div>
+                    <div style="font-size: 13px; color: #aaa; max-width: 500px; margin: 0 auto 16px; line-height: 1.5;">
+                        ${escapeHtml(errorMsg)}<br>
+                        (L'API AniList subit parfois de courtes instabilités temporaires).
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                        <button class="btn-refresh-watching" onclick="loadAnilistWatchingList(true)">
+                            🔄 Réessayer
+                        </button>
+                        <button class="btn-secondary" onclick="loadDemoWatchingList()">
+                            ✨ Charger des animes de démonstration (Mode Test)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function loadDemoWatchingList() {
+        anilistWatchingList = [
+            {
+                id: 154587,
+                status: "CURRENT",
+                progress: 5,
+                updatedAt: Math.floor(Date.now() / 1000),
+                media: {
+                    id: 154587,
+                    title: {
+                        romaji: "Sousou no Frieren",
+                        english: "Frieren: Beyond Journey's End",
+                        userPreferred: "Sousou no Frieren"
+                    },
+                    episodes: 28,
+                    format: "TV",
+                    status: "FINISHED",
+                    averageScore: 91,
+                    coverImage: {
+                        large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx154587-n2bOfj42nh9k.jpg"
+                    }
+                }
+            },
+            {
+                id: 171018,
+                status: "CURRENT",
+                progress: 2,
+                updatedAt: Math.floor(Date.now() / 1000) - 3600,
+                media: {
+                    id: 171018,
+                    title: {
+                        romaji: "Dandadan",
+                        english: "DAN DA DAN",
+                        userPreferred: "Dandadan"
+                    },
+                    episodes: 12,
+                    format: "TV",
+                    status: "RELEASING",
+                    averageScore: 84,
+                    coverImage: {
+                        large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx171018-8GfBf44YcZf9.jpg"
+                    },
+                    nextAiringEpisode: {
+                        episode: 3,
+                        airingAt: Math.floor(Date.now() / 1000) + (2 * 86400 + 14 * 3600 + 35 * 60 + 20)
+                    }
+                }
+            },
+            {
+                id: 151807,
+                status: "CURRENT",
+                progress: 7,
+                updatedAt: Math.floor(Date.now() / 1000) - 7200,
+                media: {
+                    id: 151807,
+                    title: {
+                        romaji: "Ore dake Level Up na Ken",
+                        english: "Solo Leveling",
+                        userPreferred: "Solo Leveling"
+                    },
+                    episodes: 12,
+                    format: "TV",
+                    status: "FINISHED",
+                    averageScore: 83,
+                    coverImage: {
+                        large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx151807-f1c24e65.jpg"
+                    }
+                }
+            }
+        ];
+        try {
+            localStorage.setItem('anilist_watching_cache', JSON.stringify(anilistWatchingList));
+        } catch(e) {}
+        renderHomeScreen();
+        showToast("✨ Animes de démonstration chargés avec succès !");
+    }
+
+    // Clic sur un anime de la liste d'accueil pour chercher l'épisode suivant
+    function watchAnimeNextEpisode(entryIndex) {
+        const entry = typeof entryIndex === 'number' ? anilistWatchingList[entryIndex] : entryIndex;
+        if (!entry || !entry.media) return;
+
+        const media = entry.media;
+        const progress = entry.progress || 0;
+        const nextEp = progress + 1;
+        const total = media.episodes || null;
+        
+        let searchTitle = media.title?.romaji || media.title?.userPreferred || media.title?.english || 'Anime';
+        searchTitle = searchTitle.replace(/[:]/g, ' ').replace(/\s+/g, ' ').trim();
+
+        // Vérification si le prochain épisode n'est pas encore sorti
+        const nextAiring = media.nextAiringEpisode;
+        let isNextEpUnreleased = false;
+        let airingCountdownStr = '';
+        let airingTimestamp = null;
+        if (nextAiring && nextAiring.airingAt && nextEp >= nextAiring.episode) {
+            const diffMs = (nextAiring.airingAt * 1000) - Date.now();
+            if (diffMs > 0) {
+                isNextEpUnreleased = true;
+                airingTimestamp = nextAiring.airingAt;
+                airingCountdownStr = formatAiringCountdown(diffMs);
+            }
+        }
+
+        // Enregistrer l'association d'ID AniList pour que la page de détail s'associe instantanément
+        try {
+            localStorage.setItem('anilist_map_' + searchTitle.toLowerCase(), media.id);
+            if (media.title?.userPreferred) {
+                localStorage.setItem('anilist_map_' + media.title.userPreferred.toLowerCase(), media.id);
+            }
+            if (media.title?.romaji) {
+                localStorage.setItem('anilist_map_' + media.title.romaji.toLowerCase(), media.id);
+            }
+        } catch(e) {}
+
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = searchTitle;
+
+        currentTargetNextEpisode = {
+            mediaId: media.id,
+            animeName: media.title?.userPreferred || media.title?.romaji || searchTitle,
+            searchTitle: searchTitle,
+            romaji: media.title?.romaji,
+            english: media.title?.english,
+            nextEp: nextEp,
+            progress: progress,
+            totalEpisodes: total,
+            coverImage: media.coverImage?.large || media.coverImage?.medium,
+            media: media,
+            isNextEpUnreleased: isNextEpUnreleased,
+            airingTimestamp: airingTimestamp,
+            airingCountdownStr: airingCountdownStr
+        };
+
+        executeSearchForAnime(searchTitle, currentTargetNextEpisode);
+    }
+
+    // Déduplication et tri des entrées d'animes en cours
+    function extractWatchingEntries(data) {
+        if (!data?.MediaListCollection?.lists) return [];
+        const entries = [];
+        for (const list of data.MediaListCollection.lists) {
+            if (!list.entries) continue;
+            for (const entry of list.entries) {
+                if (entry.status === 'CURRENT' || list.status === 'CURRENT' || !entry.status) {
+                    entries.push(entry);
+                }
+            }
+        }
+        const map = new Map();
+        for (const entry of entries) {
+            if (entry.media && !map.has(entry.media.id)) {
+                map.set(entry.media.id, entry);
+            }
+        }
+        const result = Array.from(map.values());
+        result.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        return result;
+    }
+
+    // Chargement de la liste des animes en cours depuis AniList
+    async function loadAnilistWatchingList(forceFresh = false) {
+        const token = localStorage.getItem('anilist_token');
+        if (!token) {
+            anilistWatchingList = [];
+            renderHomeScreen();
+            return;
+        }
+
+        // Si le cache est présent et qu'on ne force pas le rechargement, afficher immédiatement
+        let cached = null;
+        try {
+            const raw = localStorage.getItem('anilist_watching_cache');
+            if (raw) cached = JSON.parse(raw);
+        } catch(e) {}
+
+        if (cached && cached.length > 0 && !forceFresh) {
+            anilistWatchingList = cached;
+            renderHomeScreen();
+        }
+
+        if (!anilistWatchingList || anilistWatchingList.length === 0) {
+            isLoadingWatchingList = true;
+            renderHomeScreen();
+        }
+
+        try {
+            const query = `
+                query ($userId: Int, $userName: String) {
+                    MediaListCollection(userId: $userId, userName: $userName, type: ANIME, status: CURRENT, sort: UPDATED_TIME_DESC) {
+                        lists {
+                            name
+                            status
+                            isCustomList
+                            entries {
+                                id
+                                mediaId
+                                status
+                                progress
+                                score
+                                updatedAt
+                                media {
+                                    id
+                                    idMal
+                                    title {
+                                        romaji
+                                        english
+                                        native
+                                        userPreferred
+                                    }
+                                    synonyms
+                                    episodes
+                                    format
+                                    status
+                                    averageScore
+                                    bannerImage
+                                    coverImage {
+                                        extraLarge
+                                        large
+                                        medium
+                                    }
+                                    nextAiringEpisode {
+                                        episode
+                                        timeUntilAiring
+                                        airingAt
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            `;
+            const variables = {};
+            if (currentAnilistUser?.id) variables.userId = currentAnilistUser.id;
+            else if (currentAnilistUser?.name) variables.userName = currentAnilistUser.name;
+
+            const data = await callAnilistGraphQL(query, variables);
+            const entries = extractWatchingEntries(data);
+            anilistWatchingList = entries;
+            isLoadingWatchingList = false;
+            try {
+                localStorage.setItem('anilist_watching_cache', JSON.stringify(entries));
+            } catch(e) {}
+            renderHomeScreen();
+        } catch(err) {
+            console.warn("AniList watching list error:", err.message);
+            isLoadingWatchingList = false;
+            if (!anilistWatchingList || anilistWatchingList.length === 0) {
+                renderHomeScreenError(err.message);
+            } else {
+                const sub = document.getElementById('homeWatchingSubtitle');
+                if (sub) {
+                    sub.innerHTML = `⚠️ Données en cache (AniList temporairement indisponible)`;
+                }
+            }
+        }
+    }
 
     // Détection avancée du numéro d'épisode depuis le tag épisode ou le titre
     function extractEpisodeNumber(episodeStr, titleStr) {
@@ -2244,6 +3329,7 @@
         checkUrlForAnilistToken();
         const token = localStorage.getItem('anilist_token');
         renderAnilistNav();
+        renderHomeScreen();
 
         // Récupérer éventuel Client ID pré-configuré par le serveur
         fetch('/api/anilist/config')
@@ -2255,7 +3341,10 @@
             })
             .catch(() => {});
 
-        if (!token) return;
+        if (!token) {
+            renderHomeScreen();
+            return;
+        }
 
         try {
             const query = `
@@ -2279,8 +3368,11 @@
             if (err.message && (err.message.toLowerCase().includes('token') || err.message.toLowerCase().includes('auth'))) {
                 logoutAnilist(false);
                 showToast("⚠️ Votre session AniList a expiré.");
+                return;
             }
         }
+
+        await loadAnilistWatchingList();
     }
 
     // Récupération automatique du token OAuth dans le hash de l'URL (#access_token=...)
@@ -2391,6 +3483,8 @@
                 localStorage.setItem('anilist_user', JSON.stringify(currentAnilistUser));
                 closeAnilistAuthModal();
                 renderAnilistNav();
+                renderHomeScreen();
+                await loadAnilistWatchingList(true);
                 if (currentAnimeItem) syncAnilistForDetail(currentAnimeItem);
                 showToast(`🎉 Bienvenue ${currentAnilistUser.name} !`);
             }
@@ -2403,9 +3497,12 @@
     function logoutAnilist(notify = true) {
         localStorage.removeItem('anilist_token');
         localStorage.removeItem('anilist_user');
+        localStorage.removeItem('anilist_watching_cache');
         currentAnilistUser = null;
         currentAnilistMedia = null;
+        anilistWatchingList = [];
         renderAnilistNav();
+        renderHomeScreen();
         if (currentAnimeItem) renderAnilistDetailCard();
         updatePlayerTrackButton();
         if (notify) showToast("🚪 Vous êtes déconnecté d'AniList.");
@@ -2660,6 +3757,20 @@
                 }
                 currentAnilistMedia.mediaListEntry.progress = data.SaveMediaListEntry.progress;
                 currentAnilistMedia.mediaListEntry.status = data.SaveMediaListEntry.status;
+
+                // Mettre à jour l'entrée correspondante dans la liste des animes en cours
+                if (anilistWatchingList && anilistWatchingList.length > 0) {
+                    const idx = anilistWatchingList.findIndex(e => e.media?.id === currentAnilistMedia.id);
+                    if (idx !== -1) {
+                        anilistWatchingList[idx].progress = data.SaveMediaListEntry.progress;
+                        anilistWatchingList[idx].status = data.SaveMediaListEntry.status;
+                        anilistWatchingList[idx].updatedAt = Math.floor(Date.now() / 1000);
+                        try {
+                            localStorage.setItem('anilist_watching_cache', JSON.stringify(anilistWatchingList));
+                        } catch(e) {}
+                    }
+                }
+
                 renderAnilistDetailCard();
                 updatePlayerTrackButton();
                 showToast(`🎉 AniList synchronisé : Épisode ${targetProgress} enregistré !`);
@@ -2688,6 +3799,22 @@
             if (data?.SaveMediaListEntry) {
                 if (!currentAnilistMedia.mediaListEntry) currentAnilistMedia.mediaListEntry = {};
                 currentAnilistMedia.mediaListEntry.status = data.SaveMediaListEntry.status;
+
+                // Mettre à jour le statut local
+                if (anilistWatchingList && anilistWatchingList.length > 0) {
+                    const idx = anilistWatchingList.findIndex(e => e.media?.id === currentAnilistMedia.id);
+                    if (idx !== -1) {
+                        if (newStatus === 'CURRENT') {
+                            anilistWatchingList[idx].status = newStatus;
+                        } else {
+                            anilistWatchingList.splice(idx, 1);
+                        }
+                        try {
+                            localStorage.setItem('anilist_watching_cache', JSON.stringify(anilistWatchingList));
+                        } catch(e) {}
+                    }
+                }
+
                 renderAnilistDetailCard();
                 showToast(`✅ Statut AniList : ${newStatus}`);
             }
