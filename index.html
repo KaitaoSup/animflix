@@ -1265,6 +1265,105 @@
             color: #000 !important;
             font-weight: 800 !important;
         }
+
+        /* SECTION SÉLECTEUR D'ÉPISODES DU PACK */
+        .pack-episodes-section {
+            background: #141414;
+            border: 1px solid #2b2b2b;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        .pack-episodes-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding-bottom: 8px;
+        }
+        .pack-episodes-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 220px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .btn-pack-ep {
+            background: #222;
+            border: 1px solid #383838;
+            color: #ddd;
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-pack-ep:hover {
+            background: #333;
+            border-color: #666;
+            color: #fff;
+            transform: translateY(-1px);
+        }
+        .btn-pack-ep.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: #fff;
+            font-weight: 700;
+            box-shadow: 0 0 12px rgba(229, 9, 20, 0.5);
+        }
+        .btn-seek-jump {
+            background: #252525;
+            border: 1px solid #3c3c3c;
+            color: #ccc;
+            padding: 4px 9px;
+            border-radius: 5px;
+            font-size: 11.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-seek-jump:hover {
+            background: #383838;
+            color: #fff;
+            border-color: #555;
+        }
+        .btn-skip-op {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #fbbf24;
+        }
+        .btn-skip-op:hover {
+            background: rgba(245, 158, 11, 0.3);
+            border-color: #f59e0b;
+            color: #fff;
+        }
+        .btn-clean-cache {
+            background: #1f1f1f;
+            border: 1px solid #333;
+            color: #aaa;
+            padding: 7px 11px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-clean-cache:hover {
+            background: #2a2a2a;
+            color: #fff;
+            border-color: #555;
+            transform: scale(1.05);
+        }
     </style>
 </head>
 <body>
@@ -1285,6 +1384,10 @@
               </select>
               <button onclick="handleSearchClick()">Chercher</button>
           </div>
+          <!-- BOUTON PURGE CACHE TORRSERVER -->
+          <button class="btn-clean-cache" onclick="cleanTorrServerCache()" title="Purger le cache et les torrents en mémoire de TorrServer">
+              🧹
+          </button>
           <!-- PROFIL / BOUTON CONNEXION ANILIST -->
           <div id="anilistNavContainer"></div>
       </div>
@@ -1381,6 +1484,17 @@
           <!-- SECTION DE SUIVI & SYNCHRONISATION ANILIST -->
           <div id="detailAnilistSection" class="anilist-track-section"></div>
 
+          <!-- SECTION SÉLECTION D'ÉPISODE POUR LES PACKS / BATCHES -->
+          <div id="detailPackEpisodesSection" class="pack-episodes-section" style="display: none;">
+              <div class="pack-episodes-header">
+                  <span style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+                      📦 Épisodes disponibles dans ce Pack (<span id="packEpisodesCount">0</span>) :
+                  </span>
+                  <span style="font-size: 12px; color: #888;">Sélectionnez l'épisode à lire dans le lecteur</span>
+              </div>
+              <div id="packEpisodesList" class="pack-episodes-grid"></div>
+          </div>
+
           <!-- ENDROIT OÙ LE MEDIA PLAYER SERA (ESPACE LECTEUR VIDÉO DÉDIÉ) -->
           <div id="detailPlayerArea" class="detail-player-section">
               <div class="player-area-header">
@@ -1418,6 +1532,21 @@
                           </button>
                       </div>
                       <span id="sub-status" style="font-size: 12px; color: #46d369; font-weight: 500;"></span>
+
+                      <!-- SÉLECTEUR AUDIO DYNAMIQUE -->
+                      <div style="display: flex; align-items: center; gap: 6px; background: #1f1f1f; padding: 6px 12px; border-radius: 6px; border: 1px solid #333;">
+                          <span style="font-size: 13px; color: #aaa;">🎧 Audio :</span>
+                          <select id="audioSelect" onchange="onAudioChange(this.value)" style="padding: 4px 8px; font-size: 13px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; color: white;">
+                              <option value="">Auto (Défaut)</option>
+                          </select>
+                      </div>
+
+                      <!-- NAVIGATION TEMPORELLE / SEEK RAPIDE -->
+                      <div class="player-seek-group" style="display: flex; align-items: center; gap: 4px; background: #1a1a1a; padding: 4px 8px; border-radius: 6px; border: 1px solid #333;">
+                          <button class="btn-seek-jump" onclick="jumpSeekRelative(-10)" title="Reculer de 10s [←]">-10s</button>
+                          <button class="btn-seek-jump" onclick="jumpSeekRelative(10)" title="Avancer de 10s [→]">+10s</button>
+                          <button class="btn-seek-jump btn-skip-op" onclick="jumpSeekRelative(85)" title="Sauter l'Opening (+85s)">⏭️ Skip OP (+85s)</button>
+                      </div>
 
                       <!-- POPUP DE MODIFICATION DU STYLE DES SOUS-TITRES -->
                       <div id="subStyleMenu" class="sub-style-popup">
@@ -1615,6 +1744,9 @@
     const TORR_HOST = window.location.hostname || '127.0.0.1';
     let streamTimeout = null;
     let currentActiveMagnet = null;
+    let currentActiveFileIndex = 1;
+    let currentActiveAudioIndex = null;
+    let currentStreamOffset = 0;
     let currentSubAbort = null;
     let currentTextTrack = null;
     let currentAnimeItem = null;
@@ -1708,9 +1840,105 @@
         return { animeName: name, season, episode, resolution, audioLang };
     }
 
+    // Configuration dynamique des liens VLC (selon le fichier sélectionné dans le pack)
+    function updateVlcLinks(vlcUrl) {
+        const detailVlcBtn = document.getElementById('detailVlcBtn');
+        if (detailVlcBtn) {
+            detailVlcBtn.href = vlcUrl;
+            detailVlcBtn.onclick = () => openInVlc(vlcUrl);
+        }
+        const detailCopyVlcBtn = document.getElementById('detailCopyVlcBtn');
+        if (detailCopyVlcBtn) {
+            detailCopyVlcBtn.onclick = (e) => {
+                if (e) e.preventDefault();
+                copyVlcLink(vlcUrl);
+            };
+        }
+        const vlcLink = document.getElementById('vlcLink');
+        if (vlcLink) {
+            vlcLink.href = vlcUrl;
+            vlcLink.onclick = () => openInVlc(vlcUrl);
+        }
+        const playerCopyVlcBtn = document.getElementById('playerCopyVlcBtn');
+        if (playerCopyVlcBtn) {
+            playerCopyVlcBtn.onclick = (e) => {
+                if (e) e.preventDefault();
+                copyVlcLink(vlcUrl);
+            };
+        }
+    }
+
+    // Chargement de la liste des épisodes si le torrent contient plusieurs vidéos (Packs / Batches)
+    async function loadPackEpisodes(anime) {
+        const packSection = document.getElementById('detailPackEpisodesSection');
+        const packCount = document.getElementById('packEpisodesCount');
+        const packList = document.getElementById('packEpisodesList');
+        if (!packSection || !packList) return;
+
+        packSection.style.display = 'none';
+        packList.innerHTML = '';
+
+        try {
+            const res = await fetch('/api/torrent/files?magnet=' + encodeURIComponent(anime.lienMagnet));
+            const data = await res.json();
+            const files = data.files || [];
+
+            if (data.isMultiFile && files.length > 1) {
+                packCount.innerText = files.length;
+                packSection.style.display = 'block';
+
+                // Trouver l'épisode correspondant le mieux à la cible actuelle
+                const parsed = parseAnimeDetails(anime.titre);
+                const targetEp = currentDetectedEpisode || extractEpisodeNumber(anime.episode || parsed.episode, anime.titre);
+                let selectedFile = files.find(f => f.episode === targetEp) || files[0];
+                currentActiveFileIndex = selectedFile.id;
+
+                files.forEach(f => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn-pack-ep' + (f.id === currentActiveFileIndex ? ' active' : '');
+                    btn.innerHTML = `<span>▶</span> <span>${escapeHtml(f.label)}</span>`;
+                    btn.title = f.name;
+                    btn.onclick = () => {
+                        document.querySelectorAll('.btn-pack-ep').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        currentActiveFileIndex = f.id;
+                        currentStreamOffset = 0;
+                        if (f.episode) {
+                            currentDetectedEpisode = f.episode;
+                            document.getElementById('detailEpisodeBadge').innerText = '🎬 Épisode ' + f.episode;
+                            updatePlayerTrackButton();
+                        }
+                        const newVlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(anime.lienMagnet) + "&index=" + f.id + "&play";
+                        updateVlcLinks(newVlcUrl);
+                        showToast(`🎬 Lecture : ${f.label}`);
+                        startStreamingInPlayer(anime.lienMagnet, anime.titre, newVlcUrl, f.id, 0);
+                    };
+                    packList.appendChild(btn);
+                });
+
+                // Si le fichier cible trouvé n'était pas l'index 1, basculer immédiatement le lecteur dessus
+                if (selectedFile.id !== 1) {
+                    const matchedVlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(anime.lienMagnet) + "&index=" + selectedFile.id + "&play";
+                    updateVlcLinks(matchedVlcUrl);
+                    if (selectedFile.episode) {
+                        currentDetectedEpisode = selectedFile.episode;
+                        document.getElementById('detailEpisodeBadge').innerText = '🎬 Épisode ' + selectedFile.episode;
+                        updatePlayerTrackButton();
+                    }
+                    startStreamingInPlayer(anime.lienMagnet, anime.titre, matchedVlcUrl, selectedFile.id, 0);
+                }
+            }
+        } catch (e) {
+            console.warn("Erreur chargement des épisodes du pack:", e);
+        }
+    }
+
     // --- NAVIGATION ET REDIRECTION VERS LA PAGE DE DÉTAIL ---
     function openAnimeDetail(anime) {
         currentAnimeItem = anime;
+        currentActiveFileIndex = 1;
+        currentActiveAudioIndex = null;
+        currentStreamOffset = 0;
 
         // Bascule des vues
         document.getElementById('catalogView').style.display = 'none';
@@ -1750,26 +1978,10 @@
             this.src = 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(animeName);
         };
 
-        // Configuration des liens VLC et Magnet
+        // Configuration initiale des liens VLC et Magnet
         const vlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(anime.lienMagnet) + "&index=1&play";
-        
-        // 1. Bouton VLC principal
-        const detailVlcBtn = document.getElementById('detailVlcBtn');
-        if (detailVlcBtn) {
-            detailVlcBtn.href = vlcUrl;
-            detailVlcBtn.onclick = (e) => {
-                openInVlc(vlcUrl);
-            };
-        }
-        const detailCopyVlcBtn = document.getElementById('detailCopyVlcBtn');
-        if (detailCopyVlcBtn) {
-            detailCopyVlcBtn.onclick = (e) => {
-                if (e) e.preventDefault();
-                copyVlcLink(vlcUrl);
-            };
-        }
+        updateVlcLinks(vlcUrl);
 
-        // 2. Bouton Magnet (vrai lien magnet: avec copie simultanée)
         const detailMagnetBtn = document.getElementById('detailMagnetBtn');
         if (detailMagnetBtn) {
             detailMagnetBtn.href = anime.lienMagnet;
@@ -1787,22 +1999,6 @@
             };
         }
 
-        // 3. Boutons VLC du lecteur
-        const vlcLink = document.getElementById('vlcLink');
-        if (vlcLink) {
-            vlcLink.href = vlcUrl;
-            vlcLink.onclick = (e) => {
-                openInVlc(vlcUrl);
-            };
-        }
-        const playerCopyVlcBtn = document.getElementById('playerCopyVlcBtn');
-        if (playerCopyVlcBtn) {
-            playerCopyVlcBtn.onclick = (e) => {
-                if (e) e.preventDefault();
-                copyVlcLink(vlcUrl);
-            };
-        }
-
         // Synchronisation du mode de lecture de la fiche
         const streamModeSelect = document.getElementById('detailStreamMode');
         if (streamModeSelect) {
@@ -1812,8 +2008,11 @@
         // Synchronisation du suivi de progression AniList
         syncAnilistForDetail(anime);
 
-        // Lancement immédiat de la vidéo dans l'espace media player
-        startStreamingInPlayer(anime.lienMagnet, anime.titre, vlcUrl);
+        // Lancement immédiat de la vidéo (fichier 1 par défaut)
+        startStreamingInPlayer(anime.lienMagnet, anime.titre, vlcUrl, 1, 0);
+
+        // Analyse des fichiers du pack en arrière-plan pour afficher les épisodes disponibles
+        loadPackEpisodes(anime);
     }
 
     function closeDetailView() {
@@ -1830,10 +2029,22 @@
             video.textTracks[i].mode = 'disabled';
         }
         currentTextTrack = null;
+
+        // Purge automatique du torrent quitté dans TorrServer
+        if (currentActiveMagnet) {
+            fetch('/api/torrserver/drop?magnet=' + encodeURIComponent(currentActiveMagnet), { method: 'POST' }).catch(() => {});
+        }
+
         currentActiveMagnet = null;
+        currentActiveFileIndex = 1;
+        currentActiveAudioIndex = null;
+        currentStreamOffset = 0;
         currentAnimeItem = null;
         currentAnilistMedia = null;
         hasAutoTrackedCurrentEpisode = false;
+
+        const packSection = document.getElementById('detailPackEpisodesSection');
+        if (packSection) packSection.style.display = 'none';
 
         document.getElementById('detailView').style.display = 'none';
         document.getElementById('catalogView').style.display = 'block';
@@ -1869,8 +2080,8 @@
         if (!currentAnimeItem) return;
         const newMode = document.getElementById('detailStreamMode').value;
         document.getElementById('streamMode').value = newMode;
-        const vlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(currentAnimeItem.lienMagnet) + "&index=1&play";
-        startStreamingInPlayer(currentAnimeItem.lienMagnet, currentAnimeItem.titre, vlcUrl);
+        const vlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(currentAnimeItem.lienMagnet) + "&index=" + currentActiveFileIndex + "&play";
+        startStreamingInPlayer(currentAnimeItem.lienMagnet, currentAnimeItem.titre, vlcUrl, currentActiveFileIndex, currentStreamOffset);
         showToast("Mode de lecture mis à jour : " + (newMode === 'direct' ? '⚡ Direct' : '🔄 Transcodage'));
     }
 
@@ -2160,23 +2371,88 @@
         }
     }
 
+    // --- OUTILS DE NAVIGATION TEMPORELLE ET AUDIO ---
+    function formatTimestamp(sec) {
+        if (!sec || isNaN(sec)) return "0:00";
+        const total = Math.floor(sec);
+        const h = Math.floor(total / 3600);
+        const m = Math.floor((total % 3600) / 60);
+        const s = total % 60;
+        if (h > 0) {
+            return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function jumpSeekRelative(deltaSeconds) {
+        const video = document.getElementById('videoPlayer');
+        if (!video || !currentActiveMagnet) return;
+        const currentPos = currentStreamOffset + (video.currentTime || 0);
+        const targetPos = Math.max(0, Math.round(currentPos + deltaSeconds));
+        showToast((deltaSeconds > 0 ? `⏩ +${deltaSeconds}s` : `⏪ ${deltaSeconds}s`) + ` (${formatTimestamp(targetPos)})`);
+        
+        const currentVlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(currentActiveMagnet) + "&index=" + currentActiveFileIndex + "&play";
+        startStreamingInPlayer(currentActiveMagnet, currentAnimeItem?.titre || 'Anime', currentVlcUrl, currentActiveFileIndex, targetPos);
+    }
+
+    function onAudioChange(val) {
+        currentActiveAudioIndex = (val !== '' && val !== null) ? parseInt(val, 10) : null;
+        const video = document.getElementById('videoPlayer');
+        const curPos = Math.round(currentStreamOffset + (video?.currentTime || 0));
+        showToast("Piste audio modifiée : " + (currentActiveAudioIndex !== null ? 'Piste ' + (currentActiveAudioIndex + 1) : 'Automatique'));
+        if (currentActiveMagnet) {
+            const currentVlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(currentActiveMagnet) + "&index=" + currentActiveFileIndex + "&play";
+            startStreamingInPlayer(currentActiveMagnet, currentAnimeItem?.titre || 'Anime', currentVlcUrl, currentActiveFileIndex, curPos);
+        }
+    }
+
+    async function cleanTorrServerCache() {
+        if (!confirm("Voulez-vous purger tous les torrents et données en mémoire de TorrServer ?\n(Libère immédiatement la RAM et le cache de streaming)")) return;
+        showToast("Purge du cache TorrServer en cours... ⏳");
+        try {
+            const res = await fetch('/api/torrserver/clean', { method: 'POST' });
+            const data = await res.json();
+            showToast(`✅ ${data.message || 'Cache TorrServer nettoyé !'}`);
+        } catch (e) {
+            showToast("❌ Erreur lors du nettoyage : " + e.message);
+        }
+    }
+
     // --- LECTEUR VIDÉO ET STREAMING ---
-    async function startStreamingInPlayer(magnet, titre, vlcUrl) {
+    async function startStreamingInPlayer(magnet, titre, vlcUrl, fileIndex = null, seekSeconds = 0) {
         currentActiveMagnet = magnet;
+        if (fileIndex !== null) {
+            currentActiveFileIndex = fileIndex;
+        }
+        currentStreamOffset = seekSeconds;
         hasAutoTrackedCurrentEpisode = false;
         updatePlayerTrackButton();
+
         const streamMode = document.getElementById('detailStreamMode') ? document.getElementById('detailStreamMode').value : 'direct';
         const type = document.getElementById('searchType').value || 'vostfr';
         const video = document.getElementById('videoPlayer');
         const playerStatus = document.getElementById('player-status');
         const statusText = document.getElementById('status-text');
         playerStatus.style.display = 'block';
-        statusText.innerText = "Connexion à TorrServer & chargement du flux... ⏳";
+        statusText.innerText = seekSeconds > 0 
+            ? `Reprise à ${formatTimestamp(seekSeconds)}... ⏳`
+            : "Connexion à TorrServer & chargement du flux... ⏳";
 
-        const webUrl = '/play?magnet=' + encodeURIComponent(magnet) + '&mode=' + streamMode + '&type=' + type;
+        let webUrl = '/play?magnet=' + encodeURIComponent(magnet) + 
+                     '&mode=' + encodeURIComponent(streamMode) + 
+                     '&type=' + encodeURIComponent(type) +
+                     '&fileIndex=' + encodeURIComponent(currentActiveFileIndex);
+
+        if (currentActiveAudioIndex !== null && currentActiveAudioIndex !== '') {
+            webUrl += '&audioIndex=' + encodeURIComponent(currentActiveAudioIndex);
+        }
+        if (seekSeconds > 0) {
+            webUrl += '&ss=' + encodeURIComponent(seekSeconds);
+        }
+
         video.src = webUrl;
 
-        setupSubtitles(magnet, type);
+        setupSubtitles(magnet, type, currentActiveFileIndex, seekSeconds);
 
         video.onplaying = () => {
             if (streamTimeout) clearTimeout(streamTimeout);
@@ -2214,17 +2490,40 @@
         return 0;
     }
 
-    async function setupSubtitles(magnet, type) {
+    async function setupSubtitles(magnet, type, fileIndex = 1, seekOffset = 0) {
         const subSelect = document.getElementById('subSelect');
+        const audioSelect = document.getElementById('audioSelect');
         const subStatus = document.getElementById('sub-status');
         subSelect.innerHTML = '<option value="-1">Analyse des pistes... ⏳</option>';
+        if (audioSelect) audioSelect.innerHTML = '<option value="">Analyse audio... ⏳</option>';
         subStatus.innerText = "";
 
         try {
-            const res = await fetch('/api/streams?magnet=' + encodeURIComponent(magnet));
+            const res = await fetch('/api/streams?magnet=' + encodeURIComponent(magnet) + '&fileIndex=' + fileIndex);
             const info = await res.json();
             const subTracks = info.subTracks || [];
+            const audioTracks = info.audioTracks || [];
 
+            // 1. Mise à jour du sélecteur Audio
+            if (audioSelect) {
+                audioSelect.innerHTML = '';
+                const optAuto = document.createElement('option');
+                optAuto.value = "";
+                optAuto.textContent = "Auto (Défaut)";
+                audioSelect.appendChild(optAuto);
+
+                audioTracks.forEach(a => {
+                    const opt = document.createElement('option');
+                    opt.value = a.index;
+                    opt.textContent = a.label;
+                    if (currentActiveAudioIndex !== null && currentActiveAudioIndex === a.index) {
+                        opt.selected = true;
+                    }
+                    audioSelect.appendChild(opt);
+                });
+            }
+
+            // 2. Mise à jour du sélecteur Sous-titres
             subSelect.innerHTML = '';
             if (subTracks.length === 0) {
                 subSelect.innerHTML = '<option value="-1">Aucun sous-titre intégré</option>';
@@ -2245,13 +2544,13 @@
             subSelect.appendChild(optOff);
 
             let chosenIndex = info.subIndex !== null ? info.subIndex : 0;
-            if (type === 'vf' && info.frAudioIndex !== null) {
+            if (type === 'vf' && info.frAudioIndex !== null && currentActiveAudioIndex === null) {
                 chosenIndex = -1;
             }
 
             subSelect.value = chosenIndex;
             if (chosenIndex !== -1) {
-                streamSubtitlesLive(magnet, chosenIndex);
+                streamSubtitlesLive(magnet, chosenIndex, fileIndex, seekOffset);
             } else {
                 subStatus.innerText = "Sous-titres désactivés";
                 document.getElementById('toggleSubBtn').innerText = "CC OFF";
@@ -2259,11 +2558,11 @@
             }
         } catch (err) {
             subSelect.innerHTML = '<option value="0">Sous-titre 1 (Auto)</option><option value="-1">Désactivés</option>';
-            streamSubtitlesLive(magnet, 0);
+            streamSubtitlesLive(magnet, 0, fileIndex, seekOffset);
         }
     }
 
-    async function streamSubtitlesLive(magnet, subIndex) {
+    async function streamSubtitlesLive(magnet, subIndex, fileIndex = 1, seekOffset = 0) {
         if (currentSubAbort) {
             currentSubAbort.abort();
         }
@@ -2286,7 +2585,7 @@
         currentTextTrack.mode = "showing";
 
         try {
-            const subUrl = '/api/subtitles?magnet=' + encodeURIComponent(magnet) + '&subIndex=' + subIndex;
+            const subUrl = '/api/subtitles?magnet=' + encodeURIComponent(magnet) + '&fileIndex=' + fileIndex + '&subIndex=' + subIndex;
             const response = await fetch(subUrl, { signal: currentSubAbort.signal });
             if (!response.ok || !response.body) {
                 subStatus.innerText = "⚠️ Sous-titres indisponibles";
@@ -2313,9 +2612,12 @@
                     for (let i = 0; i < lines.length; i++) {
                         const match = lines[i].match(/((?:\d+:)?\d+:\d+\.\d+)\s*-->\s*((?:\d+:)?\d+:\d+\.\d+)/);
                         if (match) {
-                            const start = parseVttTime(match[1]);
-                            const end = parseVttTime(match[2]);
-                            const cueKey = start + '_' + end;
+                            const rawStart = parseVttTime(match[1]);
+                            const rawEnd = parseVttTime(match[2]);
+                            const start = Math.max(0, rawStart - seekOffset);
+                            const end = Math.max(0, rawEnd - seekOffset);
+                            const cueKey = rawStart + '_' + rawEnd;
+
                             if (!seenCues.has(cueKey)) {
                                 seenCues.add(cueKey);
                                 const rawTextLines = lines.slice(i + 1);
@@ -2389,7 +2691,7 @@
             btn.innerText = "CC ON";
             btn.style.background = "var(--primary)";
             if (currentActiveMagnet) {
-                streamSubtitlesLive(currentActiveMagnet, subIndex);
+                streamSubtitlesLive(currentActiveMagnet, subIndex, currentActiveFileIndex, currentStreamOffset);
             }
         }
     }
@@ -2682,10 +2984,12 @@
         } else if (e.key.toLowerCase() === 's' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
             e.preventDefault();
             toggleSubStyleMenu();
-        } else if (e.key === 'ArrowRight' && e.target.tagName !== 'SELECT') {
-            video.currentTime += 5;
-        } else if (e.key === 'ArrowLeft' && e.target.tagName !== 'SELECT') {
-            video.currentTime -= 5;
+        } else if (e.key === 'ArrowRight' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'INPUT') {
+            e.preventDefault();
+            jumpSeekRelative(10);
+        } else if (e.key === 'ArrowLeft' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'INPUT') {
+            e.preventDefault();
+            jumpSeekRelative(-10);
         } else if (e.key.toLowerCase() === 'f' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
             if (document.fullscreenElement) {
                 document.exitFullscreen().catch(() => {});
@@ -3866,8 +4170,10 @@
 
         video.addEventListener('timeupdate', () => {
             if (!hasAutoTrackedCurrentEpisode && currentAnilistMedia && localStorage.getItem('anilist_token')) {
-                if (video.duration && isFinite(video.duration) && video.duration > 60) {
-                    const percent = (video.currentTime / video.duration) * 100;
+                const totalDur = (video.duration && isFinite(video.duration)) ? (video.duration + currentStreamOffset) : 0;
+                const curTime = (video.currentTime || 0) + currentStreamOffset;
+                if (totalDur > 60) {
+                    const percent = (curTime / totalDur) * 100;
                     if (percent >= 85) {
                         hasAutoTrackedCurrentEpisode = true;
                         trackCurrentPlayingEpisode(true);
@@ -3965,16 +4271,18 @@
         await syncAnilistForDetail(currentAnimeItem);
     }
 
-    // Chargement immédiat du style et initialisation session AniList au démarrage
-    loadSavedSubStyle();
-    initAnilistSession();
-    setupVideoPlayerTracking();
-
-    window.addEventListener('DOMContentLoaded', () => {
+    // Initialisation unique au chargement
+    function initApp() {
         loadSavedSubStyle();
         initAnilistSession();
         setupVideoPlayerTracking();
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', initApp);
+    } else {
+        initApp();
+    }
   </script>
 </body>
 </html>

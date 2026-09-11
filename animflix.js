@@ -1,21 +1,31 @@
 import express from 'express';
 import Parser from 'rss-parser';
-import { spawn, exec } from 'child_process';
+import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Chargement automatique des variables d'environnement (.env)
+if (typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile();
+  } catch (e) {
+    // Le fichier .env est optionnel
+  }
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const execPromise = promisify(exec);
+const execFilePromise = promisify(execFile);
 
 // --- CONFIGURATION ---
-const TORRSERVER_LOCAL_URL = "http://127.0.0.1:8090"; // Connexion interne ultra-rapide
-const TMDB_API_KEY = "3fdc6d0d7e26ee891af1f1ba1469a4e8"; // Optionnel : clé TMDB (Kitsu est utilisé en fallback automatique sans clé)
+const PORT = parseInt(process.env.PORT, 10) || 3000;
+const TORRSERVER_LOCAL_URL = process.env.TORRSERVER_URL || "http://127.0.0.1:8090"; // Connexion interne ultra-rapide
+const TMDB_API_KEY = process.env.TMDB_API_KEY || ""; // Optionnel : clé TMDB (Kitsu et TVMaze sont utilisés en fallback automatique sans clé)
 
 // Dossier de cache persistant pour les sous-titres WebVTT
 const SUB_CACHE_DIR = path.join(process.cwd(), 'cache', 'subtitles');
@@ -419,8 +429,15 @@ const STREAMS_CACHE_TTL = 1000 * 60 * 60; // 1 heure
 async function analyzeStreams(videoUrl) {
   try {
     console.log("🔍 FFPROBE: Analyse rapide des flux...");
-    const cmd = `ffprobe -v error -probesize 4000000 -analyzeduration 4000000 -show_entries stream=index,codec_type,codec_name:stream_tags=language,title -of json "${videoUrl}"`;
-    const { stdout } = await execPromise(cmd, { timeout: 12000 });
+    const ffprobeArgs = [
+      '-v', 'error',
+      '-probesize', '4000000',
+      '-analyzeduration', '4000000',
+      '-show_entries', 'stream=index,codec_type,codec_name:stream_tags=language,title',
+      '-of', 'json',
+      videoUrl
+    ];
+    const { stdout } = await execFilePromise('ffprobe', ffprobeArgs, { timeout: 12000 });
     const data = JSON.parse(stdout);
     const streams = data.streams || [];
 
@@ -491,24 +508,124 @@ async function analyzeStreams(videoUrl) {
   }
 }
 
-async function getStreamInfo(magnet) {
+// Détection du numéro d'épisode dans le nom de fichier
+function extractFileEpisodeNumber(filePath) {
+  if (!filePath) return null;
+  const base = path.basename(filePath);
+  const mSe = base.match(/S\d{1,2}\s*E0*(\d{1,4})\b/i);
+  if (mSe) return parseInt(mSe[1], 10);
+  const mEp = base.match(/\b(?:E|EP|Episode|Épisode)\s*0*(\d{1,4})\b/i) ||
+              base.match(/\s-\s0*(\d{1,4})(?:v\d+)?(?:\s|\.|$|\[|\()/);
+  if (mEp) return parseInt(mEp[1], 10);
+  const mNum = base.match(/(?:^|[^\d])0*(\d{1,3})(?:[^\d]|$)/);
+  if (mNum) return parseInt(mNum[1], 10);
+  return null;
+}
+
+const torrentFilesCache = new Map(); // key: hash, val: { data, timestamp }
+
+// --- ROUTE API LISTE DES FICHIERS D'UN TORRENT (MULTI-FICHIERS / PACKS / BATCHES) ---
+app.get('/api/torrent/files', async (req, res) => {
+  const { magnet } = req.query;
+  if (!magnet) return res.status(400).json({ error: "Lien magnet manquant" });
+
   const hash = getTorrentHash(magnet);
-  const cached = streamsCache.get(hash);
+  const cached = torrentFilesCache.get(hash);
+  if (cached && (Date.now() - cached.timestamp < 1000 * 60 * 60 * 24)) {
+    return res.json(cached.data);
+  }
+
+  try {
+    // 1. Ajouter le torrent à TorrServer sans enregistrer dans la base
+    try {
+      await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
+        action: "add",
+        link: magnet,
+        save_to_db: false
+      }, { timeout: 3500 });
+    } catch (e) {}
+
+    // 2. Récupérer les informations et la liste des fichiers (poll court)
+    let fileStats = [];
+    for (let i = 0; i < 6; i++) {
+      try {
+        const statRes = await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
+          action: "get",
+          hash
+        }, { timeout: 2500 });
+        if (statRes.data?.file_stats && statRes.data.file_stats.length > 0) {
+          fileStats = statRes.data.file_stats;
+          break;
+        }
+      } catch (e) {}
+      await new Promise(r => setTimeout(r, 600));
+    }
+
+    const VIDEO_EXTENSIONS = new Set(['.mkv', '.mp4', '.avi', '.webm', '.mov', '.m4v', '.ts']);
+    let videoFiles = fileStats
+      .filter(f => {
+        const ext = path.extname(f.path || '').toLowerCase();
+        return VIDEO_EXTENSIONS.has(ext) || (f.length && f.length > 25 * 1024 * 1024);
+      })
+      .map(f => {
+        const ep = extractFileEpisodeNumber(f.path);
+        return {
+          id: f.id,
+          path: f.path,
+          name: path.basename(f.path),
+          length: f.length,
+          episode: ep,
+          label: ep !== null ? `Épisode ${ep}` : path.basename(f.path)
+        };
+      });
+
+    // Tri par numéro d'épisode puis par nom
+    videoFiles.sort((a, b) => {
+      if (a.episode !== null && b.episode !== null) return a.episode - b.episode;
+      return a.name.localeCompare(b.name, undefined, { numeric: true });
+    });
+
+    const isMultiFile = videoFiles.length > 1;
+    const responseData = {
+      hash,
+      isMultiFile,
+      files: videoFiles.length > 0 ? videoFiles : [{ id: 1, name: "Flux vidéo principal", episode: 1, label: "Épisode 1" }]
+    };
+
+    if (videoFiles.length > 0) {
+      torrentFilesCache.set(hash, { data: responseData, timestamp: Date.now() });
+    }
+
+    return res.json(responseData);
+  } catch (err) {
+    return res.json({
+      hash,
+      isMultiFile: false,
+      files: [{ id: 1, name: "Flux vidéo principal", episode: 1, label: "Épisode 1" }]
+    });
+  }
+});
+
+async function getStreamInfo(magnet, fileIndex = 1) {
+  const hash = getTorrentHash(magnet);
+  const parsedFileIndex = parseInt(fileIndex, 10) || 1;
+  const cacheKey = `${hash}_f${parsedFileIndex}`;
+  const cached = streamsCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < STREAMS_CACHE_TTL)) {
     return cached.data;
   }
-  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=1&play`;
+  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
   const data = await analyzeStreams(torrUrl);
-  streamsCache.set(hash, { data, timestamp: Date.now() });
+  streamsCache.set(cacheKey, { data, timestamp: Date.now() });
   return data;
 }
 
 // --- ROUTE API INFO FLUX (AUDIO & SOUS-TITRES) ---
 app.get('/api/streams', async (req, res) => {
-  const { magnet } = req.query;
+  const { magnet, fileIndex = 1 } = req.query;
   if (!magnet) return res.status(400).json({ error: "Lien magnet manquant" });
   try {
-    const info = await getStreamInfo(magnet);
+    const info = await getStreamInfo(magnet, fileIndex);
     res.json(info);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -517,14 +634,16 @@ app.get('/api/streams', async (req, res) => {
 
 // --- ROUTE API STREAMING SOUS-TITRES WEBVTT DIRECTS DANS LE SITE ---
 app.get('/api/subtitles', async (req, res) => {
-  const { magnet, subIndex = 0 } = req.query;
+  const { magnet, fileIndex = 1, subIndex = 0 } = req.query;
   if (!magnet) return res.status(400).send("Lien magnet manquant");
 
   const hash = getTorrentHash(magnet);
-  const parsedIndex = parseInt(subIndex, 10) || 0;
-  const cacheKey = `${hash}_${parsedIndex}`;
+  const parsedFileIndex = parseInt(fileIndex, 10) || 1;
+  const parsedSubIndex = parseInt(subIndex, 10) || 0;
+  const cacheKey = `${hash}_f${parsedFileIndex}_s${parsedSubIndex}`;
   const vttFile = path.join(SUB_CACHE_DIR, `${cacheKey}.vtt`);
-  const tmpFile = path.join(SUB_CACHE_DIR, `${cacheKey}.tmp`);
+  const uniqueId = Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  const tmpFile = path.join(SUB_CACHE_DIR, `${cacheKey}.${uniqueId}.tmp`);
 
   // 1. Si déjà entièrement extrait et mis en cache, servir instantanément (< 1ms)
   if (fs.existsSync(vttFile)) {
@@ -535,7 +654,7 @@ app.get('/api/subtitles', async (req, res) => {
   }
 
   // 2. Sinon, streamer en temps réel avec FFmpeg (flush_packets pour affichage immédiat)
-  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=1&play`;
+  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
 
   res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -545,7 +664,7 @@ app.get('/api/subtitles', async (req, res) => {
   const ffmpegArgs = [
     '-v', 'error',
     '-i', torrUrl,
-    '-map', `0:s:${parsedIndex}`,
+    '-map', `0:s:${parsedSubIndex}`,
     '-flush_packets', '1',
     '-f', 'webvtt',
     'pipe:1'
@@ -563,7 +682,13 @@ app.get('/api/subtitles', async (req, res) => {
     if (code === 0) {
       finishedCleanly = true;
       if (fs.existsSync(tmpFile)) {
-        try { fs.renameSync(tmpFile, vttFile); } catch(e) {}
+        try {
+          if (!fs.existsSync(vttFile)) {
+            fs.renameSync(tmpFile, vttFile);
+          } else {
+            fs.unlinkSync(tmpFile);
+          }
+        } catch(e) {}
       }
     } else {
       if (fs.existsSync(tmpFile)) {
@@ -583,31 +708,49 @@ app.get('/api/subtitles', async (req, res) => {
   });
 });
 
-// --- TRANSCODEUR FFMPEG OPTIMISÉ (ZÉRO LATENCE & MULTITHREAD) ---
+// --- TRANSCODEUR FFMPEG OPTIMISÉ (ZÉRO LATENCE, SEEK & MULTITHREAD) ---
 app.get('/play', async (req, res) => {
-  const { magnet, mode, type } = req.query;
+  const { magnet, mode, type, fileIndex = 1, audioIndex, ss } = req.query;
   if (!magnet) return res.status(400).send("Lien magnet manquant");
 
-  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=1&play`;
+  const parsedFileIndex = parseInt(fileIndex, 10) || 1;
+  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
+  const seekSeconds = parseFloat(ss) || 0;
 
   res.setHeader('Content-Type', 'video/mp4');
   res.setHeader('Accept-Ranges', 'none');
 
   // MODE 1 : LECTURE DIRECTE (0% CPU, STREAM ULTRA-RAPIDE SANS RÉENCODAGE VIDÉO)
   if (mode === 'direct') {
-    console.log("⚡ Lancement FFmpeg en Mode Direct (Copie vidéo, 0% CPU)");
+    console.log(`⚡ Lancement FFmpeg en Mode Direct (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s, Audio: ${audioIndex ?? 'auto'})`);
     const directArgs = [
-      '-threads', '0',
+      '-threads', '0'
+    ];
+
+    if (seekSeconds > 0) {
+      directArgs.push('-ss', `${seekSeconds}`);
+    }
+
+    directArgs.push(
       '-i', torrUrl,
       '-map', '0:v:0',
-      '-c:v', 'copy',
-      '-map', '0:a:0?',
+      '-c:v', 'copy'
+    );
+
+    // Sélection de la piste audio
+    if (audioIndex !== undefined && audioIndex !== null && audioIndex !== '') {
+      directArgs.push('-map', `0:a:${parseInt(audioIndex, 10)}`);
+    } else {
+      directArgs.push('-map', '0:a:0?');
+    }
+
+    directArgs.push(
       '-c:a', 'aac',
       '-ac', '2',
       '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
       '-f', 'mp4',
       'pipe:1'
-    ];
+    );
 
     const ffmpeg = spawn('ffmpeg', directArgs);
     ffmpeg.stdout.pipe(res);
@@ -620,16 +763,23 @@ app.get('/play', async (req, res) => {
   }
 
   // MODE 2 : TRANSCODAGE VIDÉO H.264 (POUR NAVIGATEURS OU APPAREILS SANS HEVC)
-  console.log("🔄 Lancement FFmpeg en Mode Transcodage H.264 (Compatibilité standard)");
-  const streamInfo = await getStreamInfo(magnet);
+  console.log(`🔄 Lancement FFmpeg en Mode Transcodage H.264 (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s, Audio: ${audioIndex ?? 'auto'})`);
+  const streamInfo = await getStreamInfo(magnet, parsedFileIndex);
 
   const ffmpegArgs = [
-    '-threads', '0', // Utilise tous les coeurs CPU disponibles
-    '-i', torrUrl
+    '-threads', '0'
   ];
 
+  if (seekSeconds > 0) {
+    ffmpegArgs.push('-ss', `${seekSeconds}`);
+  }
+
+  ffmpegArgs.push('-i', torrUrl);
+
   // Sélection intelligente de la piste audio
-  if (type === 'vf' && streamInfo.frAudioIndex !== null) {
+  if (audioIndex !== undefined && audioIndex !== null && audioIndex !== '') {
+    ffmpegArgs.push('-map', `0:a:${parseInt(audioIndex, 10)}`);
+  } else if (type === 'vf' && streamInfo.frAudioIndex !== null) {
     ffmpegArgs.push('-map', `0:a:${streamInfo.frAudioIndex}`);
   } else {
     ffmpegArgs.push('-map', '0:a:0?');
@@ -666,6 +816,67 @@ app.get('/play', async (req, res) => {
   });
 });
 
-app.listen(3000, () => {
-  console.log('✅ Serveur Animflix optimisé prêt sur http://localhost:3000 !');
+// --- ROUTES API GESTION DU CACHE TORRSERVER ---
+app.post('/api/torrserver/drop', async (req, res) => {
+  const { magnet, hash } = { ...req.query, ...req.body };
+  const torrentHash = hash || (magnet ? getTorrentHash(magnet) : null);
+  if (!torrentHash) return res.status(400).json({ error: "Hash ou magnet manquant" });
+
+  try {
+    await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
+      action: "rem",
+      hash: torrentHash
+    }, { timeout: 3000 });
+    return res.json({ success: true, message: `Torrent ${torrentHash} retiré de TorrServer.` });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/torrserver/clean', async (req, res) => {
+  try {
+    const listRes = await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
+      action: "list"
+    }, { timeout: 3000 });
+    const torrents = listRes.data || [];
+    let cleaned = 0;
+    for (const t of torrents) {
+      if (t.hash) {
+        try {
+          await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
+            action: "rem",
+            hash: t.hash
+          }, { timeout: 2000 });
+          cleaned++;
+        } catch (e) {}
+      }
+    }
+    return res.json({ success: true, cleaned, message: `${cleaned} torrent(s) purgé(s) du cache TorrServer.` });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/torrserver/status', async (req, res) => {
+  try {
+    const listRes = await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
+      action: "list"
+    }, { timeout: 3000 });
+    const torrents = listRes.data || [];
+    return res.json({
+      activeCount: torrents.length,
+      torrents: torrents.map(t => ({
+        hash: t.hash,
+        title: t.title || t.name,
+        stat: t.stat_string || t.stat,
+        size: t.torrent_size
+      }))
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`✅ Serveur Animflix optimisé prêt sur http://localhost:${PORT} !`);
 });
