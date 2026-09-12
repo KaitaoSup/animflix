@@ -428,18 +428,38 @@ const STREAMS_CACHE_TTL = 1000 * 60 * 60; // 1 heure
 
 async function analyzeStreams(videoUrl) {
   try {
-    console.log("🔍 FFPROBE: Analyse rapide des flux...");
+    console.log("🔍 FFPROBE: Analyse rapide des flux et durée...");
     const ffprobeArgs = [
       '-v', 'error',
-      '-probesize', '4000000',
-      '-analyzeduration', '4000000',
-      '-show_entries', 'stream=index,codec_type,codec_name:stream_tags=language,title',
+      '-probesize', '5000000',
+      '-analyzeduration', '5000000',
+      '-show_entries', 'stream=index,codec_type,codec_name,duration:format=duration:stream_tags=language,title',
       '-of', 'json',
       videoUrl
     ];
-    const { stdout } = await execFilePromise('ffprobe', ffprobeArgs, { timeout: 12000 });
+    const { stdout } = await execFilePromise('ffprobe', ffprobeArgs, { timeout: 15000 });
     const data = JSON.parse(stdout);
     const streams = data.streams || [];
+
+    // Extraction de la durée totale en secondes
+    let duration = null;
+    if (data.format?.duration && !isNaN(parseFloat(data.format.duration))) {
+      duration = Math.round(parseFloat(data.format.duration));
+    }
+    if (!duration) {
+      for (const s of streams) {
+        if (s.duration && !isNaN(parseFloat(s.duration))) {
+          const d = Math.round(parseFloat(s.duration));
+          if (d > 0) {
+            duration = d;
+            break;
+          }
+        }
+      }
+    }
+    if (!duration || duration <= 0) {
+      duration = 1440; // 24 minutes standard fallback
+    }
 
     let subIndex = null;
     let relativeSubCount = 0;
@@ -496,14 +516,16 @@ async function analyzeStreams(videoUrl) {
       subIndex = 0;
     }
 
-    return { subIndex, subTracks, frAudioIndex, audioTracks };
+    console.log(`✅ FFPROBE: Analyse terminée. Durée = ${duration}s, Sous-titres = ${subTracks.length}, Audio = ${audioTracks.length}`);
+    return { subIndex, subTracks, frAudioIndex, audioTracks, duration };
   } catch (e) {
-    console.log("⚠️ FFPROBE: Analyse rapide streams terminée avec fallback.");
+    console.log("⚠️ FFPROBE: Analyse rapide streams terminée avec fallback:", e.message);
     return {
       subIndex: 0,
       subTracks: [{ index: 0, lang: 'fre', label: 'Français (VOSTFR)', isFrench: true }],
       frAudioIndex: null,
-      audioTracks: []
+      audioTracks: [],
+      duration: 1440
     };
   }
 }
@@ -611,7 +633,7 @@ async function getStreamInfo(magnet, fileIndex = 1) {
   const parsedFileIndex = parseInt(fileIndex, 10) || 1;
   const cacheKey = `${hash}_f${parsedFileIndex}`;
   const cached = streamsCache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp < STREAMS_CACHE_TTL)) {
+  if (cached && (Date.now() - cached.timestamp < STREAMS_CACHE_TTL) && cached.data?.duration) {
     return cached.data;
   }
   const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
