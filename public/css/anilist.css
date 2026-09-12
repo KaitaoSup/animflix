@@ -1,0 +1,668 @@
+        /* --- STYLES ANILIST TRACKING --- */
+        .btn-anilist-nav {
+            background: linear-gradient(135deg, #02a9ff 0%, #0072b0 100%);
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 9px 15px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(2, 169, 255, 0.35);
+            transition: all 0.2s ease;
+        }
+        .btn-anilist-nav:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(2, 169, 255, 0.5);
+            background: linear-gradient(135deg, #1ab3ff 0%, #0084cc 100%);
+        }
+        .anilist-user-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            background: #182330;
+            border: 1px solid #23374d;
+            border-radius: 24px;
+            padding: 4px 12px 4px 5px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .anilist-user-badge:hover {
+            background: #203144;
+            border-color: var(--anilist-blue);
+        }
+        .anilist-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1.5px solid var(--anilist-blue);
+            background: #000;
+        }
+        .anilist-username {
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+            max-width: 130px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .anilist-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            right: 0;
+            background: #152232;
+            border: 1px solid #22374e;
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.85);
+            z-index: 200;
+            width: 220px;
+            animation: fadeIn 0.15s ease-out;
+            cursor: default;
+        }
+        /* Pont invisible pour préserver le hover continu sans rupture */
+        .anilist-dropdown::before {
+            content: "";
+            position: absolute;
+            top: -10px;
+            left: 0;
+            right: 0;
+            height: 10px;
+        }
+        .anilist-user-badge:hover .anilist-dropdown,
+        .anilist-user-badge.active .anilist-dropdown {
+            display: block !important;
+        }
+        .anilist-dropdown a, .anilist-dropdown button {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            font-size: 13px;
+            border-radius: 6px;
+            color: #ddd;
+            text-decoration: none;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.15s;
+            box-sizing: border-box;
+        }
+        .anilist-dropdown a:hover, .anilist-dropdown button:hover {
+            background: rgba(2, 169, 255, 0.15);
+            color: #fff;
+        }
+
+        /* SECTION SUIVI ANILIST DANS LA FICHE DE L'ANIME */
+        .anilist-track-section {
+            background: linear-gradient(135deg, #111a26 0%, #0c141e 100%);
+            border: 1px solid var(--anilist-border);
+            border-radius: 14px;
+            padding: 20px 24px;
+            margin-bottom: 28px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+            position: relative;
+            overflow: hidden;
+        }
+        .anilist-track-section::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; bottom: 0; width: 4px;
+            background: linear-gradient(180deg, var(--anilist-blue), #0077b6);
+        }
+        .anilist-track-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            padding-bottom: 12px;
+        }
+        .anilist-track-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .anilist-track-actions-top {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .btn-anilist-link {
+            background: rgba(2, 169, 255, 0.12);
+            border: 1px solid rgba(2, 169, 255, 0.35);
+            color: var(--anilist-blue);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-anilist-link:hover {
+            background: rgba(2, 169, 255, 0.25);
+            border-color: var(--anilist-blue);
+        }
+        .anilist-track-body {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .anilist-progress-wrap {
+            flex: 1;
+            min-width: 280px;
+        }
+        .anilist-progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .anilist-progress-bar-bg {
+            width: 100%;
+            height: 10px;
+            background: #192738;
+            border-radius: 5px;
+            overflow: hidden;
+            border: 1px solid #23374d;
+        }
+        .anilist-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #02a9ff 0%, #00d2ff 100%);
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+        .anilist-stepper {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #162436;
+            border: 1px solid #243a54;
+            border-radius: 8px;
+            padding: 4px 6px;
+        }
+        .anilist-btn-step {
+            background: #1f334d;
+            border: 1px solid #2f4b70;
+            color: #fff;
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 15px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            padding: 0;
+        }
+        .anilist-btn-step:hover:not(:disabled) {
+            background: var(--anilist-blue);
+            border-color: var(--anilist-blue);
+            color: #fff;
+        }
+        .anilist-btn-step:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .anilist-badge-status {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .status-CURRENT { background: rgba(2, 169, 255, 0.15); color: #02a9ff; border: 1px solid rgba(2, 169, 255, 0.35); }
+        .status-COMPLETED { background: rgba(70, 211, 105, 0.15); color: #46d369; border: 1px solid rgba(70, 211, 105, 0.35); }
+        .status-PLANNING { background: rgba(255, 193, 7, 0.15); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.35); }
+        .status-PAUSED { background: rgba(255, 152, 0, 0.15); color: #ff9800; border: 1px solid rgba(255, 152, 0, 0.35); }
+        .status-DROPPED { background: rgba(229, 9, 20, 0.15); color: #ff525d; border: 1px solid rgba(229, 9, 20, 0.35); }
+        .status-NOT_IN_LIST { background: rgba(255, 255, 255, 0.08); color: #aaa; border: 1px solid rgba(255, 255, 255, 0.15); }
+
+        .btn-anilist-quick-ep {
+            background: #02a9ff;
+            color: #ffffff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 12px rgba(2, 169, 255, 0.3);
+        }
+        .btn-anilist-quick-ep:hover {
+            background: #0093de;
+            box-shadow: 0 6px 16px rgba(2, 169, 255, 0.45);
+        }
+        .btn-anilist-quick-ep.synced {
+            background: #144026;
+            color: #46d369;
+            border: 1px solid #46d369;
+            cursor: default;
+            box-shadow: none;
+        }
+
+        /* BOUTON DANS LE LECTEUR VIDÉO */
+        .btn-anilist-player {
+            background: #10263d;
+            border: 1px solid #02a9ff;
+            color: #02a9ff;
+            padding: 7px 13px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-anilist-player:hover {
+            background: #02a9ff;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(2, 169, 255, 0.4);
+        }
+        .btn-anilist-player.synced {
+            background: #133820;
+            border-color: #46d369;
+            color: #46d369;
+        }
+
+        /* MODALES ANILIST */
+        .anilist-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.82);
+            backdrop-filter: blur(6px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .anilist-modal-content {
+            background: #131a24;
+            border: 1px solid #203146;
+            border-radius: 14px;
+            width: 100%;
+            max-width: 520px;
+            padding: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.85);
+            animation: fadeIn 0.2s ease-out;
+            color: #fff;
+            position: relative;
+        }
+        .anilist-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #1f2e42;
+            padding-bottom: 12px;
+        }
+        .anilist-modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+        }
+        .anilist-modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        .anilist-modal-close:hover { color: #fff; }
+        .anilist-auth-section {
+            background: #182230;
+            border: 1px solid #22344a;
+            border-radius: 10px;
+            padding: 16px;
+        }
+        .anilist-section-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+        .anilist-candidate-item {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: #16202c;
+            border: 1px solid #203042;
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .anilist-candidate-item:hover {
+            background: #1e2c3d;
+            border-color: var(--anilist-blue);
+        }
+        .anilist-candidate-thumb {
+            width: 42px;
+            height: 60px;
+            border-radius: 4px;
+            object-fit: cover;
+            background: #000;
+        }
+
+        /* --- ACCUEIL : ANIMES EN COURS (ANILIST) --- */
+        .home-watching-section {
+            margin-bottom: 30px;
+            animation: fadeIn 0.3s ease-out;
+        }
+        .home-watching-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 22px;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #242424;
+        }
+        .home-watching-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .home-watching-title {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 800;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: 0.3px;
+        }
+        .home-watching-badge {
+            background: rgba(2, 169, 255, 0.15);
+            color: var(--anilist-blue);
+            border: 1px solid rgba(2, 169, 255, 0.35);
+            font-size: 12px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 12px;
+        }
+        .home-watching-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .btn-refresh-watching {
+            background: #182330;
+            border: 1px solid #23374d;
+            color: #d0def0;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            transition: all 0.2s;
+        }
+        .btn-refresh-watching:hover {
+            background: #22354c;
+            border-color: var(--anilist-blue);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+        .card-watching {
+            cursor: pointer;
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        }
+        .card-watching:hover {
+            transform: translateY(-5px);
+            border-color: rgba(2, 169, 255, 0.5);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 0 16px rgba(2, 169, 255, 0.2);
+        }
+        .card-watching-progress-bar-wrap {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 3;
+        }
+        .card-watching-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--anilist-blue), #00e5ff);
+            box-shadow: 0 0 8px rgba(2, 169, 255, 0.7);
+            border-radius: 0 3px 3px 0;
+        }
+        .card-watching-meta {
+            font-size: 12.5px;
+            color: #aaa;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .card-ep-progress-text {
+            color: #ddd;
+            font-size: 12px;
+        }
+        .card-ep-progress-text b {
+            color: #fff;
+        }
+        .card-next-ep-btn-pill {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: linear-gradient(135deg, rgba(229, 9, 20, 0.2), rgba(2, 169, 255, 0.2));
+            border: 1px solid rgba(2, 169, 255, 0.4);
+            color: #fff;
+            padding: 7px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin-top: auto;
+            transition: all 0.2s;
+        }
+        .card-watching:hover .card-next-ep-btn-pill {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(229, 9, 20, 0.5);
+        }
+        .badge-tag-airing-timer {
+            background: rgba(255, 153, 0, 0.25) !important;
+            border-color: rgba(255, 153, 0, 0.55) !important;
+            color: #ffb84d !important;
+            font-weight: 800 !important;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            animation: pulseGlow 2s infinite ease-in-out;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.72; }
+        }
+        .card-next-ep-pill-airing {
+            background: linear-gradient(135deg, rgba(255, 153, 0, 0.18), rgba(229, 9, 20, 0.15)) !important;
+            border: 1px solid rgba(255, 153, 0, 0.45) !important;
+            color: #ffc266 !important;
+        }
+        .card-watching:hover .card-next-ep-pill-airing {
+            background: linear-gradient(135deg, #e67300, #cc3300) !important;
+            border-color: #ff9900 !important;
+            color: #fff !important;
+            box-shadow: 0 4px 12px rgba(255, 153, 0, 0.4) !important;
+        }
+        .home-watching-error {
+            background: #1c1515;
+            border: 1px solid #4a2323;
+            border-radius: 12px;
+            padding: 30px 20px;
+            text-align: center;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        .anilist-home-connect-promo {
+            background: linear-gradient(135deg, #101924 0%, #152438 100%);
+            border: 1px solid var(--anilist-border);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 620px;
+            margin: 25px auto 0;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+        .anilist-home-connect-icon {
+            width: 46px;
+            height: 46px;
+            margin-bottom: 12px;
+        }
+        .anilist-home-connect-promo h3 {
+            margin: 0 0 8px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+        }
+        .anilist-home-connect-promo p {
+            margin: 0 0 18px;
+            font-size: 13.5px;
+            color: #a0aec0;
+            line-height: 1.55;
+        }
+        /* --- BANNIÈRE DE CIBLAGE PROCHAIN ÉPISODE --- */
+        .next-ep-target-banner {
+            background: linear-gradient(135deg, #101a26 0%, #162436 100%);
+            border: 1px solid var(--anilist-border);
+            border-left: 4px solid var(--anilist-blue);
+            border-radius: 10px;
+            padding: 14px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 14px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+            animation: fadeIn 0.25s ease-out;
+        }
+        .next-ep-banner-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .btn-back-watching {
+            background: #1a2738;
+            border: 1px solid #2d425f;
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-back-watching:hover {
+            background: #243850;
+            border-color: var(--anilist-blue);
+        }
+        .next-ep-banner-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .next-ep-banner-anime {
+            font-size: 17px;
+            font-weight: 800;
+            color: #fff;
+        }
+        .next-ep-banner-subtitle {
+            font-size: 13.5px;
+            color: #aaa;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .next-ep-badge-highlight {
+            background: rgba(70, 211, 105, 0.2);
+            border: 1px solid rgba(70, 211, 105, 0.5);
+            color: #5eff88;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12.5px;
+        }
+        .btn-play-target-direct {
+            background: linear-gradient(135deg, var(--primary) 0%, #ff2a3b 100%);
+            color: white;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-weight: 800;
+            font-size: 13.5px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 14px rgba(229, 9, 20, 0.45);
+            transition: transform 0.15s, box-shadow 0.2s;
+        }
+        .btn-play-target-direct:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(229, 9, 20, 0.65);
+        }
+        .card-target-highlight {
+            border: 2px solid var(--accent-green) !important;
+            box-shadow: 0 0 18px rgba(70, 211, 105, 0.35) !important;
+        }
+        .badge-target-direct-match {
+            background: rgba(70, 211, 105, 0.9) !important;
+            color: #000 !important;
+            font-weight: 800 !important;
+            border-color: #5eff88 !important;
+        }
+        .badge-target-pack-match {
+            background: rgba(0, 229, 255, 0.85) !important;
+            color: #000 !important;
+            font-weight: 800 !important;
+        }
+

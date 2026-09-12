@@ -56,12 +56,73 @@ const parser = new Parser({
   },
 });
 
-// --- CACHES EN MÉMOIRE (HAUTE PERFORMANCE) ---
-const metadataCache = new Map(); // key: cleanTitle, val: { poster, rating, timestamp }
-const METADATA_TTL = 1000 * 60 * 60 * 24; // 24 heures
+// --- GESTIONNAIRE DE CACHE EN MÉMOIRE AVEC ÉVICTION LRU ET EXPIRATION TTL ---
+class ExpiringLRUCache {
+  constructor({ maxEntries = 500, defaultTTL = 1000 * 60 * 15 } = {}) {
+    this.maxEntries = maxEntries;
+    this.defaultTTL = defaultTTL;
+    this.cache = new Map();
+  }
 
-const searchCache = new Map(); // key: query+type, val: { results, timestamp }
-const SEARCH_TTL = 1000 * 60 * 5; // 5 minutes
+  get(key) {
+    const item = this.cache.get(key);
+    if (!item) return undefined;
+    if (Date.now() - item.timestamp > (item.ttl || this.defaultTTL)) {
+      this.cache.delete(key);
+      return undefined;
+    }
+    // Mise à jour de l'ordre LRU (déplacer à la fin de la Map)
+    this.cache.delete(key);
+    this.cache.set(key, item);
+    return item.value;
+  }
+
+  set(key, value, ttl = this.defaultTTL) {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxEntries) {
+      // Éviction du plus ancien élément inséré
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey !== undefined) this.cache.delete(oldestKey);
+    }
+    this.cache.set(key, { value, timestamp: Date.now(), ttl });
+  }
+
+  has(key) {
+    return this.get(key) !== undefined;
+  }
+
+  delete(key) {
+    return this.cache.delete(key);
+  }
+
+  clear() {
+    this.cache.clear();
+  }
+
+  purgeExpired() {
+    const now = Date.now();
+    for (const [key, item] of this.cache.entries()) {
+      if (now - item.timestamp > (item.ttl || this.defaultTTL)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+}
+
+// Caches bornés avec éviction automatique (protection contre les fuites mémoires)
+const metadataCache = new ExpiringLRUCache({ maxEntries: 1000, defaultTTL: 1000 * 60 * 60 * 24 }); // 24h
+const searchCache = new ExpiringLRUCache({ maxEntries: 200, defaultTTL: 1000 * 60 * 5 }); // 5 min
+const streamsCache = new ExpiringLRUCache({ maxEntries: 200, defaultTTL: 1000 * 60 * 60 }); // 1h
+const torrentFilesCache = new ExpiringLRUCache({ maxEntries: 300, defaultTTL: 1000 * 60 * 60 * 24 }); // 24h
+
+// Balayage régulier toutes les 15 minutes des entrées expirées
+setInterval(() => {
+  metadataCache.purgeExpired();
+  searchCache.purgeExpired();
+  streamsCache.purgeExpired();
+  torrentFilesCache.purgeExpired();
+}, 1000 * 60 * 15).unref();
 
 // Nettoyeur intelligent de titre d'anime pour un matching API précis
 function cleanAnimeTitle(raw) {
@@ -85,7 +146,7 @@ async function getAnimeMetadata(cleanTitle) {
   const key = cleanTitle.toLowerCase();
 
   const cached = metadataCache.get(key);
-  if (cached && (Date.now() - cached.timestamp < METADATA_TTL)) {
+  if (cached) {
     return { poster: cached.poster, rating: cached.rating };
   }
 
@@ -214,10 +275,17 @@ app.get('/api/anilist/config', (req, res) => {
   });
 });
 
+// Servir les fichiers statiques (CSS, JS) mis en cache par le navigateur
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
+
 app.get('/', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+  const publicIndex = path.join(__dirname, 'public', 'index.html');
+  if (fs.existsSync(publicIndex)) {
+    return res.sendFile(publicIndex);
+  }
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
@@ -229,8 +297,8 @@ app.get('/api/search', async (req, res) => {
 
   const cacheKey = `${query.toLowerCase()}_${type}`;
   const cached = searchCache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp < SEARCH_TTL)) {
-    return res.json(cached.results);
+  if (cached) {
+    return res.json(cached);
   }
 
   let searchQuery = query;
@@ -257,7 +325,7 @@ app.get('/api/search', async (req, res) => {
     const items = feed.items?.slice(0, 25) || [];
 
     if (items.length === 0) {
-      searchCache.set(cacheKey, { results: [], timestamp: Date.now() });
+      searchCache.set(cacheKey, []);
       return res.json([]);
     }
 
@@ -414,7 +482,7 @@ function parseAnimeDetails(rawTitle) {
       };
     });
 
-    searchCache.set(cacheKey, { results: videos, timestamp: Date.now() });
+    searchCache.set(cacheKey, videos);
     res.json(videos);
   } catch (error) {
     console.error("⚠️ Erreur API Nyaa:", error.message);
@@ -423,9 +491,6 @@ function parseAnimeDetails(rawTitle) {
 });
 
 // --- ANALYSEUR FFPROBE RAPIDE (STREAMS SOUS-TITRES & AUDIO) AVEC CACHE ---
-const streamsCache = new Map(); // key: hash, val: { data, timestamp }
-const STREAMS_CACHE_TTL = 1000 * 60 * 60; // 1 heure
-
 async function analyzeStreams(videoUrl) {
   try {
     console.log("🔍 FFPROBE: Analyse rapide des flux et durée...");
@@ -500,7 +565,8 @@ async function analyzeStreams(videoUrl) {
           streamIndex: s.index,
           lang: lang || 'und',
           label: title || (isFrench ? 'Français (VF)' : (lang ? `Audio (${lang.toUpperCase()})` : `Audio ${relativeAudioCount + 1}`)),
-          isFrench
+          isFrench,
+          codec: (s.codec_name || '').toLowerCase()
         });
 
         if (frAudioIndex === null && isFrench) {
@@ -544,8 +610,6 @@ function extractFileEpisodeNumber(filePath) {
   return null;
 }
 
-const torrentFilesCache = new Map(); // key: hash, val: { data, timestamp }
-
 // --- ROUTE API LISTE DES FICHIERS D'UN TORRENT (MULTI-FICHIERS / PACKS / BATCHES) ---
 app.get('/api/torrent/files', async (req, res) => {
   const { magnet } = req.query;
@@ -553,8 +617,8 @@ app.get('/api/torrent/files', async (req, res) => {
 
   const hash = getTorrentHash(magnet);
   const cached = torrentFilesCache.get(hash);
-  if (cached && (Date.now() - cached.timestamp < 1000 * 60 * 60 * 24)) {
-    return res.json(cached.data);
+  if (cached) {
+    return res.json(cached);
   }
 
   try {
@@ -615,7 +679,7 @@ app.get('/api/torrent/files', async (req, res) => {
     };
 
     if (videoFiles.length > 0) {
-      torrentFilesCache.set(hash, { data: responseData, timestamp: Date.now() });
+      torrentFilesCache.set(hash, responseData);
     }
 
     return res.json(responseData);
@@ -633,12 +697,12 @@ async function getStreamInfo(magnet, fileIndex = 1) {
   const parsedFileIndex = parseInt(fileIndex, 10) || 1;
   const cacheKey = `${hash}_f${parsedFileIndex}`;
   const cached = streamsCache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp < STREAMS_CACHE_TTL) && cached.data?.duration) {
-    return cached.data;
+  if (cached && cached.duration) {
+    return cached;
   }
   const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
   const data = await analyzeStreams(torrUrl);
-  streamsCache.set(cacheKey, { data, timestamp: Date.now() });
+  streamsCache.set(cacheKey, data);
   return data;
 }
 
@@ -730,45 +794,134 @@ app.get('/api/subtitles', async (req, res) => {
   });
 });
 
+// --- GESTION DES SESSIONS DE LECTURE POUR SYNCHRONISATION PRÉCISE (KEYFRAME / SUBTITLES) ---
+const activePlaySessions = new Map();
+
+// Nettoyage périodique des sessions inactives (> 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, session] of activePlaySessions.entries()) {
+    if (now - session.createdAt > 300000) {
+      activePlaySessions.delete(id);
+    }
+  }
+}, 60000);
+
+// --- ROUTE API SYNCHRONISATION PRÉCISE DU LECTEUR ET DES SOUS-TITRES ---
+app.get('/api/play-sync', async (req, res) => {
+  const { playId } = req.query;
+  if (!playId) return res.status(400).json({ error: "playId manquant" });
+
+  let session = activePlaySessions.get(playId);
+  if (!session) {
+    // Si la requête fetch arrive quelques millisecondes avant la requête <video>
+    session = {
+      seekSeconds: 0,
+      actualStart: 0,
+      keyframeOffset: 0,
+      resolved: false,
+      createdAt: Date.now(),
+      waiters: []
+    };
+    activePlaySessions.set(playId, session);
+  }
+
+  if (session.resolved) {
+    return res.json({
+      playId,
+      actualStart: session.actualStart,
+      keyframeOffset: session.keyframeOffset || 0,
+      seekSeconds: session.seekSeconds,
+      resolved: true
+    });
+  }
+
+  // Si le flux est encore en cours d'initialisation, attendre jusqu'à 3.5 secondes l'arrivée du premier paquet
+  await new Promise((resolve) => {
+    session.waiters.push(resolve);
+    setTimeout(resolve, 3500);
+  });
+
+  return res.json({
+    playId,
+    actualStart: session.actualStart,
+    keyframeOffset: session.keyframeOffset || 0,
+    seekSeconds: session.seekSeconds,
+    resolved: session.resolved
+  });
+});
+
 // --- TRANSCODEUR FFMPEG OPTIMISÉ (ZÉRO LATENCE, SEEK & MULTITHREAD) ---
 app.get('/play', async (req, res) => {
-  const { magnet, mode, type, fileIndex = 1, audioIndex, ss } = req.query;
+  const { magnet, mode, type, fileIndex = 1, audioIndex, ss, playId } = req.query;
   if (!magnet) return res.status(400).send("Lien magnet manquant");
 
   const parsedFileIndex = parseInt(fileIndex, 10) || 1;
   const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
   const seekSeconds = parseFloat(ss) || 0;
 
+  // Création / liaison de la session de synchronisation
+  let playSession = null;
+  if (playId) {
+    playSession = activePlaySessions.get(playId);
+    if (!playSession) {
+      playSession = {
+        seekSeconds,
+        actualStart: seekSeconds,
+        keyframeOffset: 0,
+        resolved: false,
+        createdAt: Date.now(),
+        waiters: []
+      };
+      activePlaySessions.set(playId, playSession);
+    } else {
+      playSession.seekSeconds = seekSeconds;
+      playSession.actualStart = seekSeconds;
+    }
+  }
+
   res.setHeader('Content-Type', 'video/mp4');
   res.setHeader('Accept-Ranges', 'none');
 
   // MODE 1 : LECTURE DIRECTE (0% CPU, STREAM ULTRA-RAPIDE SANS RÉENCODAGE VIDÉO)
   if (mode === 'direct') {
-    console.log(`⚡ Lancement FFmpeg en Mode Direct (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s, Audio: ${audioIndex ?? 'auto'})`);
+    const streamInfo = await getStreamInfo(magnet, parsedFileIndex).catch(() => null);
+    console.log(`⚡ Lancement FFmpeg en Mode Direct (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s, Audio: ${audioIndex ?? 'auto'}, playId: ${playId ?? 'none'})`);
     const directArgs = [
       '-threads', '0'
     ];
 
     if (seekSeconds > 0) {
-      directArgs.push('-ss', `${seekSeconds}`);
+      directArgs.push('-noaccurate_seek', '-ss', `${seekSeconds}`);
     }
 
     directArgs.push(
       '-i', torrUrl,
       '-map', '0:v:0',
-      '-c:v', 'copy'
+      '-c:v', 'copy',
+      '-bsf:v', 'showinfo'
     );
 
-    // Sélection de la piste audio
+    // Sélection intelligente de la piste audio
+    let chosenAudioTrack = null;
     if (audioIndex !== undefined && audioIndex !== null && audioIndex !== '') {
-      directArgs.push('-map', `0:a:${parseInt(audioIndex, 10)}`);
+      const idx = parseInt(audioIndex, 10);
+      directArgs.push('-map', `0:a:${idx}`);
+      chosenAudioTrack = (streamInfo?.audioTracks || []).find(a => a.index === idx);
     } else {
       directArgs.push('-map', '0:a:0?');
+      chosenAudioTrack = (streamInfo?.audioTracks || [])[0];
+    }
+
+    // Si la piste audio source est déjà en AAC, la copier directement (0% CPU, 0ms latence, synchronisation native)
+    if (chosenAudioTrack && chosenAudioTrack.codec === 'aac') {
+      directArgs.push('-c:a', 'copy');
+    } else {
+      directArgs.push('-c:a', 'aac', '-ac', '2');
     }
 
     directArgs.push(
-      '-c:a', 'aac',
-      '-ac', '2',
+      '-max_muxing_queue_size', '1024',
       '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
       '-f', 'mp4',
       'pipe:1'
@@ -777,16 +930,58 @@ app.get('/play', async (req, res) => {
     const ffmpeg = spawn('ffmpeg', directArgs);
     ffmpeg.stdout.pipe(res);
 
+    let stderrBuf = '';
+    let foundFirstPacket = false;
+
+    ffmpeg.stderr.on('data', (data) => {
+      const str = data.toString();
+      if (!foundFirstPacket && playSession) {
+        stderrBuf += str;
+        const match = stderrBuf.match(/\[showinfo.*?\]\s+n:\s+0\s+.*?pt:\s*(-?[\d\.]+)/);
+        if (match) {
+          foundFirstPacket = true;
+          const ptOffset = parseFloat(match[1]) || 0;
+          const actualStart = Math.max(0, seekSeconds + ptOffset);
+          playSession.actualStart = actualStart;
+          playSession.keyframeOffset = ptOffset;
+          playSession.resolved = true;
+          console.log(`🎯 Keyframe aligné (${playId}): Demandé=${seekSeconds}s -> Réel=${actualStart.toFixed(3)}s (Décalage=${ptOffset.toFixed(3)}s)`);
+          if (playSession.waiters) {
+            playSession.waiters.forEach(fn => fn());
+            playSession.waiters = [];
+          }
+          stderrBuf = '';
+        }
+      }
+      if (str.includes('Error') && !str.includes('broken pipe')) {
+        console.log("⚠️ FFmpeg Log (Direct):", str.trim());
+      }
+    });
+
     req.on('close', () => {
       console.log("🛑 Client déconnecté (Mode Direct).");
+      if (playSession && playSession.waiters) {
+        playSession.waiters.forEach(fn => fn());
+        playSession.waiters = [];
+      }
       ffmpeg.kill('SIGKILL');
     });
     return;
   }
 
   // MODE 2 : TRANSCODAGE VIDÉO H.264 (POUR NAVIGATEURS OU APPAREILS SANS HEVC)
-  console.log(`🔄 Lancement FFmpeg en Mode Transcodage H.264 (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s, Audio: ${audioIndex ?? 'auto'})`);
+  console.log(`🔄 Lancement FFmpeg en Mode Transcodage H.264 (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s, Audio: ${audioIndex ?? 'auto'}, playId: ${playId ?? 'none'})`);
   const streamInfo = await getStreamInfo(magnet, parsedFileIndex);
+
+  if (playSession) {
+    playSession.actualStart = seekSeconds;
+    playSession.keyframeOffset = 0;
+    playSession.resolved = true;
+    if (playSession.waiters) {
+      playSession.waiters.forEach(fn => fn());
+      playSession.waiters = [];
+    }
+  }
 
   const ffmpegArgs = [
     '-threads', '0'
@@ -834,6 +1029,10 @@ app.get('/play', async (req, res) => {
 
   req.on('close', () => {
     console.log("🛑 Client déconnecté, arrêt de FFmpeg.");
+    if (playSession && playSession.waiters) {
+      playSession.waiters.forEach(fn => fn());
+      playSession.waiters = [];
+    }
     ffmpeg.kill('SIGKILL');
   });
 });

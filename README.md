@@ -1,17 +1,19 @@
 # 🍿 Animflix (ServeurAnimeTorr)
 
-Application web de streaming d'animes en direct à partir de torrents (Nyaa), avec jaquettes et notes instantanées (TVMaze / Kitsu / TMDB), détection intelligente des flux audio/sous-titres français (FFprobe), sous-titres WebVTT personnalisables (0% CPU) et transcodage à la volée (FFmpeg).
+Application web de streaming d'animes en direct à partir de torrents (Nyaa), avec jaquettes et notes instantanées (TVMaze / Kitsu / TMDB), détection intelligente des flux audio/sous-titres français (FFprobe), lecteur multimédia sur-mesure, sous-titres WebVTT personnalisables (0% CPU), synchronisation précise au keyframe et transcodage à la volée (FFmpeg).
 
 ---
 
 ## 📋 Sommaire
 1. [Fonctionnalités & Optimisations](#-fonctionnalités--optimisations)
 2. [Comment ça marche ?](#-comment-ça-marche-)
-3. [Prérequis](#-prérequis)
-4. [Installation & Configuration](#-installation--configuration)
-5. [Lancement de l'application](#-lancement-de-lapplication)
-6. [Guide d'utilisation](#-guide-dutilisation)
-7. [Dépannage & Astuces](#-dépannage--astuces)
+3. [Architecture du Projet](#-architecture-du-projet)
+4. [Prérequis](#-prérequis)
+5. [Installation & Configuration](#-installation--configuration)
+6. [Lancement de l'application](#-lancement-de-lapplication)
+7. [Guide d'utilisation](#-guide-dutilisation)
+8. [Raccourcis Clavier](#-raccourcis-clavier)
+9. [Dépannage & Astuces](#-dépannage--astuces)
 
 ---
 
@@ -19,24 +21,39 @@ Application web de streaming d'animes en direct à partir de torrents (Nyaa), av
 
 - **Recherche ultra-rapide sur Nyaa.si (< 400 ms)** avec filtres : VOSTFR, VF, Multi-Sub, VOSTA.
 - **Génération directe de liens Magnets P2P** : extraction de l'infoHash BitTorrent et génération de liens `magnet:?xt=urn:btih:...` avec trackers publics (évite les blocages Cloudflare/anti-bot sur les fichiers `.torrent`).
+- **Page d'accueil intelligente avec carrousel AniList** : affiche automatiquement vos animés *En cours de visionnage* directement sur la page d'accueil si vous êtes connecté à AniList.
+- **Gestion des packs & saisons complètes (Batches)** : détection et analyse automatique des épisodes au sein d'un pack torrent avec sélecteur interactif pour passer d'un épisode à l'autre en un clic.
 - **Récupération intelligente des jaquettes et notes d'animes** :
   - Moteur prioritaire **TVMaze API** (100% gratuit, sans clé requise, ultra-rapide < 50 ms).
   - Fallback automatique vers **Kitsu API** (spécialisée anime) et compatibilité **TMDB**.
-  - Déduplication ciblée sur la franchise et algorithme de nettoyage des titres pour un matching à 95%+.
+  - Algorithme de déduplication et nettoyage des titres pour un matching à 95%+.
 - **Système de cache mémoire haute performance** :
   - Cache des métadonnées (affiches & notes) conservé 24h.
   - Cache des recherches (5 min) : résultats quasi-instantanés (< 20 ms).
 - **Deux modes de lecture au choix** :
   - ⚡ **Lecture Directe (0% CPU, ultra-rapide)** : copie brute du flux vidéo MP4 avec extraction et streaming en direct des pistes de sous-titres WebVTT (`<track>`).
-  - 🎨 **Incrustation des sous-titres FR (Transcodage)** : FFprobe analyse les flux en 1-2s (`-probesize 4M`), FFmpeg transcode en multithread (`-threads 0`, zéro latence) et incruste les sous-titres français.
+  - 🔄 **Transcodage H.264 universel** : FFmpeg transcode en multithread (`-threads 0`, zéro latence) si votre appareil ne supporte pas le codec d'origine.
+- **Lecteur multimédia moderne & sur-mesure** :
+  - **Timeline Scrubber interactif** : affichage de la durée totale réelle, progression fluide au clic/glissement (souris et tactile), prévisualisation temporelle (tooltip) et indicateur de buffer réseau.
+  - **Bouton Skip OP (+85s)** : saut instantané par-dessus le générique d'ouverture.
+  - **Sauts temporels rapides** : boutons et raccourcis clavier pour reculer ou avancer de **10 secondes**.
+  - **Gestion complète du volume** : curseur dynamique, mute instantané et ajustement au clavier.
+  - **Feedback visuel central** : animations instantanées Play (▶) et Pause (❚❚).
+  - **Badge d'épisode dynamique** incrusté dans le lecteur.
+- **Synchronisation dynamique et persistance des sous-titres** :
+  - Synchronisation temporelle instantanée lors des sauts (Skip OP, timeline, boutons -10s/+10s) sans décalage ni écrasement.
+  - Aligné au milliseconde près avec le point clé réel (**Keyframe**) grâce à l'API de synchronisation (`/api/play-sync`).
+  - **Ajustement manuel de synchronisation** pour les sous-titres (<kbd>G</kbd> / <kbd>H</kbd> ou boutons de -0.5s à +0.5s) et pour l'audio (<kbd>J</kbd> / <kbd>K</kbd>).
+- **Support Multi-Audio en direct** : bascule de piste audio (VO, VF, etc.) à chaud directement dans l'interface du lecteur avec copie directe AAC (0% CPU).
 - **Personnalisation complète du style des sous-titres** :
   - Menu dédié accessible via le bouton `🎨 Style` ou la touche <kbd>S</kbd>.
-  - **Disposition intelligente** : fusionne automatiquement les phrases courtes coupées artificiellement sur 2 lignes pour un affichage sur **1 seule ligne** nette, tout en préservant les répliques de dialogue (`- `) et les paroles musicales (`♪`).
-  - Réglage de la **taille** (Petite, Normale, Grande, Très grande), de la **couleur** (Blanc, Jaune Anime VOSTFR, Cyan, Vert, Rose), de l'**arrière-plan** (transparent, semi-transparent, opaque), des **contours / ombres** (outline 360°, ombre marquée, etc.) et de la **police**.
-  - Aperçu en direct et mémorisation automatique de vos préférences dans le navigateur (`localStorage`).
+  - **Disposition intelligente** : fusionne les coupures artificielles sur 2 lignes pour un affichage sur **1 seule ligne** nette, tout en préservant les répliques de dialogue (`- `) et les paroles musicales (`♪`).
+  - Réglage de la **taille**, **couleur** (Blanc, Jaune Anime VOSTFR, Cyan, Vert, Rose), **arrière-plan**, **contours / ombres** (outline 360°, ombre marquée) et **police**.
+  - Aperçu en direct et mémorisation automatique dans `localStorage`.
+- **Nettoyage et purge TorrServer** :
+  - Bouton `🧹` dans la barre de navigation pour purger le cache et la RAM de TorrServer.
+  - Nettoyage automatique du torrent quitté dès la fermeture du lecteur (`/api/torrserver/drop`).
 - **Option de lecture externe (VLC)** : bouton de copie d'URL réseau universelle (détecte dynamiquement l'hôte).
-- **Lecteur web enrichi** : raccourcis clavier (<kbd>Espace</kbd> Pause, <kbd>C</kbd> Sous-titres, <kbd>S</kbd> Menu Style, <kbd>F</kbd> Plein écran, <kbd>Échap</kbd> Quitter, <kbd>←</kbd> / <kbd>→</kbd> -5s / +5s).
-- **Cache TorrServer augmenté à 200 Mo** pour supprimer les interruptions de flux sur les animes 1080p à haut débit.
 
 ---
 
@@ -50,8 +67,34 @@ flowchart LR
     B -->|4. Flux P2P Local| E[TorrServer :8090]
     B -->|5. Détection flux & Sous-titres| F[FFprobe / WebVTT]
     B -->|6. Transcodage ou Direct| G[FFmpeg]
-    G -->|7. Flux MP4 + Track VTT| A
+    G -->|7. Flux MP4 + Track VTT Synchro| A
     E -.->|Optionnel : Flux brut direct| H[Lecteur VLC]
+```
+
+---
+
+## 📂 Architecture du Projet
+
+Le projet adopte une structure modulaire claire séparant le backend et les composants frontend :
+
+```
+ServeurAnimeTorr/
+├── animflix.js              # Serveur Express, APIs (TorrServer, Nyaa, FFmpeg, Play-Sync)
+├── TorrServer-linux-amd64   # Binaire autonome de TorrServer (Moteur P2P)
+├── ecosystem.config.cjs     # Configuration PM2 pour le démarrage en arrière-plan
+├── public/                  # Fichiers statiques servis au client
+│   ├── index.html           # Page principale de l'application
+│   ├── css/
+│   │   ├── style.css        # Styles globaux & mise en page responsive
+│   │   ├── player.css       # Styles du lecteur personnalisé & timeline
+│   │   └── anilist.css      # Styles des composants et widgets AniList
+│   └── js/
+│       ├── app.js           # Variables globales, utilitaires & routage
+│       ├── player.js        # Logique du lecteur multimédia & raccourcis clavier
+│       ├── subtitles.js     # Décodage WebVTT, synchronisation & styles
+│       ├── search.js        # Recherche Nyaa, gestion des packs & navigation
+│       └── anilist.js       # Authentification OAuth & suivi AniList
+└── cache/                   # Fichiers temporaires et sous-titres extraits
 ```
 
 ---
@@ -88,40 +131,30 @@ chmod +x TorrServer-linux-amd64
 
 ### Option A : Gestion recommandée avec PM2 (Production & Arrière-plan)
 
-**PM2** est un gestionnaire de processus professionnel pour Linux. Il permet de faire tourner **Animflix** et **TorrServer** en tâche de fond 24h/24, de les redémarrer automatiquement en cas d'erreur inattendue et de les relancer automatiquement au démarrage de votre PC ou serveur.
+**PM2** permet de faire tourner **Animflix** et **TorrServer** en tâche de fond 24h/24 et de les relancer automatiquement au démarrage du système.
 
 #### 1. Installer PM2 globalement
-Si PM2 n'est pas encore installé sur votre système :
 ```bash
 sudo npm install -g pm2
 ```
 
-#### 2. Démarrage initial des services
-Vous pouvez lancer les deux services en une seule commande grâce au fichier de configuration `ecosystem.config.cjs` inclus :
+#### 2. Démarrage des services
+Grâce au fichier `ecosystem.config.cjs` inclus :
 ```bash
 pm2 start ecosystem.config.cjs
 ```
 
-*(Alternative manuelle sans fichier de configuration)* :
+*(Alternative sans fichier de configuration)* :
 ```bash
-# 1. Démarrer le moteur de streaming TorrServer
 pm2 start ./TorrServer-linux-amd64 --name torrserver
-
-# 2. Démarrer le serveur web Animflix
 pm2 start animflix.js --name animflix
 ```
 
 #### 3. Sauvegarder et activer le lancement automatique au démarrage (Boot)
-Pour que l'application et TorrServer redémarrent automatiquement même après un redémarrage de la machine :
 ```bash
-# 1. Sauvegarder la liste des processus actifs dans PM2
 pm2 save
-
-# 2. Configurer le service systemd au démarrage de l'OS
 pm2 startup
 ```
-> [!NOTE]
-> La commande `pm2 startup` affiche une commande personnalisée avec `sudo env PATH=...`. Copiez et collez cette commande dans votre terminal pour finaliser la configuration systemd.
 
 #### 4. Commandes utiles au quotidien
 
@@ -132,19 +165,19 @@ pm2 startup
 | **Redémarrer tous les services** | `pm2 restart all` |
 | **Redémarrer un service spécifique** | `pm2 restart animflix` ou `pm2 restart torrserver` |
 | **Arrêter les services** | `pm2 stop all` |
-| **Tableau de bord interactif** (ressources temps réel) | `pm2 monit` |
+| **Tableau de bord interactif** | `pm2 monit` |
 
 ---
 
-### Option B : Lancement manuel (Mode développement / Débogage sans PM2)
+### Option B : Lancement manuel (Mode développement sans PM2)
 
-Si vous souhaitez simplement tester l'application dans votre terminal sans installer PM2, ouvrez **deux terminaux** distincts :
+Dans deux terminaux distincts :
 
-1. **Terminal 1 (Moteur TorrServer)** :
+1. **Terminal 1 (TorrServer)** :
    ```bash
    ./TorrServer-linux-amd64
    ```
-2. **Terminal 2 (Serveur Web Animflix)** :
+2. **Terminal 2 (Animflix)** :
    ```bash
    npm start
    # ou directement : node animflix.js
@@ -157,42 +190,53 @@ Si vous souhaitez simplement tester l'application dans votre terminal sans insta
 1. Ouvrez votre navigateur sur :
    - En local : [http://localhost:3000](http://localhost:3000)
    - Sur votre réseau local : `http://<IP_SERVEUR>:3000` (ex: `192.168.1.55:3000`).
-2. Entrez le nom d'un anime dans la barre de recherche (ex: *Frieren*, *Naruto*, *Dandadan*).
-3. Choisissez la langue : **VOSTFR**, **VF**, **Multi-Sub** ou **VOSTA**.
-4. Sélectionnez votre mode de streaming :
-   - **⚡ Lecture Directe** : 0% CPU, démarrage instantané avec extraction des sous-titres WebVTT en direct.
-   - **🔄 Transcodage H.264** : compatibilité standard si votre navigateur ne supporte pas le conteneur ou le codec d'origine.
-5. Cliquez sur un épisode pour lancer la lecture :
-   - **Sous-titres automatiques** : Les sous-titres français (VOSTFR) sont automatiquement extraits et affichés en direct dans le lecteur web.
-   - **Bouton CC & Sélecteur** : Changez de piste audio/sous-titres ou masquez-les en un clic.
-   - **Menu `🎨 Style`** : Personnalisez la taille, la couleur (jaune anime, blanc, etc.), l'arrière-plan, les contours d'ombre et la disposition (1 ligne max ou standard) avec aperçu en temps réel.
-6. **Raccourcis clavier dans le lecteur** :
-   - <kbd>Espace</kbd> : Lecture / Pause
-   - <kbd>C</kbd> : Activer / Masquer les sous-titres (CC ON/OFF)
-   - <kbd>S</kbd> : **Ouvrir / Fermer le menu de style des sous-titres**
-   - <kbd>F</kbd> : Basculer en plein écran
-   - <kbd>Échap</kbd> : Fermer le menu de style ou quitter le lecteur
-   - <kbd>←</kbd> / <kbd>→</kbd> : Reculer / Avancer de 5 secondes
-7. **Lecture VLC (Alternative)** :
-   - Si vous préférez utiliser votre lecteur externe dédié (pour bénéficier des polices ou effets graphiques ASS exotiques), cliquez sur **🟠 Ouvrir dans VLC** (le lien réseau est automatiquement copié dans votre presse-papiers).
-   - Dans VLC : `Média > Ouvrir un flux réseau (Ctrl+N)` et collez l'URL.
-8. **Synchronisation & Suivi AniList** :
-   - **Connexion en 1 clic (OAuth)** ou via un **jeton d'accès personnel** directement depuis la barre de navigation.
-   - **Suivi automatique** : dès que vous regardez au moins 85% d'un épisode (ou à la fin de la vidéo), Animflix met automatiquement à jour votre progression sur votre compte AniList !
-   - **Widget interactif dans la fiche de l'anime** :
-     - Statut en temps réel (*En cours*, *Terminé*, *À voir*, *En pause*, *Abandonné*).
-     - Barre de progression visuelle avec compteur d'épisodes et boutons pas à pas `[-]` / `[+]`.
-     - Bouton rapide pour marquer immédiatement l'épisode sélectionné comme vu.
-     - Bouton dans la barre de contrôle du lecteur : `⚡ Tracker sur AniList`.
-     - Outil d'association manuelle `🔍 Changer d'anime` si le titre Nyaa diffère de la fiche officielle AniList.
+2. **Page d'accueil** :
+   - Si vous êtes connecté à AniList, vos animés en cours de visionnage apparaissent automatiquement avec reprise rapide.
+3. **Recherche** :
+   - Tapez le nom d'un animé (ex: *Frieren*, *Dandadan*, *Solo Leveling*).
+   - Choisissez la langue : **VOSTFR**, **VF**, **Multi-Sub** ou **VOSTA**.
+4. **Sélection & Lecture** :
+   - Choisissez le mode de lecture : **⚡ Lecture Directe** (recommandé, 0% CPU) ou **🔄 Transcodage H.264**.
+   - Cliquez sur une fiche pour ouvrir la page de détail.
+   - **Packs / Saisons complètes** : si le torrent contient plusieurs épisodes, la liste complète s'affiche pour choisir directement l'épisode désiré.
+5. **Contrôles du lecteur** :
+   - **Skip OP (+85s)** : Sautez directement l'opening.
+   - **Sauts temporels** : Boutons `-10s` et `+10s` ou timeline scrubber.
+   - **Pistes Audio & Sous-titres** : Menus déroulants dédiés pour changer de piste ou de langue en temps réel.
+   - **Menu `🎨 Style`** : Personnalisez l'apparence des sous-titres et ajustez la synchronisation fine.
+6. **Synchronisation & Suivi AniList** :
+   - Connexion via le bouton dans la barre de navigation.
+   - Dès que vous regardez au moins 85% d'un épisode (ou en fin de lecture), la progression est automatiquement synchronisée sur votre profil AniList.
+   - Possibilité de forcer la mise à jour avec le bouton `⚡ Tracker sur AniList`.
+
+---
+
+## ⌨️ Raccourcis Clavier
+
+Le lecteur multimédia prend en charge un ensemble complet de raccourcis clavier intuitifs :
+
+| Touche | Action |
+|:---:|---|
+| <kbd>Espace</kbd> | Lecture / Pause |
+| <kbd>←</kbd> / <kbd>→</kbd> | Reculer / Avancer de **10 secondes** |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Augmenter / Diminuer le volume sonore (+5% / -5%) |
+| <kbd>M</kbd> | Couper / Réactiver le son (Mute) |
+| <kbd>C</kbd> | Activer / Masquer les sous-titres (CC ON / OFF) |
+| <kbd>S</kbd> | Ouvrir / Fermer le menu de style & synchro des sous-titres |
+| <kbd>G</kbd> / <kbd>H</kbd> | Ajuster la **synchronisation des sous-titres** (-0.1s / +0.1s) |
+| <kbd>J</kbd> / <kbd>K</kbd> | Ajuster la **synchronisation audio** (-0.1s / +0.1s) |
+| <kbd>F</kbd> | Basculer en mode Plein écran |
+| <kbd>Échap</kbd> | Quitter le mode plein écran, fermer les popups ou revenir au catalogue |
 
 ---
 
 ## ❓ Dépannage & Astuces
 
-- **Le processeur chauffe ou la vidéo saccade ?**
-  - Basculez le sélecteur sur **⚡ Lecture Directe** ou utilisez le lien **VLC**.
-- **Pas de résultat / recherche lente ?**
-  - Vérifiez la connexion Internet et les filtres Nyaa. Le cache garde vos recherches précédentes en mémoire pour un accès immédiat.
-- **Accès depuis une TV / Smartphone** :
+- **Les sous-titres ou le son sont légèrement décalés par rapport à la vidéo source ?**
+  - Utilisez les touches <kbd>G</kbd> / <kbd>H</kbd> pour recaler les sous-titres au dixième de seconde près, ou <kbd>J</kbd> / <kbd>K</kbd> pour l'audio.
+- **La vidéo saccade ou le processeur chauffe ?**
+  - Basculez le mode sur **⚡ Lecture Directe** (0% CPU) ou utilisez le bouton **🟠 Ouvrir dans VLC**.
+- **TorrServer consomme trop de mémoire tampon ?**
+  - Cliquez sur le bouton `🧹` en haut à droite pour purger le cache et libérer instantanément la mémoire.
+- **Accès depuis une TV / Smartphone / Tablette** :
   - Connectez l'appareil au même réseau Wi-Fi que le serveur et ouvrez l'adresse IP locale du serveur sur le port 3000.
