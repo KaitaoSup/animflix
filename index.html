@@ -7,6 +7,16 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Animflix 🍿</title>
+    <!-- PWA (PROGRESSIVE WEB APP) & MOBILE HEADERS -->
+    <meta name="theme-color" content="#e50914">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Animflix">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/player.css">
     <link rel="stylesheet" href="/css/anilist.css">
@@ -29,6 +39,10 @@
               </select>
               <button onclick="handleSearchClick()">Chercher</button>
           </div>
+          <!-- BOUTON INSTALLATION PWA -->
+          <button id="pwaInstallBtn" class="btn-pwa-install" onclick="triggerPwaInstall()" style="display: none;" title="Installer Animflix comme application native">
+              📲 Installer l'App
+          </button>
           <!-- BOUTON PURGE CACHE TORRSERVER -->
           <button class="btn-clean-cache" onclick="cleanTorrServerCache()" title="Purger le cache et les torrents en mémoire de TorrServer">
               🧹
@@ -100,6 +114,12 @@
 
                   <!-- Boutons d'action rapides -->
                   <div class="detail-actions">
+                      <button id="detailFavoriteBtn" class="btn-favorite-toggle" onclick="toggleCurrentAnimeFavorite()" title="Ajouter cet anime à vos favoris locaux">
+                          <span id="detailFavoriteIcon">🤍</span> <span id="detailFavoriteText">Ajouter aux favoris</span>
+                      </button>
+                      <button id="detailResumeBtn" class="btn-secondary btn-detail-resume" style="display: none;" onclick="resumePlaybackFromSaved()" title="Reprendre la lecture de cet épisode">
+                          ▶ Reprendre
+                      </button>
                       <div class="detail-mode-select-wrap">
                           <label for="detailStreamMode" style="font-size: 12px; color: #aaa; margin-right: 4px;">Mode :</label>
                           <select id="detailStreamMode" onchange="onDetailStreamModeChange()">
@@ -159,6 +179,26 @@
                   
                   <!-- Indicateur central Play / Pause -->
                   <div id="playerCenterIndicator" class="player-center-indicator">▶</div>
+
+                  <!-- Bannière de Reprise de lecture (Resume Playback) -->
+                  <div id="playerResumeBanner" class="player-resume-banner" style="display: none;">
+                      <div class="player-resume-content">
+                          <span class="player-resume-icon">⏱️</span>
+                          <div class="player-resume-text">
+                              <div class="player-resume-title">Reprendre la lecture ?</div>
+                              <div class="player-resume-sub" id="playerResumeTimeLabel">Reprendre à 00:00</div>
+                          </div>
+                      </div>
+                      <div class="player-resume-buttons">
+                          <button class="btn-resume-action btn-resume-primary" onclick="resumePlaybackFromBanner()" title="Reprendre à cette position">
+                              ▶ Reprendre
+                          </button>
+                          <button class="btn-resume-action btn-resume-secondary" onclick="dismissResumeBanner(true)" title="Recommencer depuis le début">
+                              ↺ Du début
+                          </button>
+                          <button class="btn-resume-close" onclick="dismissResumeBanner(false)" title="Fermer cette notification">&times;</button>
+                      </div>
+                  </div>
 
                   <!-- Écran de statut TorrServer / Chargement -->
                   <div id="player-status" style="position: absolute; background: rgba(12,12,12,0.92); backdrop-filter: blur(8px); padding: 25px 35px; border-radius: 12px; text-align: center; border: 1px solid #333; z-index: 15; max-width: 85%;">
@@ -481,6 +521,7 @@
   <script src="/js/app.js"></script>
   <script src="/js/subtitles.js"></script>
   <script src="/js/player.js"></script>
+  <script src="/js/history.js"></script>
   <script src="/js/search.js"></script>
   <script src="/js/anilist.js"></script>
 </body>

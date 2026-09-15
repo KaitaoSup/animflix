@@ -75,47 +75,192 @@
         }, 1000);
     }
 
-    // Rendu de l'écran d'accueil
+    // --- GESTION DU FILTRE NSFW / CONTENU ADULTE (18+) ---
+    function getShowNsfwPreference() {
+        const stored = localStorage.getItem('animflix_show_nsfw');
+        if (stored !== null) {
+            return stored === 'true';
+        }
+        if (currentAnilistUser && currentAnilistUser.options && typeof currentAnilistUser.options.displayAdultContent === 'boolean') {
+            return currentAnilistUser.options.displayAdultContent;
+        }
+        return false;
+    }
+
+    function toggleNsfwFilter(checked) {
+        localStorage.setItem('animflix_show_nsfw', checked ? 'true' : 'false');
+        renderHomeScreen();
+        renderAnilistNav();
+        if (typeof showToast === 'function') {
+            showToast(checked ? "🔞 Contenu adulte (18+) affiché" : "🛡️ Contenu adulte (18+) masqué");
+        }
+    }
+
+    function onNsfwContainerClick(e) {
+        if (e && e.target && e.target.tagName === 'INPUT') return;
+        const cb = document.getElementById('nsfwToggleInput');
+        if (cb) {
+            cb.checked = !cb.checked;
+            toggleNsfwFilter(cb.checked);
+        } else {
+            toggleNsfwFilter(!getShowNsfwPreference());
+        }
+    }
+
+    // Rendu de l'écran d'accueil avec onglets (AniList, Historique local, Favoris)
     function renderHomeScreen() {
         const homeView = document.getElementById('homeView');
         if (!homeView) return;
 
         const token = localStorage.getItem('anilist_token');
-        if (token && currentAnilistUser) {
-            if (anilistWatchingList && anilistWatchingList.length > 0) {
-                renderWatchingListHtml(homeView, anilistWatchingList);
-            } else {
-                let cached = null;
-                try {
-                    const raw = localStorage.getItem('anilist_watching_cache');
-                    if (raw) cached = JSON.parse(raw);
-                } catch(e) {}
+        const hasAnilist = !!(token && currentAnilistUser);
+        const activeTab = (typeof getActiveHomeTab === 'function') ? getActiveHomeTab() : (hasAnilist ? 'anilist' : 'history');
 
-                if (cached && cached.length > 0) {
-                    anilistWatchingList = cached;
-                    renderWatchingListHtml(homeView, anilistWatchingList);
-                } else if (isLoadingWatchingList) {
-                    renderWatchingEmptyOrLoading(homeView);
-                } else {
-                    renderWatchingEmptyList(homeView);
-                }
-            }
+        const histCount = (typeof getPlaybackHistory === 'function') ? getPlaybackHistory().length : 0;
+        const favCount = (typeof getFavorites === 'function') ? getFavorites().length : 0;
+        const anilistCount = (anilistWatchingList && anilistWatchingList.length) ? anilistWatchingList.length : 0;
+
+        let tabsHtml = `
+            <div class="home-tabs-nav">
+                ${hasAnilist ? `
+                    <button class="home-tab-btn ${activeTab === 'anilist' ? 'active' : ''}" onclick="switchHomeTab('anilist')">
+                        <span>🍿 AniList En cours</span>
+                        <span class="home-tab-badge">${anilistCount}</span>
+                    </button>
+                ` : ''}
+                <button class="home-tab-btn ${activeTab === 'history' ? 'active' : ''}" onclick="switchHomeTab('history')">
+                    <span>🕒 Historique</span>
+                    ${histCount > 0 ? `<span class="home-tab-badge">${histCount}</span>` : ''}
+                </button>
+                <button class="home-tab-btn ${activeTab === 'favorites' ? 'active' : ''}" onclick="switchHomeTab('favorites')">
+                    <span>❤️ Favoris</span>
+                    ${favCount > 0 ? `<span class="home-tab-badge">${favCount}</span>` : ''}
+                </button>
+                ${!hasAnilist ? `
+                    <button class="home-tab-btn ${activeTab === 'anilist' ? 'active' : ''}" onclick="switchHomeTab('anilist')" style="margin-left: auto;">
+                        <span>☁️ Connexion AniList</span>
+                    </button>
+                ` : ''}
+            </div>
+            <div id="homeTabContent"></div>
+        `;
+
+        homeView.innerHTML = tabsHtml;
+        const tabContent = document.getElementById('homeTabContent');
+        if (!tabContent) return;
+
+        if (activeTab === 'history' && typeof renderHistoryTabHtml === 'function') {
+            renderHistoryTabHtml(tabContent);
+        } else if (activeTab === 'favorites' && typeof renderFavoritesTabHtml === 'function') {
+            renderFavoritesTabHtml(tabContent);
         } else {
-            renderLoggedOutHomeHtml(homeView);
+            // Tab anilist
+            if (hasAnilist) {
+                if (anilistWatchingList && anilistWatchingList.length > 0) {
+                    renderWatchingListHtml(tabContent, anilistWatchingList);
+                } else {
+                    let cached = null;
+                    try {
+                        const raw = localStorage.getItem('anilist_watching_cache');
+                        if (raw) cached = JSON.parse(raw);
+                    } catch(e) {}
+
+                    if (cached && cached.length > 0) {
+                        anilistWatchingList = cached;
+                        renderWatchingListHtml(tabContent, anilistWatchingList);
+                    } else if (isLoadingWatchingList) {
+                        renderWatchingEmptyOrLoading(tabContent);
+                    } else {
+                        renderWatchingEmptyList(tabContent);
+                    }
+                }
+            } else {
+                renderLoggedOutHomeHtml(tabContent);
+            }
         }
     }
 
+
     function renderWatchingListHtml(container, list) {
+        const showNsfw = getShowNsfwPreference();
+        // Compter les items adultes au total
+        const totalNsfw = list.filter(entry => {
+            const m = entry.media;
+            return m && (m.isAdult === true || (Array.isArray(m.genres) && m.genres.includes('Hentai')));
+        }).length;
+
+        // Filtrer la liste à afficher selon la préférence NSFW
+        const displayList = list.filter(entry => {
+            const m = entry.media;
+            const isAdult = m && (m.isAdult === true || (Array.isArray(m.genres) && m.genres.includes('Hentai')));
+            return showNsfw || !isAdult;
+        });
+
+        const nsfwToggleHtml = `
+            <div class="nsfw-filter-container" onclick="onNsfwContainerClick(event)" title="${showNsfw ? 'Désactiver le contenu adulte (18+)' : 'Afficher le contenu adulte (18+)'}">
+                <label class="switch-nsfw" onclick="event.stopPropagation()">
+                    <input type="checkbox" id="nsfwToggleInput" ${showNsfw ? 'checked' : ''} onchange="toggleNsfwFilter(this.checked)">
+                    <span class="slider-nsfw"></span>
+                </label>
+                <span class="nsfw-filter-label">
+                    🔞 18+ ${totalNsfw > 0 ? `<span class="badge-nsfw-count">(${totalNsfw})</span>` : ''}
+                </span>
+            </div>
+        `;
+
+        if (displayList.length === 0) {
+            container.innerHTML = `
+                <div class="home-watching-section">
+                    <div class="home-watching-header">
+                        <div class="home-watching-title-group">
+                            <h2 class="home-watching-title">
+                                <span style="font-size: 24px;">🍿</span>
+                                En cours de visionnage
+                            </h2>
+                            <span class="home-watching-badge">0 anime</span>
+                        </div>
+                        <div class="home-watching-actions">
+                            ${nsfwToggleHtml}
+                            <button class="btn-refresh-watching" onclick="loadAnilistWatchingList(true)" title="Actualiser la liste depuis AniList">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <polyline points="1 20 1 14 7 14"></polyline>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                </svg>
+                                <span>Actualiser</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="empty-state" style="padding: 50px 20px;">
+                        <div style="font-size: 38px; margin-bottom: 12px;">🛡️</div>
+                        <div style="font-size: 16px; font-weight: bold; color: #fff; margin-bottom: 8px;">
+                            ${totalNsfw} anime${totalNsfw > 1 ? 's masqués' : ' masqué'} par le filtre 18+
+                        </div>
+                        <div style="font-size: 13.5px; color: #aaa; margin-bottom: 20px;">
+                            Activez l'interrupteur "🔞 18+" en haut à droite pour afficher vos animes adultes en cours.
+                        </div>
+                        <button class="btn-secondary" onclick="toggleNsfwFilter(true)">
+                            🔞 Activer le contenu 18+
+                        </button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
         let cardsHtml = '';
-        list.forEach((entry, idx) => {
+        displayList.forEach(entry => {
             const media = entry.media || {};
-            const title = media.title?.userPreferred || media.title?.romaji || media.title?.english || 'Anime';
+            // Priorité au titre anglais pour l'affichage et la recherche selon la demande
+            const displayTitle = media.title?.english || media.title?.userPreferred || media.title?.romaji || 'Anime';
+            const secondaryTitle = (media.title?.romaji && media.title.romaji !== displayTitle) ? media.title.romaji : '';
+            const isAdult = media.isAdult === true || (Array.isArray(media.genres) && media.genres.includes('Hentai'));
             const progress = entry.progress || 0;
             const total = media.episodes || null;
             const nextEp = progress + 1;
             const isCompleted = total && progress >= total;
             const progressPct = total ? Math.min(100, Math.round((progress / total) * 100)) : (progress > 0 ? 50 : 0);
-            const poster = media.coverImage?.large || media.coverImage?.extraLarge || media.coverImage?.medium || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(title);
+            const poster = media.coverImage?.large || media.coverImage?.extraLarge || media.coverImage?.medium || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(displayTitle);
             const score = media.averageScore ? (media.averageScore / 10).toFixed(1) : null;
             const format = media.format || 'TV';
 
@@ -137,8 +282,11 @@
             let overlayBtnHtml = '';
             let actionPillHtml = '';
 
+            const nsfwBadge = isAdult ? `<span class="badge-tag-mini badge-nsfw-tag" title="Contenu 18+ / Adulte">🔞 18+</span>` : '';
+
             if (isNextEpUnreleased) {
                 badgesTopHtml = `
+                    ${nsfwBadge}
                     ${score ? `<span class="badge-tag-mini" style="background:rgba(255,193,7,0.2);color:#ffc107;border-color:rgba(255,193,7,0.4);">⭐ ${score}</span>` : `<span class="badge-tag-mini">${format}</span>`}
                     <span class="badge-tag-mini badge-tag-airing-timer" data-airing-at="${airingTimestamp}" data-ep="${nextAiring.episode}" title="Sortie prévue le ${new Date(airingTimestamp * 1000).toLocaleString('fr-FR')}">
                         ⏳ Ép. ${nextAiring.episode} : ${airingCountdownStr}
@@ -156,6 +304,7 @@
                 `;
             } else {
                 badgesTopHtml = `
+                    ${nsfwBadge}
                     ${score ? `<span class="badge-tag-mini" style="background:rgba(255,193,7,0.2);color:#ffc107;border-color:rgba(255,193,7,0.4);">⭐ ${score}</span>` : `<span class="badge-tag-mini">${format}</span>`}
                     <span class="badge-tag-mini badge-tag-ep" style="background:rgba(2,169,255,0.25);border-color:rgba(2,169,255,0.4);color:#02a9ff;">
                         ${isCompleted ? 'Terminé' : `Ép. ${progress}${total ? '/' + total : ''}`}
@@ -171,9 +320,9 @@
             }
 
             cardsHtml += `
-                <div class="card card-watching" onclick="watchAnimeNextEpisode(${idx})" title="${isNextEpUnreleased ? `Épisode ${nextAiring.episode} pas encore sorti. Cliquer pour chercher les vidéos disponibles.` : `Cliquer pour chercher les vidéos de l'épisode ${nextEp}`}">
+                <div class="card card-watching" onclick="watchAnimeNextEpisode(${media.id})" title="${isNextEpUnreleased ? `Épisode ${nextAiring.episode} pas encore sorti. Cliquer pour chercher les vidéos disponibles.` : `Cliquer pour chercher les vidéos de l'épisode ${nextEp}`}">
                     <div class="card-img-wrap">
-                        <img src="${escapeHtml(poster)}" loading="lazy" alt="${escapeHtml(title)}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                        <img src="${escapeHtml(poster)}" loading="lazy" alt="${escapeHtml(displayTitle)}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
                         <div class="card-overlay-hover">
                             ${overlayBtnHtml}
                         </div>
@@ -185,7 +334,8 @@
                         </div>
                     </div>
                     <div class="card-info">
-                        <span class="card-title" title="${escapeHtml(title)}">${escapeHtml(title)}</span>
+                        <span class="card-title" title="${escapeHtml(displayTitle)}${secondaryTitle ? ' (' + escapeHtml(secondaryTitle) + ')' : ''}">${escapeHtml(displayTitle)}</span>
+                        ${secondaryTitle ? `<div style="font-size: 11px; color: #718096; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px;">${escapeHtml(secondaryTitle)}</div>` : ''}
                         <div class="card-watching-meta">
                             <span class="card-ep-progress-text">
                                 ${isCompleted ? `✅ Tous les ${total} épisodes vus` : `Visionné : <b>Épisode ${progress}</b> ${total ? '<span style="color:#777;">/ ' + total + '</span>' : ''}`}
@@ -205,9 +355,10 @@
                             <span style="font-size: 24px;">🍿</span>
                             En cours de visionnage
                         </h2>
-                        <span class="home-watching-badge">${list.length} anime${list.length > 1 ? 's' : ''}</span>
+                        <span class="home-watching-badge">${displayList.length} anime${displayList.length > 1 ? 's' : ''}</span>
                     </div>
                     <div class="home-watching-actions">
+                        ${nsfwToggleHtml}
                         <span id="homeWatchingSubtitle" style="font-size: 13px; color: #888;">
                             Synchronisé avec AniList (${escapeHtml(currentAnilistUser.name)})
                         </span>
@@ -303,7 +454,8 @@
     function renderHomeScreenError(errorMsg) {
         const homeView = document.getElementById('homeView');
         if (!homeView) return;
-        homeView.innerHTML = `
+        const targetContainer = document.getElementById('homeTabContent') || homeView;
+        targetContainer.innerHTML = `
             <div class="home-watching-section">
                 <div class="home-watching-header">
                     <div class="home-watching-title-group">
@@ -344,6 +496,8 @@
                 updatedAt: Math.floor(Date.now() / 1000),
                 media: {
                     id: 154587,
+                    isAdult: false,
+                    genres: ["Action", "Adventure", "Fantasy"],
                     title: {
                         romaji: "Sousou no Frieren",
                         english: "Frieren: Beyond Journey's End",
@@ -365,6 +519,8 @@
                 updatedAt: Math.floor(Date.now() / 1000) - 3600,
                 media: {
                     id: 171018,
+                    isAdult: false,
+                    genres: ["Action", "Comedy", "Supernatural"],
                     title: {
                         romaji: "Dandadan",
                         english: "DAN DA DAN",
@@ -390,6 +546,8 @@
                 updatedAt: Math.floor(Date.now() / 1000) - 7200,
                 media: {
                     id: 151807,
+                    isAdult: false,
+                    genres: ["Action", "Fantasy"],
                     title: {
                         romaji: "Ore dake Level Up na Ken",
                         english: "Solo Leveling",
@@ -403,6 +561,29 @@
                         large: "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx151807-f1c24e65.jpg"
                     }
                 }
+            },
+            {
+                id: 999999,
+                status: "CURRENT",
+                progress: 1,
+                updatedAt: Math.floor(Date.now() / 1000) - 10800,
+                media: {
+                    id: 999999,
+                    isAdult: true,
+                    genres: ["Ecchi", "Hentai"],
+                    title: {
+                        romaji: "Kanojo x Kanojo x Kanojo",
+                        english: "Girl x Girl x Girl",
+                        userPreferred: "Kanojo x Kanojo x Kanojo"
+                    },
+                    episodes: 3,
+                    format: "OVA",
+                    status: "FINISHED",
+                    averageScore: 78,
+                    coverImage: {
+                        large: "https://via.placeholder.com/300x450/3a1020/ff4757?text=18%2B+Hentai+Demo"
+                    }
+                }
             }
         ];
         try {
@@ -413,8 +594,17 @@
     }
 
     // Clic sur un anime de la liste d'accueil pour chercher l'épisode suivant
-    function watchAnimeNextEpisode(entryIndex) {
-        const entry = typeof entryIndex === 'number' ? anilistWatchingList[entryIndex] : entryIndex;
+    function watchAnimeNextEpisode(target) {
+        let entry = null;
+        if (typeof target === 'object' && target !== null) {
+            entry = target;
+        } else if (typeof target === 'number') {
+            // Recherche prioritaire par ID AniList du média
+            entry = anilistWatchingList.find(e => e.media && e.media.id === target);
+            if (!entry && target >= 0 && target < anilistWatchingList.length) {
+                entry = anilistWatchingList[target];
+            }
+        }
         if (!entry || !entry.media) return;
 
         const media = entry.media;
@@ -422,7 +612,8 @@
         const nextEp = progress + 1;
         const total = media.episodes || null;
         
-        let searchTitle = media.title?.romaji || media.title?.userPreferred || media.title?.english || 'Anime';
+        // Priorité absolue au titre anglais selon la demande utilisateur
+        let searchTitle = media.title?.english || media.title?.romaji || media.title?.userPreferred || 'Anime';
         searchTitle = searchTitle.replace(/[:]/g, ' ').replace(/\s+/g, ' ').trim();
 
         // Vérification si le prochain épisode n'est pas encore sorti
@@ -439,14 +630,17 @@
             }
         }
 
-        // Enregistrer l'association d'ID AniList pour que la page de détail s'associe instantanément
+        // Enregistrer l'association d'ID AniList pour tous les alias du titre
         try {
             localStorage.setItem('anilist_map_' + searchTitle.toLowerCase(), media.id);
-            if (media.title?.userPreferred) {
-                localStorage.setItem('anilist_map_' + media.title.userPreferred.toLowerCase(), media.id);
+            if (media.title?.english) {
+                localStorage.setItem('anilist_map_' + media.title.english.toLowerCase(), media.id);
             }
             if (media.title?.romaji) {
                 localStorage.setItem('anilist_map_' + media.title.romaji.toLowerCase(), media.id);
+            }
+            if (media.title?.userPreferred) {
+                localStorage.setItem('anilist_map_' + media.title.userPreferred.toLowerCase(), media.id);
             }
         } catch(e) {}
 
@@ -455,10 +649,11 @@
 
         currentTargetNextEpisode = {
             mediaId: media.id,
-            animeName: media.title?.userPreferred || media.title?.romaji || searchTitle,
+            animeName: media.title?.english || media.title?.userPreferred || media.title?.romaji || searchTitle,
             searchTitle: searchTitle,
             romaji: media.title?.romaji,
             english: media.title?.english,
+            userPreferred: media.title?.userPreferred,
             nextEp: nextEp,
             progress: progress,
             totalEpisodes: total,
@@ -546,6 +741,8 @@
                                         userPreferred
                                     }
                                     synonyms
+                                    isAdult
+                                    genres
                                     episodes
                                     format
                                     status
@@ -661,6 +858,9 @@
                         name
                         avatar { large medium }
                         siteUrl
+                        options {
+                            displayAdultContent
+                        }
                     }
                 }
             `;
@@ -714,15 +914,23 @@
         const token = localStorage.getItem('anilist_token');
         if (token && currentAnilistUser) {
             const avatarUrl = currentAnilistUser.avatar?.medium || currentAnilistUser.avatar?.large || 'https://anilist.co/img/icons/icon.svg';
+            const showNsfw = getShowNsfwPreference();
             container.innerHTML = `
-                <div id="anilistUserBadge" class="anilist-user-badge" onclick="toggleAnilistDropdown(event)" tabindex="0" title="Connecté à AniList : ${currentAnilistUser.name}">
-                    <img class="anilist-avatar" src="${avatarUrl}" alt="${currentAnilistUser.name}" onerror="this.src='https://anilist.co/img/icons/icon.svg'">
-                    <span class="anilist-username">${currentAnilistUser.name}</span>
+                <div id="anilistUserBadge" class="anilist-user-badge" onclick="toggleAnilistDropdown(event)" tabindex="0" title="Connecté à AniList : ${escapeHtml(currentAnilistUser.name)}">
+                    <img class="anilist-avatar" src="${avatarUrl}" alt="${escapeHtml(currentAnilistUser.name)}" onerror="this.src='https://anilist.co/img/icons/icon.svg'">
+                    <span class="anilist-username">${escapeHtml(currentAnilistUser.name)}</span>
                     <span style="font-size: 10px; color: #888;">▼</span>
                     <div class="anilist-dropdown" onclick="event.stopPropagation()">
                         <div style="padding: 4px 10px 8px; border-bottom: 1px solid #23374d; margin-bottom: 6px;">
                             <div style="font-size: 11px; color: #888;">Connecté en tant que</div>
-                            <div style="font-weight: bold; color: #fff;">${currentAnilistUser.name}</div>
+                            <div style="font-weight: bold; color: #fff;">${escapeHtml(currentAnilistUser.name)}</div>
+                        </div>
+                        <div class="anilist-dropdown-nsfw" onclick="toggleNsfwFilter(!getShowNsfwPreference())">
+                            <span style="font-size: 12px; font-weight: 600;">🔞 Contenu 18+</span>
+                            <label class="switch-nsfw" onclick="event.stopPropagation()">
+                                <input type="checkbox" id="nsfwDropdownToggle" ${showNsfw ? 'checked' : ''} onchange="toggleNsfwFilter(this.checked)">
+                                <span class="slider-nsfw"></span>
+                            </label>
                         </div>
                         <a href="${currentAnilistUser.siteUrl || 'https://anilist.co'}" target="_blank" rel="noopener">
                             🔗 Profil AniList
@@ -783,7 +991,7 @@
         localStorage.setItem('anilist_token', token);
         showToast("Vérification du compte AniList... ⏳");
         try {
-            const query = `query { Viewer { id name avatar { large medium } siteUrl } }`;
+            const query = `query { Viewer { id name avatar { large medium } siteUrl options { displayAdultContent } } }`;
             const data = await callAnilistGraphQL(query);
             if (data && data.Viewer) {
                 currentAnilistUser = data.Viewer;
@@ -1273,3 +1481,12 @@
         showToast(`✅ Associé à : ${candidate.title?.userPreferred || candidate.title?.romaji}`);
         await syncAnilistForDetail(currentAnimeItem);
     }
+
+    // Export global pour interaction depuis le DOM HTML
+    window.watchAnimeNextEpisode = watchAnimeNextEpisode;
+    window.toggleNsfwFilter = toggleNsfwFilter;
+    window.onNsfwContainerClick = onNsfwContainerClick;
+    window.getShowNsfwPreference = getShowNsfwPreference;
+    window.loadAnilistWatchingList = loadAnilistWatchingList;
+    window.loadDemoWatchingList = loadDemoWatchingList;
+

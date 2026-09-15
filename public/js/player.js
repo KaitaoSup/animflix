@@ -32,10 +32,18 @@
                 if (bufEl) bufEl.style.width = bufPct + '%';
             } catch (e) {}
         }
+
+        // Sauvegarde automatique et périodique de la progression dans l'historique local
+        if (typeof savePlaybackProgress === 'function') {
+            savePlaybackProgress();
+        }
     }
 
     function seekVideoTo(targetSeconds) {
         if (!currentActiveMagnet) return;
+        if (typeof dismissResumeBanner === 'function') {
+            dismissResumeBanner(false);
+        }
         const totalDur = currentTotalDuration > 0 ? currentTotalDuration : 1440;
         const target = Math.max(0, Math.min(totalDur, Math.round(targetSeconds)));
         
@@ -178,6 +186,10 @@
         hasAutoTrackedCurrentEpisode = false;
         updatePlayerTrackButton();
 
+        if (seekSeconds > 0 && typeof dismissResumeBanner === 'function') {
+            dismissResumeBanner(false);
+        }
+
         // Afficher le badge épisode dans le lecteur overlay
         const epBadge = document.getElementById('playerOverlayEpBadge');
         if (epBadge) {
@@ -264,6 +276,15 @@
             const playIcon = document.getElementById('customPlayIcon');
             if (playIcon) playIcon.textContent = '▶';
             showControls();
+            if (typeof savePlaybackProgress === 'function') {
+                savePlaybackProgress(true);
+            }
+        };
+
+        video.onended = () => {
+            if (typeof markCurrentPlaybackCompleted === 'function') {
+                markCurrentPlaybackCompleted();
+            }
         };
 
         if (streamTimeout) clearTimeout(streamTimeout);
@@ -512,3 +533,10 @@
             togglePlayerFullscreen();
         }
     });
+
+    window.addEventListener('beforeunload', () => {
+        if (typeof savePlaybackProgress === 'function') {
+            savePlaybackProgress(true);
+        }
+    });
+

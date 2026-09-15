@@ -57,7 +57,16 @@
                 files.forEach(f => {
                     const btn = document.createElement('button');
                     btn.className = 'btn-pack-ep' + (f.id === currentActiveFileIndex ? ' active' : '');
-                    btn.innerHTML = `<span>▶</span> <span>${escapeHtml(f.label)}</span>`;
+
+                    // Vérifier si cet épisode a une progression enregistrée
+                    const resumeInfo = (typeof getPlaybackResume === 'function') 
+                        ? getPlaybackResume(anime.lienMagnet, f.id, anime.animeName || parsed.animeName, f.episode)
+                        : null;
+                    const resumeBadge = resumeInfo 
+                        ? `<span class="badge-pack-resume" title="Reprendre à ${formatTimestamp(resumeInfo.currentTime)}">⏱️ ${formatTimestamp(resumeInfo.currentTime)}</span>`
+                        : '';
+
+                    btn.innerHTML = `<span>▶</span> <span>${escapeHtml(f.label)}</span> ${resumeBadge}`;
                     btn.title = f.name;
                     btn.onclick = () => {
                         document.querySelectorAll('.btn-pack-ep').forEach(b => b.classList.remove('active'));
@@ -72,6 +81,9 @@
                         const newVlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(anime.lienMagnet) + "&index=" + f.id + "&play";
                         updateVlcLinks(newVlcUrl);
                         showToast(`🎬 Lecture : ${f.label}`);
+                        if (typeof checkAndShowResumeBanner === 'function') {
+                            checkAndShowResumeBanner(anime.lienMagnet, f.id, anime);
+                        }
                         startStreamingInPlayer(anime.lienMagnet, anime.titre, newVlcUrl, f.id, 0);
                     };
                     packList.appendChild(btn);
@@ -86,6 +98,9 @@
                         document.getElementById('detailEpisodeBadge').innerText = '🎬 Épisode ' + selectedFile.episode;
                         updatePlayerTrackButton();
                     }
+                    if (typeof checkAndShowResumeBanner === 'function') {
+                        checkAndShowResumeBanner(anime.lienMagnet, selectedFile.id, anime);
+                    }
                     startStreamingInPlayer(anime.lienMagnet, anime.titre, matchedVlcUrl, selectedFile.id, 0);
                 }
             }
@@ -95,14 +110,14 @@
     }
 
     // --- NAVIGATION ET REDIRECTION VERS LA PAGE DE DÉTAIL ---
-    function openAnimeDetail(anime) {
+    function openAnimeDetail(anime, initialFileIndex = 1, initialSeek = 0) {
         if (typeof resetSubtitlesState === 'function') {
             resetSubtitlesState();
         }
         currentAnimeItem = anime;
-        currentActiveFileIndex = 1;
+        currentActiveFileIndex = initialFileIndex || 1;
         currentActiveAudioIndex = null;
-        currentStreamOffset = 0;
+        currentStreamOffset = initialSeek || 0;
 
         // Bascule des vues
         document.getElementById('catalogView').style.display = 'none';
@@ -143,7 +158,7 @@
         };
 
         // Configuration initiale des liens VLC et Magnet
-        const vlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(anime.lienMagnet) + "&index=1&play";
+        const vlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(anime.lienMagnet) + "&index=" + currentActiveFileIndex + "&play";
         updateVlcLinks(vlcUrl);
 
         const detailMagnetBtn = document.getElementById('detailMagnetBtn');
@@ -163,6 +178,11 @@
             };
         }
 
+        // Synchronisation de l'état favori
+        if (typeof updateFavoriteButtonState === 'function' && typeof isAnimeFavorite === 'function') {
+            updateFavoriteButtonState(isAnimeFavorite(animeName));
+        }
+
         // Synchronisation du mode de lecture de la fiche
         const streamModeSelect = document.getElementById('detailStreamMode');
         if (streamModeSelect) {
@@ -172,14 +192,31 @@
         // Synchronisation du suivi de progression AniList
         syncAnilistForDetail(anime);
 
-        // Lancement immédiat de la vidéo (fichier 1 par défaut)
-        startStreamingInPlayer(anime.lienMagnet, anime.titre, vlcUrl, 1, 0);
+        // Vérification de reprise de lecture si pas de seek forcé
+        if (initialSeek === 0 && typeof checkAndShowResumeBanner === 'function') {
+            checkAndShowResumeBanner(anime.lienMagnet, currentActiveFileIndex, anime);
+        } else if (initialSeek > 0) {
+            const detailResumeBtn = document.getElementById('detailResumeBtn');
+            if (detailResumeBtn) detailResumeBtn.style.display = 'none';
+        }
+
+        // Lancement immédiat de la vidéo
+        startStreamingInPlayer(anime.lienMagnet, anime.titre, vlcUrl, currentActiveFileIndex, initialSeek);
 
         // Analyse des fichiers du pack en arrière-plan pour afficher les épisodes disponibles
         loadPackEpisodes(anime);
     }
 
     function closeDetailView() {
+        if (typeof savePlaybackProgress === 'function') {
+            savePlaybackProgress(true);
+        }
+        if (typeof dismissResumeBanner === 'function') {
+            dismissResumeBanner(false);
+        }
+        const detailResumeBtn = document.getElementById('detailResumeBtn');
+        if (detailResumeBtn) detailResumeBtn.style.display = 'none';
+
         if (streamTimeout) clearTimeout(streamTimeout);
         if (currentSubAbort) currentSubAbort.abort();
         
@@ -262,7 +299,13 @@
             showHomeScreen();
             return;
         }
-        if (currentTargetNextEpisode && currentTargetNextEpisode.animeName.toLowerCase().includes(query.toLowerCase())) {
+        if (currentTargetNextEpisode && (
+            (currentTargetNextEpisode.animeName && currentTargetNextEpisode.animeName.toLowerCase().includes(query.toLowerCase())) ||
+            (currentTargetNextEpisode.english && currentTargetNextEpisode.english.toLowerCase().includes(query.toLowerCase())) ||
+            (currentTargetNextEpisode.romaji && currentTargetNextEpisode.romaji.toLowerCase().includes(query.toLowerCase())) ||
+            (currentTargetNextEpisode.userPreferred && currentTargetNextEpisode.userPreferred.toLowerCase().includes(query.toLowerCase())) ||
+            (currentTargetNextEpisode.searchTitle && currentTargetNextEpisode.searchTitle.toLowerCase().includes(query.toLowerCase()))
+        )) {
             executeSearchForAnime(query, currentTargetNextEpisode);
         } else {
             currentTargetNextEpisode = null;
@@ -286,6 +329,15 @@
         if (!query) {
             showHomeScreen();
             return;
+        }
+        if (currentTargetNextEpisode && !(
+            (currentTargetNextEpisode.animeName && currentTargetNextEpisode.animeName.toLowerCase().includes(query.toLowerCase())) ||
+            (currentTargetNextEpisode.english && currentTargetNextEpisode.english.toLowerCase().includes(query.toLowerCase())) ||
+            (currentTargetNextEpisode.romaji && currentTargetNextEpisode.romaji.toLowerCase().includes(query.toLowerCase())) ||
+            (currentTargetNextEpisode.userPreferred && currentTargetNextEpisode.userPreferred.toLowerCase().includes(query.toLowerCase())) ||
+            (currentTargetNextEpisode.searchTitle && currentTargetNextEpisode.searchTitle.toLowerCase().includes(query.toLowerCase()))
+        )) {
+            currentTargetNextEpisode = null;
         }
         executeSearchForAnime(query, currentTargetNextEpisode);
     }
@@ -369,13 +421,20 @@
             let response = await fetch('/api/search?q=' + encodeURIComponent(searchTitle) + '&type=' + type);
             let torrents = await response.json();
 
-            // Fallback éventuel sur le titre anglais si aucun résultat avec le romaji
-            if ((!torrents || torrents.length === 0) && targetInfo?.english && targetInfo.english !== searchTitle) {
-                const fallbackQuery = targetInfo.english.replace(/[:]/g, ' ').replace(/\s+/g, ' ').trim();
-                const fallbackRes = await fetch('/api/search?q=' + encodeURIComponent(fallbackQuery) + '&type=' + type);
-                const fallbackTorrents = await fallbackRes.json();
-                if (fallbackTorrents && fallbackTorrents.length > 0) {
-                    torrents = fallbackTorrents;
+            // Fallback automatique si aucun résultat avec le titre utilisé
+            if ((!torrents || torrents.length === 0) && targetInfo) {
+                // Si la recherche initiale était le titre anglais, essayer le titre romaji ou japonais, et inversement
+                const candidateFallback = (searchTitle.toLowerCase() === (targetInfo.english || '').toLowerCase())
+                    ? (targetInfo.romaji || targetInfo.userPreferred)
+                    : (targetInfo.english || targetInfo.romaji);
+                if (candidateFallback && candidateFallback.toLowerCase() !== searchTitle.toLowerCase()) {
+                    const fallbackQuery = candidateFallback.replace(/[:]/g, ' ').replace(/\s+/g, ' ').trim();
+                    console.log(`[Search] Aucun résultat pour "${searchTitle}", tentative de repli avec "${fallbackQuery}"...`);
+                    const fallbackRes = await fetch('/api/search?q=' + encodeURIComponent(fallbackQuery) + '&type=' + type);
+                    const fallbackTorrents = await fallbackRes.json();
+                    if (fallbackTorrents && fallbackTorrents.length > 0) {
+                        torrents = fallbackTorrents;
+                    }
                 }
             }
 

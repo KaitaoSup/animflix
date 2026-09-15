@@ -275,7 +275,20 @@ app.get('/api/anilist/config', (req, res) => {
   });
 });
 
-// Servir les fichiers statiques (CSS, JS) mis en cache par le navigateur
+// --- PROGRESSIVE WEB APP (PWA) ROUTES ---
+app.get('/sw.js', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.sendFile(path.join(__dirname, 'public', 'sw.js'));
+});
+
+app.get('/manifest.json', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+  res.sendFile(path.join(__dirname, 'public', 'manifest.json'));
+});
+
+// Servir les fichiers statiques (CSS, JS, Icônes) mis en cache par le navigateur
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
 
 app.get('/', (req, res) => {

@@ -203,8 +203,60 @@ function showHomeScreen() {
     }
 }
 
+// --- PROGRESSIVE WEB APP (PWA, SERVICE WORKER & INSTALL BANNER) ---
+let deferredPwaPrompt = null;
+
+function initPwa() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+                .then((reg) => {
+                    console.log('[PWA] Service Worker actif, scope:', reg.scope);
+                })
+                .catch((err) => {
+                    console.warn('[PWA] Erreur enregistrement Service Worker:', err);
+                });
+        });
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPwaPrompt = e;
+        const btn = document.getElementById('pwaInstallBtn');
+        if (btn) {
+            btn.style.display = 'inline-flex';
+        }
+    });
+
+    window.addEventListener('appinstalled', () => {
+        deferredPwaPrompt = null;
+        const btn = document.getElementById('pwaInstallBtn');
+        if (btn) btn.style.display = 'none';
+        showToast('🎉 Animflix a été installée avec succès !');
+    });
+}
+
+function triggerPwaInstall() {
+    if (!deferredPwaPrompt) {
+        showToast("💡 Pour installer : utilisez l'option 'Ajouter à l'écran d'accueil' ou 'Installer' de votre navigateur.");
+        return;
+    }
+    deferredPwaPrompt.prompt();
+    deferredPwaPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult && choiceResult.outcome === 'accepted') {
+            showToast("⏳ Installation d'Animflix en cours...");
+        }
+        deferredPwaPrompt = null;
+        const btn = document.getElementById('pwaInstallBtn');
+        if (btn) btn.style.display = 'none';
+    });
+}
+
+window.triggerPwaInstall = triggerPwaInstall;
+
 // --- INITIALISATION DE L'APPLICATION ---
 function initApp() {
+    initPwa();
     if (typeof loadSavedSubStyle === 'function') loadSavedSubStyle();
     if (typeof initAnilistSession === 'function') initAnilistSession();
     if (typeof setupVideoPlayerTracking === 'function') setupVideoPlayerTracking();
