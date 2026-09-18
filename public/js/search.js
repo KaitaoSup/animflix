@@ -242,6 +242,9 @@
         currentActiveMagnet = null;
         currentActiveFileIndex = 1;
         currentActiveAudioIndex = null;
+        currentManualAudioOffset = 0.0;
+        if (typeof updateAudioSyncDisplay === 'function') updateAudioSyncDisplay();
+        if (typeof resetSubtitleSync === 'function') resetSubtitleSync();
         currentStreamOffset = 0;
         currentTotalDuration = 1440;
         const curLabel = document.getElementById('playerDisplayCurrent');

@@ -7,6 +7,7 @@ let streamTimeout = null;
 let currentActiveMagnet = null;
 let currentActiveFileIndex = 1;
 let currentActiveAudioIndex = null;
+let currentManualAudioOffset = 0.0;
 let currentStreamOffset = 0;
 let currentTotalDuration = 1440; // Durée totale en secondes (défaut 24 min)
 let isScrubbing = false;
@@ -15,6 +16,22 @@ let currentSubAbort = null;
 let currentTextTrack = null;
 let currentAnimeItem = null;
 let currentPlaySessionId = null;
+
+// Nettoyeur intelligent de titre d'anime (identique au backend)
+function cleanAnimeTitle(raw) {
+    if (!raw) return '';
+    return raw
+        .replace(/\[.*?\]/g, ' ')
+        .replace(/\(.*?\)/g, ' ')
+        .replace(/\b\d\s*[._]\s*\d\b/g, ' ')
+        .replace(/\b(1080p|720p|480p|2160p|4k|x264|x265|x\.265|x\.264|hevc|av1|aac|flac|web-dl|webrip|bdrip|bd|bluray|dvd|vostfr|vf|multi|multisubs?|sub|mkv|mp4|avi|cr|crunchyroll|10bit|8bit|remux|uncensored|dual audio|final)\b/gi, ' ')
+        .replace(/\b(s\d+e\d+|s\d+|e\d+|ep\s*\d+|episode\s*\d+|saison\s*\d+|season\s*\d+)\b/gi, ' ')
+        .replace(/\s*-\s*\d{1,4}\b/g, ' ')
+        .replace(/\b\d{1,3}\b(?=\s*$)/g, ' ')
+        .replace(/[._\-\+\/\\:~]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
 
 // --- FORMATAGE ET ANALYSE D'ANIMES (DRY) ---
 function getAnimeDetails(anime) {
@@ -110,8 +127,16 @@ function parseAnimeDetails(rawTitle) {
     if (matchCut > 2) {
         name = name.substring(0, matchCut);
     }
-    name = name.replace(/[._]/g, ' ').replace(/\s*-\s*$/, '').trim();
-    if (!name) name = rawTitle;
+    name = name
+        .replace(/\(.*?\)/g, ' ')
+        .replace(/\[.*?\]/g, ' ')
+        .replace(/[-_.~]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (!name || name.length < 2) {
+        name = cleanAnimeTitle(rawTitle) || 'Anime';
+    }
 
     return {
         animeName: name,

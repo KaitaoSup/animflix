@@ -140,6 +140,107 @@ function cleanAnimeTitle(raw) {
     .trim();
 }
 
+// Analyse détaillée des métadonnées Anime (Nom, Saison, Épisode, Résolution, Audio)
+function parseAnimeDetails(rawTitle) {
+  if (!rawTitle) {
+    return {
+      animeName: 'Anime',
+      season: 'Saison 1',
+      episode: 'Épisode 1',
+      resolution: '1080p Full HD',
+      audioLang: 'VOSTFR'
+    };
+  }
+
+  // 1. Détection de la résolution
+  let resolution = '1080p Full HD';
+  if (/2160p|4k\b/i.test(rawTitle)) resolution = '4K Ultra HD';
+  else if (/1080p/i.test(rawTitle)) resolution = '1080p Full HD';
+  else if (/720p/i.test(rawTitle)) resolution = '720p HD';
+  else if (/480p/i.test(rawTitle)) resolution = '480p SD';
+
+  // 2. Détection de la langue / audio
+  let audioLang = 'VOSTFR';
+  if (/multi/i.test(rawTitle)) audioLang = 'MULTI (VF / VOSTFR)';
+  else if (/\bvf\b/i.test(rawTitle)) audioLang = 'VF';
+  else if (/vostfr/i.test(rawTitle)) audioLang = 'VOSTFR';
+  else if (/vosta|sub\b/i.test(rawTitle)) audioLang = 'VOSTA';
+
+  // 3. Détection de la Saison
+  let season = null;
+  const sMultiMatch = rawTitle.match(/S(\d{1,2})\s*[-+&]\s*S?(\d{1,2})/i) || 
+                      rawTitle.match(/Saisons?\s*(\d{1,2})\s*[-+&]\s*(\d{1,2})/i);
+  if (sMultiMatch) {
+    const separator = /[-~]/.test(sMultiMatch[0]) ? ' à ' : ' & ';
+    season = `Saisons ${parseInt(sMultiMatch[1], 10)}${separator}${parseInt(sMultiMatch[2], 10)}`;
+  } else {
+    const seMatch = rawTitle.match(/\bS0*(\d{1,2})E\d+/i);
+    if (seMatch) {
+      season = `Saison ${parseInt(seMatch[1], 10)}`;
+    } else {
+      const sMatch = rawTitle.match(/\bS(?:aison|eason)?\s*0*(\d{1,2})(?=[^\w]|$)/i) ||
+                     rawTitle.match(/\b(\d{1,2})(?:st|nd|rd|th)\s+Season\b/i) ||
+                     rawTitle.match(/\bSeason\s*0*(\d{1,2})\b/i) ||
+                     rawTitle.match(/\bSaison\s*0*(\d{1,2})\b/i);
+      if (sMatch) {
+        season = `Saison ${parseInt(sMatch[1], 10)}`;
+      }
+    }
+  }
+  if (!season) season = 'Saison 1';
+
+  // 4. Détection de l'Épisode
+  let episode = null;
+  const epMultiMatch = rawTitle.match(/\b(?:E|EP|Episode|Épisode)\s*0*(\d{1,4})\s*[-~]\s*0*(\d{1,4})\b/i) ||
+                       rawTitle.match(/[-_]\s*0*(\d{1,4})\s*[-~]\s*0*(\d{1,4})\b/);
+  if (epMultiMatch) {
+    episode = `Épisodes ${parseInt(epMultiMatch[1], 10)}-${parseInt(epMultiMatch[2], 10)}`;
+  } else {
+    const seMatch = rawTitle.match(/S\d{1,2}\s*E0*(\d{1,4})\b/i);
+    if (seMatch) {
+      episode = `Épisode ${parseInt(seMatch[1], 10)}`;
+    } else {
+      const epMatch = rawTitle.match(/\b(?:E|EP|Episode|Épisode)\s*0*(\d{1,4})\b/i) ||
+                      rawTitle.match(/\s-\s0*(\d{1,4})(?:v\d+)?(?:\s|$|\[|\()/);
+      if (epMatch) {
+        episode = `Épisode ${parseInt(epMatch[1], 10)}`;
+      }
+    }
+  }
+
+  if (!episode) {
+    if (/complete|intégrale|integrale|batch|s\d+[-+]s\d+/i.test(rawTitle)) {
+      episode = 'Intégrale / Pack';
+    } else if (/\bmovie\b|\bfilm\b/i.test(rawTitle)) {
+      episode = 'Film';
+    } else if (season && season !== 'Saison 1') {
+      episode = 'Saison Complète';
+    } else {
+      episode = 'Épisode 1';
+    }
+  }
+
+  // 5. Extraction du Nom de l'Anime
+  let name = rawTitle.replace(/^\[.*?\]\s*/g, '');
+  const cutPattern = /(\bS\d+|\bSeason\s*\d+|\bSaison\s*\d+|\b\d+(?:st|nd|rd|th)\s+Season|\s-\s\d+|\bE\d{1,4}\b|\bEP\s*\d+|\bEpisode\s*\d+|\bÉpisode\s*\d+|\b1080p\b|\b720p\b|\b4k\b|\b2160p\b|\bVOSTFR\b|\bVF\b|\bMULTI\b)/i;
+  const matchCut = name.search(cutPattern);
+  if (matchCut > 2) {
+    name = name.substring(0, matchCut);
+  }
+  name = name
+    .replace(/\(.*?\)/g, ' ')
+    .replace(/\[.*?\]/g, ' ')
+    .replace(/[-_.~]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!name || name.length < 2) {
+    name = cleanAnimeTitle(rawTitle) || 'Anime';
+  }
+
+  return { animeName: name, season, episode, resolution, audioLang };
+}
+
 // Récupération métadonnées (Affiche & Note) avec mise en cache et double source (TMDB + Kitsu)
 async function getAnimeMetadata(cleanTitle) {
   if (!cleanTitle) return { poster: null, rating: "N/A" };
@@ -211,16 +312,6 @@ async function getAnimeMetadata(cleanTitle) {
   const result = { poster, rating, timestamp: Date.now() };
   metadataCache.set(key, result);
   return { poster, rating };
-}
-
-// Échappement sécurisé pour les filtres FFmpeg
-function escapeFfmpegPath(str) {
-  return str
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "'\\''")
-    .replace(/:/g, '\\:')
-    .replace(/\[/g, '\\[')
-    .replace(/\]/g, '\\]');
 }
 
 app.use(express.json());
@@ -341,107 +432,6 @@ app.get('/api/search', async (req, res) => {
       searchCache.set(cacheKey, []);
       return res.json([]);
     }
-
-// Analyse détaillée des métadonnées Anime (Nom, Saison, Épisode, Résolution, Audio)
-function parseAnimeDetails(rawTitle) {
-  if (!rawTitle) {
-    return {
-      animeName: 'Anime',
-      season: 'Saison 1',
-      episode: 'Épisode 1',
-      resolution: '1080p Full HD',
-      audioLang: 'VOSTFR'
-    };
-  }
-
-  // 1. Détection de la résolution
-  let resolution = '1080p Full HD';
-  if (/2160p|4k\b/i.test(rawTitle)) resolution = '4K Ultra HD';
-  else if (/1080p/i.test(rawTitle)) resolution = '1080p Full HD';
-  else if (/720p/i.test(rawTitle)) resolution = '720p HD';
-  else if (/480p/i.test(rawTitle)) resolution = '480p SD';
-
-  // 2. Détection de la langue / audio
-  let audioLang = 'VOSTFR';
-  if (/multi/i.test(rawTitle)) audioLang = 'MULTI (VF / VOSTFR)';
-  else if (/\bvf\b/i.test(rawTitle)) audioLang = 'VF';
-  else if (/vostfr/i.test(rawTitle)) audioLang = 'VOSTFR';
-  else if (/vosta|sub\b/i.test(rawTitle)) audioLang = 'VOSTA';
-
-  // 3. Détection de la Saison
-  let season = null;
-  const sMultiMatch = rawTitle.match(/S(\d{1,2})\s*[-+&]\s*S?(\d{1,2})/i) || 
-                      rawTitle.match(/Saisons?\s*(\d{1,2})\s*[-+&]\s*(\d{1,2})/i);
-  if (sMultiMatch) {
-    const separator = /[-~]/.test(sMultiMatch[0]) ? ' à ' : ' & ';
-    season = `Saisons ${parseInt(sMultiMatch[1], 10)}${separator}${parseInt(sMultiMatch[2], 10)}`;
-  } else {
-    const seMatch = rawTitle.match(/\bS0*(\d{1,2})E\d+/i);
-    if (seMatch) {
-      season = `Saison ${parseInt(seMatch[1], 10)}`;
-    } else {
-      const sMatch = rawTitle.match(/\bS(?:aison|eason)?\s*0*(\d{1,2})(?=[^\w]|$)/i) ||
-                     rawTitle.match(/\b(\d{1,2})(?:st|nd|rd|th)\s+Season\b/i) ||
-                     rawTitle.match(/\bSeason\s*0*(\d{1,2})\b/i) ||
-                     rawTitle.match(/\bSaison\s*0*(\d{1,2})\b/i);
-      if (sMatch) {
-        season = `Saison ${parseInt(sMatch[1], 10)}`;
-      }
-    }
-  }
-  if (!season) season = 'Saison 1';
-
-  // 4. Détection de l'Épisode
-  let episode = null;
-  const epMultiMatch = rawTitle.match(/\b(?:E|EP|Episode|Épisode)\s*0*(\d{1,4})\s*[-~]\s*0*(\d{1,4})\b/i) ||
-                       rawTitle.match(/[-_]\s*0*(\d{1,4})\s*[-~]\s*0*(\d{1,4})\b/);
-  if (epMultiMatch) {
-    episode = `Épisodes ${parseInt(epMultiMatch[1], 10)}-${parseInt(epMultiMatch[2], 10)}`;
-  } else {
-    const seMatch = rawTitle.match(/S\d{1,2}\s*E0*(\d{1,4})\b/i);
-    if (seMatch) {
-      episode = `Épisode ${parseInt(seMatch[1], 10)}`;
-    } else {
-      const epMatch = rawTitle.match(/\b(?:E|EP|Episode|Épisode)\s*0*(\d{1,4})\b/i) ||
-                      rawTitle.match(/\s-\s0*(\d{1,4})(?:v\d+)?(?:\s|$|\[|\()/);
-      if (epMatch) {
-        episode = `Épisode ${parseInt(epMatch[1], 10)}`;
-      }
-    }
-  }
-
-  if (!episode) {
-    if (/complete|intégrale|integrale|batch|s\d+[-+]s\d+/i.test(rawTitle)) {
-      episode = 'Intégrale / Pack';
-    } else if (/\bmovie\b|\bfilm\b/i.test(rawTitle)) {
-      episode = 'Film';
-    } else if (season && season !== 'Saison 1') {
-      episode = 'Saison Complète';
-    } else {
-      episode = 'Épisode 1';
-    }
-  }
-
-  // 5. Extraction du Nom de l'Anime
-  let name = rawTitle.replace(/^\[.*?\]\s*/g, '');
-  const cutPattern = /(\bS\d+|\bSeason\s*\d+|\bSaison\s*\d+|\b\d+(?:st|nd|rd|th)\s+Season|\s-\s\d+|\bE\d{1,4}\b|\bEP\s*\d+|\bEpisode\s*\d+|\bÉpisode\s*\d+|\b1080p\b|\b720p\b|\b4k\b|\b2160p\b|\bVOSTFR\b|\bVF\b|\bMULTI\b)/i;
-  const matchCut = name.search(cutPattern);
-  if (matchCut > 2) {
-    name = name.substring(0, matchCut);
-  }
-  name = name
-    .replace(/\(.*?\)/g, ' ')
-    .replace(/\[.*?\]/g, ' ')
-    .replace(/[-_.~]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!name || name.length < 2) {
-    name = cleanAnimeTitle(rawTitle) || 'Anime';
-  }
-
-  return { animeName: name, season, episode, resolution, audioLang };
-}
 
     // 1. Récupération prioritaire et ultra-rapide de l'affiche de la franchise
     const queryClean = cleanAnimeTitle(query) || query;
@@ -866,12 +856,13 @@ app.get('/api/play-sync', async (req, res) => {
 
 // --- TRANSCODEUR FFMPEG OPTIMISÉ (ZÉRO LATENCE, SEEK & MULTITHREAD) ---
 app.get('/play', async (req, res) => {
-  const { magnet, mode, type, fileIndex = 1, audioIndex, ss, playId } = req.query;
+  const { magnet, mode, type, fileIndex = 1, audioIndex, ss, playId, audioOffset } = req.query;
   if (!magnet) return res.status(400).send("Lien magnet manquant");
 
   const parsedFileIndex = parseInt(fileIndex, 10) || 1;
   const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
   const seekSeconds = parseFloat(ss) || 0;
+  const parsedAudioOffset = parseFloat(audioOffset) || 0;
 
   // Création / liaison de la session de synchronisation
   let playSession = null;
@@ -895,11 +886,12 @@ app.get('/play', async (req, res) => {
 
   res.setHeader('Content-Type', 'video/mp4');
   res.setHeader('Accept-Ranges', 'none');
+  res.setHeader('Access-Control-Allow-Origin', '*');
 
   // MODE 1 : LECTURE DIRECTE (0% CPU, STREAM ULTRA-RAPIDE SANS RÉENCODAGE VIDÉO)
   if (mode === 'direct') {
     const streamInfo = await getStreamInfo(magnet, parsedFileIndex).catch(() => null);
-    console.log(`⚡ Lancement FFmpeg en Mode Direct (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s, Audio: ${audioIndex ?? 'auto'}, playId: ${playId ?? 'none'})`);
+    console.log(`⚡ Lancement FFmpeg en Mode Direct (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s, Audio: ${audioIndex ?? 'auto'}, Offset: ${parsedAudioOffset}s, playId: ${playId ?? 'none'})`);
     const directArgs = [
       '-threads', '0'
     ];
@@ -926,11 +918,20 @@ app.get('/play', async (req, res) => {
       chosenAudioTrack = (streamInfo?.audioTracks || [])[0];
     }
 
-    // Si la piste audio source est déjà en AAC, la copier directement (0% CPU, 0ms latence, synchronisation native)
-    if (chosenAudioTrack && chosenAudioTrack.codec === 'aac') {
+    // Si la piste audio source est déjà en AAC et aucun décalage audio n'est requis, la copier directement (0% CPU)
+    if (chosenAudioTrack && chosenAudioTrack.codec === 'aac' && parsedAudioOffset === 0) {
       directArgs.push('-c:a', 'copy');
     } else {
       directArgs.push('-c:a', 'aac', '-ac', '2');
+      if (parsedAudioOffset !== 0) {
+        if (parsedAudioOffset > 0) {
+          const delayMs = Math.round(parsedAudioOffset * 1000);
+          directArgs.push('-af', `adelay=${delayMs}|${delayMs}`);
+        } else {
+          const trimSec = Math.abs(parsedAudioOffset);
+          directArgs.push('-af', `atrim=start=${trimSec},asetpts=PTS-STARTPTS`);
+        }
+      }
     }
 
     directArgs.push(
@@ -1023,7 +1024,20 @@ app.get('/play', async (req, res) => {
     '-tune', 'zerolatency',
     '-crf', '25',
     '-c:a', 'aac',
-    '-ac', '2',
+    '-ac', '2'
+  );
+
+  if (parsedAudioOffset !== 0) {
+    if (parsedAudioOffset > 0) {
+      const delayMs = Math.round(parsedAudioOffset * 1000);
+      ffmpegArgs.push('-af', `adelay=${delayMs}|${delayMs}`);
+    } else {
+      const trimSec = Math.abs(parsedAudioOffset);
+      ffmpegArgs.push('-af', `atrim=start=${trimSec},asetpts=PTS-STARTPTS`);
+    }
+  }
+
+  ffmpegArgs.push(
     '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
     '-f', 'mp4',
     'pipe:1'

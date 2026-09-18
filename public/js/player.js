@@ -164,6 +164,52 @@
         }
     }
 
+    // --- SYNCHRONISATION / DÉCALAGE AUDIO (ACCESSIBLE VIA BOUTONS ET RACCOURCIS J / K) ---
+    let audioSyncDebounceTimeout = null;
+
+    function adjustAudioSync(deltaSeconds) {
+        if (typeof currentManualAudioOffset !== 'number') currentManualAudioOffset = 0.0;
+        currentManualAudioOffset = Math.round((currentManualAudioOffset + deltaSeconds) * 10) / 10;
+        updateAudioSyncDisplay();
+        showToast(`🔊 Synchro audio : ${currentManualAudioOffset >= 0 ? '+' : ''}${currentManualAudioOffset.toFixed(1)}s`);
+
+        if (!currentActiveMagnet) return;
+
+        if (audioSyncDebounceTimeout) clearTimeout(audioSyncDebounceTimeout);
+        audioSyncDebounceTimeout = setTimeout(() => {
+            const video = document.getElementById('videoPlayer');
+            const curPos = Math.max(0, Math.round(currentStreamOffset + (video?.currentTime || 0)));
+            const currentVlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(currentActiveMagnet) + "&index=" + currentActiveFileIndex + "&play";
+            startStreamingInPlayer(currentActiveMagnet, currentAnimeItem?.titre || 'Anime', currentVlcUrl, currentActiveFileIndex, curPos);
+        }, 400);
+    }
+
+    function resetAudioSync() {
+        currentManualAudioOffset = 0.0;
+        updateAudioSyncDisplay();
+        showToast("🔊 Synchro audio réinitialisée (0.0s)");
+
+        if (!currentActiveMagnet) return;
+
+        if (audioSyncDebounceTimeout) clearTimeout(audioSyncDebounceTimeout);
+        const video = document.getElementById('videoPlayer');
+        const curPos = Math.max(0, Math.round(currentStreamOffset + (video?.currentTime || 0)));
+        const currentVlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(currentActiveMagnet) + "&index=" + currentActiveFileIndex + "&play";
+        startStreamingInPlayer(currentActiveMagnet, currentAnimeItem?.titre || 'Anime', currentVlcUrl, currentActiveFileIndex, curPos);
+    }
+
+    function updateAudioSyncDisplay() {
+        const display = document.getElementById('audioSyncDisplay');
+        if (display) {
+            const offset = (typeof currentManualAudioOffset === 'number') ? currentManualAudioOffset : 0.0;
+            display.textContent = (offset >= 0 ? '+' : '') + offset.toFixed(1) + 's';
+        }
+    }
+
+    window.adjustAudioSync = adjustAudioSync;
+    window.resetAudioSync = resetAudioSync;
+    window.updateAudioSyncDisplay = updateAudioSyncDisplay;
+
     async function cleanTorrServerCache() {
         if (!confirm("Voulez-vous purger tous les torrents et données en mémoire de TorrServer ?\n(Libère immédiatement la RAM et le cache de streaming)")) return;
         showToast("Purge du cache TorrServer en cours... ⏳");
@@ -226,6 +272,9 @@
 
         if (currentActiveAudioIndex !== null && currentActiveAudioIndex !== '') {
             webUrl += '&audioIndex=' + encodeURIComponent(currentActiveAudioIndex);
+        }
+        if (typeof currentManualAudioOffset === 'number' && currentManualAudioOffset !== 0) {
+            webUrl += '&audioOffset=' + encodeURIComponent(currentManualAudioOffset);
         }
         if (seekSeconds > 0) {
             webUrl += '&ss=' + encodeURIComponent(seekSeconds);
@@ -504,6 +553,12 @@
         } else if (e.key.toLowerCase() === 'h' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
             e.preventDefault();
             if (typeof adjustSubtitleSync === 'function') adjustSubtitleSync(0.1);
+        } else if (e.key.toLowerCase() === 'j' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+            e.preventDefault();
+            if (typeof adjustAudioSync === 'function') adjustAudioSync(-0.1);
+        } else if (e.key.toLowerCase() === 'k' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+            e.preventDefault();
+            if (typeof adjustAudioSync === 'function') adjustAudioSync(0.1);
         } else if (e.key === 'ArrowRight' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'INPUT') {
             e.preventDefault();
             jumpSeekRelative(10);
