@@ -236,6 +236,7 @@ function initPwa() {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js')
                 .then((reg) => {
+                    reg.update();
                     console.log('[PWA] Service Worker actif, scope:', reg.scope);
                 })
                 .catch((err) => {
@@ -279,9 +280,129 @@ function triggerPwaInstall() {
 
 window.triggerPwaInstall = triggerPwaInstall;
 
+// --- GESTION DES PARAMÈTRES ET PRÉFÉRENCES UTILISATEUR ---
+function loadUserSettings() {
+    const searchType = localStorage.getItem('animflix_default_search_type') || 'vostfr';
+    const streamMode = localStorage.getItem('animflix_default_stream_mode') || 'direct';
+    const aniSkipMode = localStorage.getItem('animflix_aniskip_mode') || 'button';
+    const autoplayNext = localStorage.getItem('animflix_autoplay_next') || 'enabled';
+    const defaultSpeed = localStorage.getItem('animflix_default_speed') || '1';
+    const voiceBoost = localStorage.getItem('animflix_default_voice_boost') || 'disabled';
+
+    const elSearch = document.getElementById('searchType');
+    if (elSearch) elSearch.value = searchType;
+
+    const elStream = document.getElementById('streamMode');
+    if (elStream) elStream.value = streamMode;
+
+    const elDetailStream = document.getElementById('detailStreamMode');
+    if (elDetailStream) elDetailStream.value = streamMode;
+
+    // Remplissage des contrôles dans la modale
+    const prefSearch = document.getElementById('prefDefaultSearchType');
+    if (prefSearch) prefSearch.value = searchType;
+
+    const prefStream = document.getElementById('prefDefaultStreamMode');
+    if (prefStream) prefStream.value = streamMode;
+
+    const prefSkip = document.getElementById('prefAniSkipMode');
+    if (prefSkip) prefSkip.value = aniSkipMode;
+
+    const prefAuto = document.getElementById('prefAutoplayNext');
+    if (prefAuto) prefAuto.value = autoplayNext;
+
+    const prefSpeed = document.getElementById('prefDefaultSpeed');
+    if (prefSpeed) prefSpeed.value = defaultSpeed;
+
+    const prefVoice = document.getElementById('prefDefaultVoiceBoost');
+    if (prefVoice) prefVoice.value = voiceBoost;
+}
+
+function saveUserSettings() {
+    const prefSearch = document.getElementById('prefDefaultSearchType')?.value;
+    const prefStream = document.getElementById('prefDefaultStreamMode')?.value;
+    const prefSkip = document.getElementById('prefAniSkipMode')?.value;
+    const prefAuto = document.getElementById('prefAutoplayNext')?.value;
+    const prefSpeed = document.getElementById('prefDefaultSpeed')?.value;
+    const prefVoice = document.getElementById('prefDefaultVoiceBoost')?.value;
+
+    if (prefSearch) {
+        localStorage.setItem('animflix_default_search_type', prefSearch);
+        const el = document.getElementById('searchType');
+        if (el) el.value = prefSearch;
+    }
+    if (prefStream) {
+        localStorage.setItem('animflix_default_stream_mode', prefStream);
+        const el = document.getElementById('streamMode');
+        if (el) el.value = prefStream;
+        const elDetail = document.getElementById('detailStreamMode');
+        if (elDetail) elDetail.value = prefStream;
+    }
+    if (prefSkip) localStorage.setItem('animflix_aniskip_mode', prefSkip);
+    if (prefAuto) localStorage.setItem('animflix_autoplay_next', prefAuto);
+    if (prefSpeed) localStorage.setItem('animflix_default_speed', prefSpeed);
+    if (prefVoice) localStorage.setItem('animflix_default_voice_boost', prefVoice);
+
+    showToast("💾 Préférences enregistrées !");
+}
+
+async function fetchServerStatus() {
+    const content = document.getElementById('settingsServerStatusContent');
+    if (!content) return;
+    try {
+        const res = await fetch('/api/server/status');
+        const data = await res.json();
+        
+        let hwBadge = '';
+        if (data.hwAccel === 'vaapi') {
+            hwBadge = `<span style="color: #46d369; font-weight: bold;">🚀 VAAPI Matériel Actif (${data.vaapiDevice || 'Intel/AMD'})</span>`;
+        } else if (data.hwAccel === 'nvenc') {
+            hwBadge = `<span style="color: #76b900; font-weight: bold;">🚀 Nvidia NVENC Actif</span>`;
+        } else {
+            hwBadge = `<span style="color: #aaa;">⚙️ CPU Logiciel (libx264 ultrafast)</span>`;
+        }
+
+        const torrBadge = data.torrserverOnline
+            ? `<span style="color: #46d369;">● En ligne</span>`
+            : `<span style="color: #ff4757;">● Déconnecté</span>`;
+
+        content.innerHTML = `
+            <div><b>Transcodage vidéo :</b> ${hwBadge}</div>
+            <div style="margin-top: 5px;"><b>TorrServer P2P :</b> ${torrBadge}</div>
+            <div style="margin-top: 5px;"><b>Source Nyaa :</b> <span style="color: #eee;">${data.nyaaUrl || 'https://nyaa.si'}</span></div>
+            <div style="margin-top: 5px; font-size: 11px; color: #888;">Version Animflix : v${data.version || '1.1.0'}</div>
+        `;
+    } catch (e) {
+        content.innerHTML = `<span style="color: #ff4757;">⚠️ Erreur récupération état serveur</span>`;
+    }
+}
+
+function toggleSettingsModal() {
+    const modal = document.getElementById('settingsModal');
+    if (!modal) return;
+    if (modal.style.display === 'flex') {
+        closeSettingsModal();
+    } else {
+        loadUserSettings();
+        fetchServerStatus();
+        modal.style.display = 'flex';
+    }
+}
+
+function closeSettingsModal() {
+    const modal = document.getElementById('settingsModal');
+    if (modal) modal.style.display = 'none';
+}
+
+window.toggleSettingsModal = toggleSettingsModal;
+window.closeSettingsModal = closeSettingsModal;
+window.saveUserSettings = saveUserSettings;
+window.loadUserSettings = loadUserSettings;
+
 // --- INITIALISATION DE L'APPLICATION ---
 function initApp() {
     initPwa();
+    loadUserSettings();
     if (typeof loadSavedSubStyle === 'function') loadSavedSubStyle();
     if (typeof initAnilistSession === 'function') initAnilistSession();
     if (typeof setupVideoPlayerTracking === 'function') setupVideoPlayerTracking();

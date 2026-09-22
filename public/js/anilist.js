@@ -1038,11 +1038,6 @@
         renderAnilistDetailCard(true);
 
         const token = localStorage.getItem('anilist_token');
-        if (!token) {
-            renderAnilistDetailCard();
-            updatePlayerTrackButton();
-            return;
-        }
 
         try {
             const customId = localStorage.getItem('anilist_map_' + animeName.toLowerCase());
@@ -1059,7 +1054,7 @@
                             format
                             siteUrl
                             coverImage { large medium }
-                            mediaListEntry { id status progress score }
+                            ${token ? 'mediaListEntry { id status progress score }' : ''}
                         }
                     }
                 `;
@@ -1076,7 +1071,7 @@
                             format
                             siteUrl
                             coverImage { large medium }
-                            mediaListEntry { id status progress score }
+                            ${token ? 'mediaListEntry { id status progress score }' : ''}
                         }
                     }
                 `;
@@ -1087,6 +1082,11 @@
             currentAnilistMedia = data?.Media || null;
             renderAnilistDetailCard();
             updatePlayerTrackButton();
+
+            // Déclencher automatiquement la recherche AniSkip pour l'épisode en cours
+            if (typeof checkAniSkipForCurrentEpisode === 'function') {
+                checkAniSkipForCurrentEpisode();
+            }
         } catch (err) {
             console.warn("Recherche AniList:", err.message);
             renderAnilistDetailCard();

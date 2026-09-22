@@ -17,9 +17,9 @@
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-    <link rel="stylesheet" href="/css/style.css">
-    <link rel="stylesheet" href="/css/player.css">
-    <link rel="stylesheet" href="/css/anilist.css">
+    <link rel="stylesheet" href="/css/style.css?v=1.1.2">
+    <link rel="stylesheet" href="/css/player.css?v=1.1.2">
+    <link rel="stylesheet" href="/css/anilist.css?v=1.1.2">
 </head>
 <body>
   <div class="navbar">
@@ -46,6 +46,10 @@
           <!-- BOUTON PURGE CACHE TORRSERVER -->
           <button class="btn-clean-cache" onclick="cleanTorrServerCache()" title="Purger le cache et les torrents en mémoire de TorrServer">
               🧹
+          </button>
+          <!-- BOUTON PARAMÈTRES UTILISATEUR -->
+          <button class="btn-settings-nav" onclick="toggleSettingsModal()" title="Paramètres et préférences">
+              ⚙️
           </button>
           <!-- PROFIL / BOUTON CONNEXION ANILIST -->
           <div id="anilistNavContainer"></div>
@@ -175,10 +179,30 @@
 
               <!-- Écran vidéo avec contrôles personnalisés -->
               <div class="player-video-wrapper" id="playerVideoWrapper">
-                  <video id="videoPlayer" playsinline autoplay></video>
+                  <video id="videoPlayer" playsinline autoplay crossorigin="anonymous"></video>
                   
                   <!-- Indicateur central Play / Pause -->
                   <div id="playerCenterIndicator" class="player-center-indicator">▶</div>
+
+                  <!-- Bouton flottant AniSkip (Opening / Ending) -->
+                  <button id="aniSkipOverlayBtn" class="ani-skip-overlay-btn" style="display: none;" title="Passer automatiquement cette section">
+                      <span>⏭️</span>
+                      <span id="aniSkipText">Passer l'Opening</span>
+                  </button>
+
+                  <!-- Bannière d'enchaînement automatique (Binge Mode / Épisode suivant) -->
+                  <div id="playerNextEpOverlay" class="player-next-ep-overlay" style="display: none;">
+                      <div class="next-ep-header">
+                          <span class="next-ep-title-badge">🎬 Épisode suivant</span>
+                          <button class="next-ep-dismiss-btn" onclick="dismissNextEpisodeCountdown()">&times;</button>
+                      </div>
+                      <div class="next-ep-label" id="nextEpLabel">Épisode suivant</div>
+                      <div class="next-ep-timer-text">Lecture automatique dans <b id="nextEpCountdownSec">5</b>s</div>
+                      <div class="next-ep-actions">
+                          <button class="btn-next-ep-play" onclick="playNextEpisodeNow()">▶ Lancer</button>
+                          <button class="btn-next-ep-cancel" onclick="dismissNextEpisodeCountdown()">Rester ici</button>
+                      </div>
+                  </div>
 
                   <!-- Bannière de Reprise de lecture (Resume Playback) -->
                   <div id="playerResumeBanner" class="player-resume-banner" style="display: none;">
@@ -221,7 +245,7 @@
 
                       <!-- Ligne des boutons -->
                       <div class="player-bottom-bar">
-                          <!-- Gauche : Play, Saute, Volume, Durée réelle -->
+                          <!-- Gauche : Play, Saute, Volume, Boost Voix, Durée réelle -->
                           <div class="player-bar-left">
                               <button class="player-btn" id="customPlayPauseBtn" onclick="toggleCustomPlayPause()" title="Lecture / Pause [Espace]">
                                   <span id="customPlayIcon">▶</span>
@@ -243,6 +267,10 @@
                                   <input type="range" id="customVolumeSlider" class="player-volume-slider" min="0" max="1" step="0.02" value="1" oninput="onCustomVolumeInput(this.value)">
                               </div>
 
+                              <button class="player-btn" id="audioNormalizeBtn" onclick="toggleAudioNormalization()" title="Mode Nuit / Boost des dialogues [N]">
+                                  <span id="audioNormalizeIcon">🎙️</span>
+                              </button>
+
                               <div class="player-time-label">
                                   <span id="playerDisplayCurrent" class="current-time">00:00</span>
                                   <span class="time-sep">/</span>
@@ -250,9 +278,15 @@
                               </div>
                           </div>
 
-                          <!-- Droite : Badge info, CC toggle, Plein écran -->
+                          <!-- Droite : Badge info, Vitesse, PiP, CC toggle, Plein écran -->
                           <div class="player-bar-right">
                               <span id="playerOverlayEpBadge" class="player-badge-ep"></span>
+                              <button class="player-btn player-btn-speed" id="playerSpeedBtn" onclick="cyclePlaybackSpeed()" title="Vitesse de lecture [ < / > ]">
+                                  <span id="playerSpeedLabel">1x</span>
+                              </button>
+                              <button class="player-btn" id="playerPipBtn" onclick="togglePictureInPicture()" title="Picture-in-Picture [P]">
+                                  <span>⧉</span>
+                              </button>
                               <button class="player-btn" onclick="toggleSubtitles()" title="Sous-titres [C]">
                                   <span id="customCcBadge" style="font-weight: 700; font-size: 13px;">CC</span>
                               </button>
@@ -431,7 +465,7 @@
                       </button>
                   </div>
               </div>
-              <div class="shortcuts-hint">Raccourcis : [Espace] Pause | [C] Sous-titres | [S] Style | [F] Plein écran | [Échap] Retour catalogue | [← / →] -5s / +5s</div>
+              <div class="shortcuts-hint">Raccourcis : [Espace] Pause | [C] Sous-titres | [S] Style | [F] Plein écran | [P] PiP | [N] Boost Voix | [ < / > ] Vitesse | [← / →] -10s / +10s | [G / H] ST | [J / K] Audio</div>
           </div>
       </div>
   </div>
@@ -515,14 +549,106 @@
       </div>
   </div>
 
+  <!-- MODALE DE PARAMÈTRES ET PRÉFÉRENCES UTILISATEUR -->
+  <div id="settingsModal" class="anilist-modal-overlay" onclick="if(event.target === this) closeSettingsModal()">
+      <div class="anilist-modal-content settings-modal-card">
+          <div class="anilist-modal-header">
+              <div class="anilist-modal-title">
+                  <span>⚙️ Paramètres & Préférences</span>
+              </div>
+              <button class="anilist-modal-close" onclick="closeSettingsModal()">&times;</button>
+          </div>
+          <div class="settings-modal-body">
+              <!-- Langue de recherche par défaut -->
+              <div class="settings-group">
+                  <label class="settings-label">
+                      <span>🌐 Filtre de recherche par défaut :</span>
+                      <select id="prefDefaultSearchType" class="settings-select" onchange="saveUserSettings()">
+                          <option value="vostfr">VOSTFR (Recommandé)</option>
+                          <option value="vf">VF (Version Française)</option>
+                          <option value="multisub">Multi-Sub</option>
+                          <option value="sub">VOSTA (Anglais)</option>
+                      </select>
+                  </label>
+              </div>
+
+              <!-- Mode de streaming par défaut -->
+              <div class="settings-group">
+                  <label class="settings-label">
+                      <span>⚡ Mode de lecture par défaut :</span>
+                      <select id="prefDefaultStreamMode" class="settings-select" onchange="saveUserSettings()">
+                          <option value="direct">⚡ Direct (0% CPU, Instantané)</option>
+                          <option value="transcode">🔄 Transcodage H.264 (Compatibilité max)</option>
+                      </select>
+                  </label>
+              </div>
+
+              <!-- AniSkip Génériques -->
+              <div class="settings-group">
+                  <label class="settings-label">
+                      <span>⏭️ Passage Opening / Ending (AniSkip) :</span>
+                      <select id="prefAniSkipMode" class="settings-select" onchange="saveUserSettings()">
+                          <option value="button">Bouton discret à l'écran (Recommandé)</option>
+                          <option value="auto">Passage 100% Automatique</option>
+                          <option value="disabled">Désactivé</option>
+                      </select>
+                  </label>
+              </div>
+
+              <!-- Enchaînement automatique -->
+              <div class="settings-group">
+                  <label class="settings-label">
+                      <span>🍿 Enchaînement Épisode Suivant (Binge) :</span>
+                      <select id="prefAutoplayNext" class="settings-select" onchange="saveUserSettings()">
+                          <option value="enabled">Activé (Compte à rebours 5s)</option>
+                          <option value="disabled">Désactivé</option>
+                      </select>
+                  </label>
+              </div>
+
+              <!-- Vitesse par défaut -->
+              <div class="settings-group">
+                  <label class="settings-label">
+                      <span>⚡ Vitesse de lecture par défaut :</span>
+                      <select id="prefDefaultSpeed" class="settings-select" onchange="saveUserSettings()">
+                          <option value="1">1.0x (Normale)</option>
+                          <option value="1.25">1.25x</option>
+                          <option value="1.5">1.5x</option>
+                          <option value="2">2.0x</option>
+                      </select>
+                  </label>
+              </div>
+
+              <!-- Mode Nuit / Boost Voix -->
+              <div class="settings-group">
+                  <label class="settings-label">
+                      <span>🎙️ Boost des Voix / Mode Nuit par défaut :</span>
+                      <select id="prefDefaultVoiceBoost" class="settings-select" onchange="saveUserSettings()">
+                          <option value="disabled">Désactivé (Son original)</option>
+                          <option value="enabled">Activé (Égalisation & boost des dialogues)</option>
+                      </select>
+                  </label>
+              </div>
+
+              <!-- Informations Système & Serveur -->
+              <div class="settings-server-info" id="settingsServerInfo">
+                  <div class="settings-server-title">🖥️ Statut Serveur & Décodeur</div>
+                  <div id="settingsServerStatusContent" style="font-size: 12px; color: #aaa; margin-top: 6px; line-height: 1.5;">
+                      Chargement des informations serveur...
+                  </div>
+              </div>
+          </div>
+      </div>
+  </div>
+
   <div id="toast"></div>
 
   <!-- SCRIPTS MODULAIRES ANIMFLIX -->
-  <script src="/js/app.js"></script>
-  <script src="/js/subtitles.js"></script>
-  <script src="/js/player.js"></script>
-  <script src="/js/history.js"></script>
-  <script src="/js/search.js"></script>
-  <script src="/js/anilist.js"></script>
+  <script src="/js/app.js?v=1.1.2"></script>
+  <script src="/js/subtitles.js?v=1.1.2"></script>
+  <script src="/js/player.js?v=1.1.2"></script>
+  <script src="/js/history.js?v=1.1.2"></script>
+  <script src="/js/search.js?v=1.1.2"></script>
+  <script src="/js/anilist.js?v=1.1.2"></script>
 </body>
 </html>

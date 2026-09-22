@@ -31,4 +31,7 @@ yarn-error.log*
 Thumbs.db
 .vscode/
 .idea/
-config.db
+
+# Binaires volumineux TorrServer (générés/téléchargés par scripts/install-torrserver.sh)
+TorrServer
+TorrServer-linux-*

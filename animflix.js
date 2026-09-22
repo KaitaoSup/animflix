@@ -6,6 +6,12 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dns from 'dns';
+
+// Privilégier IPv4 pour éviter les lenteurs et blocages de résolution DNS
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 // Chargement automatique des variables d'environnement (.env)
 if (typeof process.loadEnvFile === 'function') {
@@ -26,6 +32,99 @@ const execFilePromise = promisify(execFile);
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 const TORRSERVER_LOCAL_URL = process.env.TORRSERVER_URL || "http://127.0.0.1:8090"; // Connexion interne ultra-rapide
 const TMDB_API_KEY = process.env.TMDB_API_KEY || ""; // Optionnel : clé TMDB (Kitsu et TVMaze sont utilisés en fallback automatique sans clé)
+
+// Configuration miroirs Nyaa avec fallback automatique
+const NYAA_PRIMARY_URL = (process.env.NYAA_URL || 'https://nyaa.si').replace(/\/+$/, '');
+const NYAA_FALLBACK_URLS = [NYAA_PRIMARY_URL, 'https://nyaa.si', 'https://nyaa.land'].filter((v, i, a) => a.indexOf(v) === i);
+let currentWorkingNyaaUrl = NYAA_PRIMARY_URL;
+
+// Détection et configuration de l'accélération matérielle FFmpeg
+let detectedHwAccel = 'cpu'; // 'vaapi' | 'nvenc' | 'cpu'
+const vaapiDevice = process.env.VAAPI_DEVICE || '/dev/dri/renderD128';
+
+// Suivi des processus FFmpeg actifs par client (évite l'avalanche lors du scrubbing)
+const activeClientFfmpegProcesses = new Map(); // key: clientId, value: ChildProcess
+
+async function checkHardwareAcceleration() {
+  const pref = (process.env.FFMPEG_HWACCEL || 'auto').toLowerCase();
+  if (pref === 'cpu' || pref === 'none' || pref === 'false') {
+    detectedHwAccel = 'cpu';
+    console.log('⚙️ Transcodage FFmpeg configuré en mode CPU logiciel (libx264).');
+    return;
+  }
+
+  // 1. Tester VAAPI sous Linux si le device DRI existe
+  if ((pref === 'auto' || pref === 'vaapi') && fs.existsSync(vaapiDevice)) {
+    try {
+      await execFilePromise('ffmpeg', [
+        '-init_hw_device', `vaapi=va:${vaapiDevice}`,
+        '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=0.1',
+        '-vf', 'format=nv12,hwupload',
+        '-c:v', 'h264_vaapi',
+        '-f', 'null', '-'
+      ]);
+      detectedHwAccel = 'vaapi';
+      console.log(`🚀 Accélération matérielle active : Intel/AMD VAAPI (${vaapiDevice})`);
+      return;
+    } catch (e) {
+      // VAAPI non disponible
+    }
+  }
+
+  // 2. Tester NVENC si GPU Nvidia
+  if (pref === 'auto' || pref === 'nvenc') {
+    try {
+      await execFilePromise('ffmpeg', [
+        '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=0.1',
+        '-c:v', 'h264_nvenc',
+        '-f', 'null', '-'
+      ]);
+      detectedHwAccel = 'nvenc';
+      console.log('🚀 Accélération matérielle active : NVIDIA NVENC (h264_nvenc)');
+      return;
+    } catch (e) {
+      // NVENC non disponible
+    }
+  }
+
+  detectedHwAccel = 'cpu';
+  console.log('ℹ️ Transcodage FFmpeg : CPU logiciel standard (libx264 ultrafast).');
+}
+
+// Récupération RSS Nyaa résiliente avec cascade de miroirs
+async function fetchNyaaRss(searchQuery, category) {
+  const mirrors = [currentWorkingNyaaUrl, ...NYAA_FALLBACK_URLS].filter((v, i, a) => a.indexOf(v) === i);
+  let lastError = null;
+
+  for (const mirror of mirrors) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const url = `${mirror}/?page=rss&q=${encodeURIComponent(searchQuery)}&c=${category}`;
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
+        },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} sur ${mirror}`);
+      }
+
+      const xmlText = await response.text();
+      const feed = await parser.parseString(xmlText);
+      currentWorkingNyaaUrl = mirror;
+      return feed.items?.slice(0, 25) || [];
+    } catch (err) {
+      lastError = err;
+      console.warn(`⚠️ Échec Nyaa sur ${mirror} (${err.message}), essai miroir suivant...`);
+    }
+  }
+
+  throw lastError || new Error("Impossible de joindre les serveurs Nyaa");
+}
 
 // Dossier de cache persistant pour les sous-titres WebVTT
 const SUB_CACHE_DIR = path.join(process.cwd(), 'cache', 'subtitles');
@@ -325,8 +424,6 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(__dirname, { etag: false, maxAge: 0 }));
-
 // --- API ANILIST PROXY GRAPHQL ---
 app.post('/api/anilist/graphql', async (req, res) => {
   const { query, variables } = req.body;
@@ -380,17 +477,13 @@ app.get('/manifest.json', (req, res) => {
 });
 
 // Servir les fichiers statiques (CSS, JS, Icônes) mis en cache par le navigateur
-app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h', index: false }));
 
-app.get('/', (req, res) => {
+app.get(['/', '/index.html'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  const publicIndex = path.join(__dirname, 'public', 'index.html');
-  if (fs.existsSync(publicIndex)) {
-    return res.sendFile(publicIndex);
-  }
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // --- API RECHERCHE ULTRA-RAPIDE (CACHE + DÉDUPLICATION + POSTER PRIORITAIRE) ---
@@ -413,20 +506,7 @@ app.get('/api/search', async (req, res) => {
   else if (type === 'sub') { category = '1_2'; }
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 7000);
-
-    const response = await fetch(`https://nyaa.si/?page=rss&q=${encodeURIComponent(searchQuery)}&c=${category}`, {
-      headers: { 
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36' 
-      },
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-
-    const xmlText = await response.text();
-    const feed = await parser.parseString(xmlText);
-    const items = feed.items?.slice(0, 25) || [];
+    const items = await fetchNyaaRss(searchQuery, category);
 
     if (items.length === 0) {
       searchCache.set(cacheKey, []);
@@ -884,6 +964,16 @@ app.get('/play', async (req, res) => {
     }
   }
 
+  // Interruption immédiate de tout flux FFmpeg précédent du même client (protection contre l'avalanche de requêtes au seek)
+  const clientId = req.query.clientId || req.ip;
+  if (activeClientFfmpegProcesses.has(clientId)) {
+    const prev = activeClientFfmpegProcesses.get(clientId);
+    try {
+      prev.kill('SIGKILL');
+    } catch (e) {}
+    activeClientFfmpegProcesses.delete(clientId);
+  }
+
   res.setHeader('Content-Type', 'video/mp4');
   res.setHeader('Accept-Ranges', 'none');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -942,6 +1032,7 @@ app.get('/play', async (req, res) => {
     );
 
     const ffmpeg = spawn('ffmpeg', directArgs);
+    activeClientFfmpegProcesses.set(clientId, ffmpeg);
     ffmpeg.stdout.pipe(res);
 
     let stderrBuf = '';
@@ -974,6 +1065,9 @@ app.get('/play', async (req, res) => {
 
     req.on('close', () => {
       console.log("🛑 Client déconnecté (Mode Direct).");
+      if (activeClientFfmpegProcesses.get(clientId) === ffmpeg) {
+        activeClientFfmpegProcesses.delete(clientId);
+      }
       if (playSession && playSession.waiters) {
         playSession.waiters.forEach(fn => fn());
         playSession.waiters = [];
@@ -984,7 +1078,7 @@ app.get('/play', async (req, res) => {
   }
 
   // MODE 2 : TRANSCODAGE VIDÉO H.264 (POUR NAVIGATEURS OU APPAREILS SANS HEVC)
-  console.log(`🔄 Lancement FFmpeg en Mode Transcodage H.264 (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s, Audio: ${audioIndex ?? 'auto'}, playId: ${playId ?? 'none'})`);
+  console.log(`🔄 Lancement FFmpeg en Mode Transcodage [${detectedHwAccel.toUpperCase()}] (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s, Audio: ${audioIndex ?? 'auto'}, playId: ${playId ?? 'none'})`);
   const streamInfo = await getStreamInfo(magnet, parsedFileIndex);
 
   if (playSession) {
@@ -1016,13 +1110,34 @@ app.get('/play', async (req, res) => {
     ffmpegArgs.push('-map', '0:a:0?');
   }
 
-  // Encodage H.264 universel ultra-rapide
+  // Configuration vidéo selon l'accélération matérielle disponible (Intel/AMD VAAPI, Nvidia NVENC, ou CPU)
+  if (detectedHwAccel === 'vaapi') {
+    ffmpegArgs.unshift('-init_hw_device', `vaapi=va:${vaapiDevice}`);
+    ffmpegArgs.push(
+      '-map', '0:v:0',
+      '-vf', 'format=nv12,hwupload',
+      '-c:v', 'h264_vaapi',
+      '-qp', '24'
+    );
+  } else if (detectedHwAccel === 'nvenc') {
+    ffmpegArgs.push(
+      '-map', '0:v:0',
+      '-c:v', 'h264_nvenc',
+      '-preset', 'p1',
+      '-tune', 'll',
+      '-cq', '24'
+    );
+  } else {
+    ffmpegArgs.push(
+      '-map', '0:v:0',
+      '-c:v', 'libx264',
+      '-preset', 'ultrafast',
+      '-tune', 'zerolatency',
+      '-crf', '25'
+    );
+  }
+
   ffmpegArgs.push(
-    '-map', '0:v:0',
-    '-c:v', 'libx264',
-    '-preset', 'ultrafast',
-    '-tune', 'zerolatency',
-    '-crf', '25',
     '-c:a', 'aac',
     '-ac', '2'
   );
@@ -1044,6 +1159,7 @@ app.get('/play', async (req, res) => {
   );
 
   const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+  activeClientFfmpegProcesses.set(clientId, ffmpeg);
 
   ffmpeg.stderr.on('data', (data) => {
     const msg = data.toString();
@@ -1056,6 +1172,9 @@ app.get('/play', async (req, res) => {
 
   req.on('close', () => {
     console.log("🛑 Client déconnecté, arrêt de FFmpeg.");
+    if (activeClientFfmpegProcesses.get(clientId) === ffmpeg) {
+      activeClientFfmpegProcesses.delete(clientId);
+    }
     if (playSession && playSession.waiters) {
       playSession.waiters.forEach(fn => fn());
       playSession.waiters = [];
@@ -1125,6 +1244,25 @@ app.get('/api/torrserver/status', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.get('/api/server/status', async (req, res) => {
+  let torrserverOnline = false;
+  try {
+    const tRes = await axios.get(`${TORRSERVER_LOCAL_URL}/echo`, { timeout: 1500 });
+    torrserverOnline = (tRes.status === 200 || tRes.data === 'echo' || tRes.data === 'MatriX');
+  } catch (e) {
+    torrserverOnline = false;
+  }
+
+  res.json({
+    version: '1.1.0',
+    hwAccel: detectedHwAccel,
+    vaapiDevice: detectedHwAccel === 'vaapi' ? vaapiDevice : null,
+    torrserverOnline,
+    nyaaUrl: currentWorkingNyaaUrl
+  });
+});
+
+app.listen(PORT, async () => {
+  await checkHardwareAcceleration();
   console.log(`✅ Serveur Animflix optimisé prêt sur http://localhost:${PORT} !`);
 });

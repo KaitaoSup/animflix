@@ -45,6 +45,7 @@
             const files = data.files || [];
 
             if (data.isMultiFile && files.length > 1) {
+                window._currentPackFiles = files;
                 packCount.innerText = files.length;
                 packSection.style.display = 'block';
 
@@ -258,6 +259,13 @@
         currentAnimeItem = null;
         currentAnilistMedia = null;
         hasAutoTrackedCurrentEpisode = false;
+        window._currentPackFiles = null;
+
+        if (typeof dismissNextEpisodeCountdown === 'function') dismissNextEpisodeCountdown();
+        const aniSkipBtn = document.getElementById('aniSkipOverlayBtn');
+        if (aniSkipBtn) aniSkipBtn.style.display = 'none';
+        const nextEpOverlay = document.getElementById('playerNextEpOverlay');
+        if (nextEpOverlay) nextEpOverlay.style.display = 'none';
 
         const packSection = document.getElementById('detailPackEpisodesSection');
         if (packSection) packSection.style.display = 'none';
@@ -491,6 +499,13 @@
                 });
                 const firstExact = mappedTorrents.find(m => m.matchType === 'exact');
                 if (firstExact) exactMatchTorrent = firstExact.torrent;
+
+                // Si autoPlayDirect demandé (Binge-watching) et qu'un torrent exact est disponible
+                if (targetInfo && targetInfo.autoPlayDirect && exactMatchTorrent) {
+                    showToast(`🚀 Lancement automatique de l'Épisode ${nextEp} !`);
+                    openAnimeDetail(exactMatchTorrent);
+                    return;
+                }
             }
 
             // Bouton d'action directe dans la bannière supérieure

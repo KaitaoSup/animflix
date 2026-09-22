@@ -670,4 +670,80 @@
             box-shadow: 0 4px 14px rgba(229, 9, 20, 0.5);
         }
 
+        /* --- BOUTON ET MODALE PARAMÈTRES --- */
+        .btn-settings-nav {
+            background: #1f1f1f;
+            border: 1px solid #333;
+            color: #aaa;
+            padding: 7px 11px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-settings-nav:hover {
+            background: #2a2a2a;
+            color: #fff;
+            border-color: #555;
+            transform: scale(1.05);
+        }
+
+        .settings-modal-card {
+            max-width: 540px;
+            background: #161616;
+            border: 1px solid #2e2e2e;
+            border-radius: 12px;
+        }
+        .settings-modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .settings-group {
+            background: #1c1c1c;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+        .settings-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: #eee;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .settings-select {
+            background: #282828;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12.5px;
+            outline: none;
+            cursor: pointer;
+        }
+        .settings-select:focus {
+            border-color: var(--primary);
+        }
+        .settings-server-info {
+            background: #141c26;
+            border: 1px solid #203146;
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+        .settings-server-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #46b3ff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
 

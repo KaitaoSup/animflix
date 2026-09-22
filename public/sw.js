@@ -2,7 +2,7 @@
 // --- ANIMFLIX SERVICE WORKER (PWA SHELL, OFFLINE CACHE & STREAM BYPASS) ---
 // =========================================================================
 
-const CACHE_NAME = 'animflix-shell-v1.0.1';
+const CACHE_NAME = 'animflix-shell-v1.1.2';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -79,7 +79,7 @@ self.addEventListener('fetch', (event) => {
           }
           return networkRes;
         })
-        .catch(() => caches.match('/') || caches.match(req))
+        .catch(() => caches.match('/', { ignoreSearch: true }) || caches.match(req, { ignoreSearch: true }))
     );
     return;
   }
@@ -92,7 +92,7 @@ self.addEventListener('fetch', (event) => {
     url.pathname === '/manifest.json'
   ) {
     event.respondWith(
-      caches.match(req).then((cachedRes) => {
+      caches.match(req, { ignoreSearch: true }).then((cachedRes) => {
         const fetchPromise = fetch(req)
           .then((networkRes) => {
             if (networkRes && networkRes.status === 200) {
@@ -111,6 +111,6 @@ self.addEventListener('fetch', (event) => {
 
   // 4. Par défaut : Réseau avec secours cache si disponible
   event.respondWith(
-    fetch(req).catch(() => caches.match(req))
+    fetch(req).catch(() => caches.match(req, { ignoreSearch: true }))
   );
 });
