@@ -17,9 +17,9 @@
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-    <link rel="stylesheet" href="/css/style.css?v=1.1.2">
-    <link rel="stylesheet" href="/css/player.css?v=1.1.2">
-    <link rel="stylesheet" href="/css/anilist.css?v=1.1.2">
+    <link rel="stylesheet" href="/css/style.css?v=1.3.0">
+    <link rel="stylesheet" href="/css/player.css?v=1.3.0">
+    <link rel="stylesheet" href="/css/anilist.css?v=1.3.0">
 </head>
 <body>
   <div class="navbar">
@@ -71,6 +71,29 @@
           <!-- VUE RECHERCHE : BANNIÈRE DE CIBLAGE PROCHAIN ÉPISODE ET RÉSULTATS -->
           <div id="searchView" style="display: none;">
               <div id="searchTargetBanner" style="display: none;"></div>
+
+              <!-- BARRE DE FILTRES ET TRI DES RÉSULTATS -->
+              <div id="searchFilterBar" class="search-filter-bar" style="display: none;">
+                  <div class="search-filter-left">
+                      <span id="searchResultsCount" class="search-results-count">0 torrents</span>
+                      <div class="search-filter-chips">
+                          <button class="filter-chip active" data-filter="all" onclick="setSearchFilter('all')">Tous</button>
+                          <button class="filter-chip" data-filter="1080p" onclick="setSearchFilter('1080p')">1080p Full HD</button>
+                          <button class="filter-chip" data-filter="720p" onclick="setSearchFilter('720p')">720p HD</button>
+                          <button class="filter-chip" data-filter="pack" onclick="setSearchFilter('pack')">📦 Packs / Saisons</button>
+                      </div>
+                  </div>
+                  <div class="search-filter-right">
+                      <label for="searchSortSelect" class="search-sort-label">Trier :</label>
+                      <select id="searchSortSelect" class="search-sort-select" onchange="onSearchSortChange(this.value)">
+                          <option value="seeders" selected>🌱 Seeders (Les plus rapides)</option>
+                          <option value="relevance">⚡ Pertinence</option>
+                          <option value="size_desc">📦 Taille (Plus grand)</option>
+                          <option value="size_asc">📦 Taille (Plus léger)</option>
+                      </select>
+                  </div>
+              </div>
+
               <div id="results" class="grid"></div>
           </div>
       </div>
@@ -183,6 +206,20 @@
                   
                   <!-- Indicateur central Play / Pause -->
                   <div id="playerCenterIndicator" class="player-center-indicator">▶</div>
+
+                  <!-- Indicateurs tactiles Double-Tap Gauche (-10s) / Droite (+10s) -->
+                  <div id="touchSeekOverlayLeft" class="touch-seek-overlay touch-seek-left">
+                      <div class="touch-seek-circle">
+                          <span class="touch-seek-arrows">«««</span>
+                          <span class="touch-seek-text" id="touchSeekTextLeft">-10s</span>
+                      </div>
+                  </div>
+                  <div id="touchSeekOverlayRight" class="touch-seek-overlay touch-seek-right">
+                      <div class="touch-seek-circle">
+                          <span class="touch-seek-arrows">»»»</span>
+                          <span class="touch-seek-text" id="touchSeekTextRight">+10s</span>
+                      </div>
+                  </div>
 
                   <!-- Bouton flottant AniSkip (Opening / Ending) -->
                   <button id="aniSkipOverlayBtn" class="ani-skip-overlay-btn" style="display: none;" title="Passer automatiquement cette section">
@@ -644,11 +681,11 @@
   <div id="toast"></div>
 
   <!-- SCRIPTS MODULAIRES ANIMFLIX -->
-  <script src="/js/app.js?v=1.1.2"></script>
-  <script src="/js/subtitles.js?v=1.1.2"></script>
-  <script src="/js/player.js?v=1.1.2"></script>
-  <script src="/js/history.js?v=1.1.2"></script>
-  <script src="/js/search.js?v=1.1.2"></script>
-  <script src="/js/anilist.js?v=1.1.2"></script>
+  <script src="/js/app.js?v=1.3.0"></script>
+  <script src="/js/subtitles.js?v=1.3.0"></script>
+  <script src="/js/player.js?v=1.3.2"></script>
+  <script src="/js/history.js?v=1.3.0"></script>
+  <script src="/js/search.js?v=1.3.0"></script>
+  <script src="/js/anilist.js?v=1.3.0"></script>
 </body>
 </html>

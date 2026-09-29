@@ -107,14 +107,307 @@
         }
     }
 
-    // Rendu de l'écran d'accueil avec onglets (AniList, Historique local, Favoris)
+    // --- SECTION DÉCOUVERTE (TENDANCES & SORTIES DE SAISON) ---
+    const DISCOVER_CACHE_KEY = 'animflix_discover_cache_v2';
+    const DISCOVER_CACHE_TTL = 30 * 60 * 1000; // 30 minutes de validité
+
+    function getCurrentAnimeSeasonInfo() {
+        const now = new Date();
+        const month = now.getMonth(); // 0 à 11
+        const year = now.getFullYear();
+
+        if (month === 11) {
+            return { season: 'WINTER', seasonYear: year + 1, labelFr: `Hiver ${year + 1}` };
+        } else if (month <= 1) {
+            return { season: 'WINTER', seasonYear: year, labelFr: `Hiver ${year}` };
+        } else if (month >= 2 && month <= 4) {
+            return { season: 'SPRING', seasonYear: year, labelFr: `Printemps ${year}` };
+        } else if (month >= 5 && month <= 7) {
+            return { season: 'SUMMER', seasonYear: year, labelFr: `Été ${year}` };
+        } else {
+            return { season: 'FALL', seasonYear: year, labelFr: `Automne ${year}` };
+        }
+    }
+
+    function formatTimeUntilAiring(seconds) {
+        if (!seconds || seconds <= 0) return '';
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+
+        if (days > 0) return `${days}j ${hours}h`;
+        if (hours > 0) return `${hours}h ${mins}m`;
+        return `${mins}m`;
+    }
+
+    function searchFromDiscover(animeTitle, coverImage, anilistId) {
+        if (!animeTitle) return;
+        const input = document.getElementById('searchInput');
+        if (input) input.value = animeTitle;
+        if (typeof executeSearchForAnime === 'function') {
+            executeSearchForAnime(animeTitle, {
+                animeName: animeTitle,
+                coverImage: coverImage,
+                anilistMediaId: anilistId
+            });
+        }
+    }
+
+    async function renderDiscoverTabHtml(container, forceRefresh = false) {
+        const targetContainer = container || document.getElementById('homeTabContent');
+        if (!targetContainer) return;
+
+        const seasonInfo = getCurrentAnimeSeasonInfo();
+
+        // 1. Vérification du cache local
+        let cached = null;
+        if (!forceRefresh) {
+            try {
+                const raw = localStorage.getItem(DISCOVER_CACHE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && parsed.timestamp && (Date.now() - parsed.timestamp < DISCOVER_CACHE_TTL) && parsed.data) {
+                        cached = parsed;
+                    }
+                }
+            } catch (e) {
+                console.warn('[Discover] Erreur lecture cache:', e);
+            }
+        }
+
+        // Si cache valide présent, rendu immédiat
+        if (cached && cached.data) {
+            renderDiscoverDom(targetContainer, cached.data, seasonInfo);
+            return;
+        }
+
+        // Affichage du loader
+        targetContainer.innerHTML = `
+            <div class="discover-container">
+                <div class="discover-top-banner">
+                    <div class="discover-top-title-group">
+                        <h2>🔥 Découverte & Nouveautés</h2>
+                        <p>Explorez les tendances et sorties de la saison ${seasonInfo.labelFr}</p>
+                    </div>
+                </div>
+                <div class="empty-state" style="padding: 60px 20px;">
+                    <div class="spinner" style="margin: 0 auto 20px;"></div>
+                    Chargement des tendances et des séries de la saison actuelle... ⏳
+                </div>
+            </div>
+        `;
+
+        try {
+            const query = `
+                query ($season: MediaSeason, $seasonYear: Int) {
+                    trending: Page(page: 1, perPage: 12) {
+                        media(type: ANIME, sort: TRENDING_DESC, isAdult: false) {
+                            id
+                            title {
+                                romaji
+                                english
+                                userPreferred
+                            }
+                            coverImage {
+                                large
+                            }
+                            bannerImage
+                            format
+                            episodes
+                            status
+                            averageScore
+                            genres
+                            nextAiringEpisode {
+                                episode
+                                timeUntilAiring
+                            }
+                        }
+                    }
+                    season: Page(page: 1, perPage: 12) {
+                        media(type: ANIME, season: $season, seasonYear: $seasonYear, sort: POPULARITY_DESC, isAdult: false) {
+                            id
+                            title {
+                                romaji
+                                english
+                                userPreferred
+                            }
+                            coverImage {
+                                large
+                            }
+                            bannerImage
+                            format
+                            episodes
+                            status
+                            averageScore
+                            genres
+                            nextAiringEpisode {
+                                episode
+                                timeUntilAiring
+                            }
+                        }
+                    }
+                }
+            `;
+
+            const variables = {
+                season: seasonInfo.season,
+                seasonYear: seasonInfo.seasonYear
+            };
+
+            const data = await callAnilistGraphQL(query, variables);
+
+            // Mise en cache
+            try {
+                localStorage.setItem(DISCOVER_CACHE_KEY, JSON.stringify({
+                    timestamp: Date.now(),
+                    seasonInfo,
+                    data
+                }));
+            } catch (e) {
+                console.warn('[Discover] Impossible de sauvegarder le cache:', e);
+            }
+
+            renderDiscoverDom(targetContainer, data, seasonInfo);
+        } catch (err) {
+            console.error('[Discover] Erreur chargement découverte:', err);
+            targetContainer.innerHTML = `
+                <div class="discover-container">
+                    <div class="discover-top-banner">
+                        <div class="discover-top-title-group">
+                            <h2>🔥 Découverte & Nouveautés</h2>
+                            <p>Explorez les tendances et sorties de la saison ${seasonInfo.labelFr}</p>
+                        </div>
+                    </div>
+                    <div class="empty-state" style="padding: 50px 20px; color: #ff525d;">
+                        <div style="font-size: 38px; margin-bottom: 12px;">⚠️</div>
+                        <div style="font-size: 16px; font-weight: bold; color: #fff; margin-bottom: 8px;">
+                            Impossible de contacter AniList pour récupérer les tendances
+                        </div>
+                        <div style="font-size: 13.5px; color: #aaa; margin-bottom: 20px;">
+                            ${escapeHtml(err.message || 'Erreur réseau temporaire')}
+                        </div>
+                        <button class="btn-refresh-watching" onclick="renderDiscoverTabHtml(null, true)">
+                            🔄 Réessayer
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    function renderDiscoverDom(container, data, seasonInfo) {
+        const trendingList = data?.trending?.media || [];
+        const seasonList = data?.season?.media || [];
+
+        function renderDiscoverCards(mediaList) {
+            if (!mediaList || mediaList.length === 0) {
+                return '<div class="empty-state" style="grid-column: 1 / -1;">Aucun anime trouvé pour cette sélection.</div>';
+            }
+            return mediaList.map(m => {
+                const title = m.title?.userPreferred || m.title?.english || m.title?.romaji || 'Anime';
+                const subTitle = (m.title?.english && m.title?.english !== title) ? m.title.english : (m.title?.romaji || '');
+                const poster = m.coverImage?.large || '';
+                const format = m.format || 'TV';
+                const score = m.averageScore ? `${(m.averageScore / 10).toFixed(1)}` : null;
+                const genres = Array.isArray(m.genres) ? m.genres.slice(0, 3) : [];
+                
+                let airingBadge = '';
+                if (m.nextAiringEpisode) {
+                    const timeStr = formatTimeUntilAiring(m.nextAiringEpisode.timeUntilAiring);
+                    airingBadge = `<span class="badge-tag-mini badge-airing-countdown">⏳ Ép. ${m.nextAiringEpisode.episode} ${timeStr ? `dans ${timeStr}` : ''}</span>`;
+                } else if (m.episodes) {
+                    airingBadge = `<span class="badge-tag-mini">${m.episodes} épisodes</span>`;
+                } else if (m.status === 'RELEASING') {
+                    airingBadge = `<span class="badge-tag-mini" style="background:rgba(70,211,105,0.25);color:#5eff88;border-color:rgba(70,211,105,0.4);">En cours</span>`;
+                }
+
+                const safeTitle = escapeHtml(title);
+                const safePoster = escapeHtml(poster);
+
+                return `
+                    <div class="card discover-card" onclick="searchFromDiscover('${safeTitle.replace(/'/g, "\\'")}', '${safePoster.replace(/'/g, "\\'")}', ${m.id})" title="Rechercher les torrents de ${safeTitle}">
+                        <div class="card-img-wrap">
+                            <img src="${safePoster}" loading="lazy" alt="${safeTitle}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                            <div class="card-overlay-hover">
+                                <span class="btn-play-hover" style="background: #02a9ff; box-shadow: 0 4px 12px rgba(2,169,255,0.5);">
+                                    🔍 Voir les torrents & épisodes
+                                </span>
+                            </div>
+                            <div class="card-badges-top">
+                                <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                                    ${score ? `<span class="badge-tag-mini" style="background:rgba(255,193,7,0.25);color:#ffc107;border-color:rgba(255,193,7,0.45);font-weight:800;">⭐ ${score}</span>` : ''}
+                                    <span class="badge-tag-mini">${format}</span>
+                                </div>
+                                ${airingBadge}
+                            </div>
+                        </div>
+                        <div class="card-info">
+                            <span class="card-title" title="${safeTitle}">${safeTitle}</span>
+                            ${subTitle && subTitle !== title ? `<span style="font-size: 11px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(subTitle)}">${escapeHtml(subTitle)}</span>` : ''}
+                            <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px;">
+                                ${genres.map(g => `<span class="badge-discover-genre">${escapeHtml(g)}</span>`).join('')}
+                            </div>
+                            <div class="card-next-ep-btn-pill" style="margin-top: 8px;">
+                                <span>🔍 Voir les torrents disponibles</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        container.innerHTML = `
+            <div class="discover-container">
+                <div class="discover-top-banner">
+                    <div class="discover-top-title-group">
+                        <h2>🔥 Découverte & Nouveautés</h2>
+                        <p>Explorez les tendances et sorties de la saison ${seasonInfo.labelFr} — Cliquez sur une carte pour lancer la recherche et regarder !</p>
+                    </div>
+                    <button class="btn-refresh-watching" onclick="renderDiscoverTabHtml(null, true)" title="Rafraîchir les tendances AniList">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        <span>Actualiser</span>
+                    </button>
+                </div>
+
+                <div class="discover-section">
+                    <div class="discover-section-header">
+                        <h3 class="discover-section-title">
+                            <span>🔥 Tendances du moment</span>
+                            <span class="discover-section-subtitle">Les séries les plus populaires cette semaine</span>
+                        </h3>
+                    </div>
+                    <div class="grid">
+                        ${renderDiscoverCards(trendingList)}
+                    </div>
+                </div>
+
+                <div class="discover-section" style="margin-top: 14px;">
+                    <div class="discover-section-header">
+                        <h3 class="discover-section-title">
+                            <span>🌸 Saison en cours (${seasonInfo.labelFr})</span>
+                            <span class="discover-section-subtitle">Les sorties populaires de la saison</span>
+                        </h3>
+                    </div>
+                    <div class="grid">
+                        ${renderDiscoverCards(seasonList)}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Rendu de l'écran d'accueil avec onglets (Découverte, AniList, Historique local, Favoris)
     function renderHomeScreen() {
         const homeView = document.getElementById('homeView');
         if (!homeView) return;
 
         const token = localStorage.getItem('anilist_token');
         const hasAnilist = !!(token && currentAnilistUser);
-        const activeTab = (typeof getActiveHomeTab === 'function') ? getActiveHomeTab() : (hasAnilist ? 'anilist' : 'history');
+        const activeTab = (typeof getActiveHomeTab === 'function') ? getActiveHomeTab() : 'discover';
 
         const histCount = (typeof getPlaybackHistory === 'function') ? getPlaybackHistory().length : 0;
         const favCount = (typeof getFavorites === 'function') ? getFavorites().length : 0;
@@ -122,6 +415,9 @@
 
         let tabsHtml = `
             <div class="home-tabs-nav">
+                <button class="home-tab-btn ${activeTab === 'discover' ? 'active' : ''}" onclick="switchHomeTab('discover')">
+                    <span>🔥 Découverte</span>
+                </button>
                 ${hasAnilist ? `
                     <button class="home-tab-btn ${activeTab === 'anilist' ? 'active' : ''}" onclick="switchHomeTab('anilist')">
                         <span>🍿 AniList En cours</span>
@@ -149,7 +445,9 @@
         const tabContent = document.getElementById('homeTabContent');
         if (!tabContent) return;
 
-        if (activeTab === 'history' && typeof renderHistoryTabHtml === 'function') {
+        if (activeTab === 'discover') {
+            renderDiscoverTabHtml(tabContent);
+        } else if (activeTab === 'history' && typeof renderHistoryTabHtml === 'function') {
             renderHistoryTabHtml(tabContent);
         } else if (activeTab === 'favorites' && typeof renderFavoritesTabHtml === 'function') {
             renderFavoritesTabHtml(tabContent);
@@ -1489,4 +1787,7 @@
     window.getShowNsfwPreference = getShowNsfwPreference;
     window.loadAnilistWatchingList = loadAnilistWatchingList;
     window.loadDemoWatchingList = loadDemoWatchingList;
+    window.renderDiscoverTabHtml = renderDiscoverTabHtml;
+    window.searchFromDiscover = searchFromDiscover;
+
 

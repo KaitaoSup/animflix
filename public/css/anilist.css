@@ -766,3 +766,104 @@
             color: #fff;
         }
 
+        /* --- SECTION DÉCOUVERTE (TENDANCES & SORTIES DE SAISON) --- */
+        .discover-container {
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        .discover-top-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, #111a26 0%, #172436 100%);
+            border: 1px solid var(--anilist-border);
+            border-left: 4px solid var(--anilist-blue);
+            border-radius: 12px;
+            padding: 16px 20px;
+            gap: 16px;
+            flex-wrap: wrap;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+        }
+
+        .discover-top-title-group h2 {
+            margin: 0;
+            font-size: 19px;
+            font-weight: 800;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .discover-top-title-group p {
+            margin: 4px 0 0;
+            font-size: 13px;
+            color: #94a3b8;
+            line-height: 1.45;
+        }
+
+        .discover-section {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .discover-section-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            border-bottom: 1px solid #1f2b3b;
+            padding-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .discover-section-title {
+            font-size: 17px;
+            font-weight: 800;
+            color: #fff;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin: 0;
+            flex-wrap: wrap;
+        }
+
+        .discover-section-subtitle {
+            font-size: 12.5px;
+            color: #889bb4;
+            font-weight: normal;
+        }
+
+        .discover-card {
+            border: 1px solid #202d3f;
+        }
+
+        .discover-card:hover {
+            border-color: var(--anilist-blue);
+            box-shadow: 0 14px 28px rgba(2, 169, 255, 0.18);
+        }
+
+        .badge-airing-countdown {
+            background: rgba(245, 158, 11, 0.9) !important;
+            color: #000 !important;
+            font-weight: 800 !important;
+            border-color: #fbbf24 !important;
+            white-space: nowrap;
+        }
+
+        .badge-discover-genre {
+            font-size: 10px;
+            font-weight: 600;
+            color: #94a3b8;
+            background: #141d27;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid #233346;
+            white-space: nowrap;
+        }
+
+

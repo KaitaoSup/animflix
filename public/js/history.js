@@ -417,11 +417,11 @@ function getActiveHomeTab() {
     const token = localStorage.getItem('anilist_token');
     const hasAnilist = !!(token && typeof currentAnilistUser !== 'undefined' && currentAnilistUser);
 
-    if (saved && (saved === 'anilist' || saved === 'history' || saved === 'favorites')) {
+    if (saved && (saved === 'anilist' || saved === 'history' || saved === 'favorites' || saved === 'discover')) {
         // Si l'utilisateur est déconnecté d'AniList mais avait sauvé l'onglet anilist, basculer intelligemment
         if (saved === 'anilist' && !hasAnilist) {
             const hist = getPlaybackHistory();
-            return hist.length > 0 ? 'history' : 'anilist';
+            return hist.length > 0 ? 'history' : 'discover';
         }
         return saved;
     }
@@ -431,7 +431,7 @@ function getActiveHomeTab() {
     if (hist.length > 0) return 'history';
     const favs = getFavorites();
     if (favs.length > 0) return 'favorites';
-    return 'anilist';
+    return 'discover';
 }
 
 function switchHomeTab(tabName) {

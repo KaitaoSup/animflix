@@ -240,6 +240,10 @@
             fetch('/api/torrserver/drop?magnet=' + encodeURIComponent(currentActiveMagnet), { method: 'POST' }).catch(() => {});
         }
 
+        if (typeof resetMediaSession === 'function') {
+            resetMediaSession();
+        }
+
         currentActiveMagnet = null;
         currentActiveFileIndex = 1;
         currentActiveAudioIndex = null;
@@ -359,14 +363,225 @@
         }
     }
 
+    // État global pour la recherche, le filtrage et le tri
+    window._currentRawTorrents = [];
+    window._currentSearchTargetInfo = null;
+    window._currentSearchFilter = 'all';
+    window._currentSearchSort = 'seeders';
+
+    function parseSizeToBytes(str) {
+        if (!str || typeof str !== 'string') return 0;
+        const match = str.trim().match(/^([\d.,]+)\s*([a-zA-Z]+)?$/);
+        if (!match) return 0;
+        const val = parseFloat(match[1].replace(',', '.'));
+        if (isNaN(val)) return 0;
+        const unit = (match[2] || '').toLowerCase();
+        if (unit.startsWith('t')) return val * 1024 * 1024 * 1024 * 1024;
+        if (unit.startsWith('g')) return val * 1024 * 1024 * 1024;
+        if (unit.startsWith('m')) return val * 1024 * 1024;
+        if (unit.startsWith('k')) return val * 1024;
+        return val;
+    }
+
+    function isTorrentPack(t) {
+        if (!t) return false;
+        const epStr = (t.episode || '').toLowerCase();
+        const titleStr = (t.titre || '').toLowerCase();
+        return /integrale|intégrale|pack|batch|saison complète|complete/i.test(epStr) ||
+               /integrale|intégrale|pack|batch|complete|s\d+[-+]s\d+/i.test(titleStr) ||
+               /épisodes?\s*0*(\d+)\s*[-~]\s*0*(\d+)/i.test(epStr) ||
+               /\b(?:e|ep|épisode|episode)\s*0*(\d+)\s*[-~]\s*0*(\d+)\b/i.test(titleStr);
+    }
+
+    function setSearchFilter(filterType) {
+        window._currentSearchFilter = filterType;
+        document.querySelectorAll('#searchFilterBar .filter-chip').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.filter === filterType);
+        });
+        renderFilteredSortedResults();
+    }
+
+    function onSearchSortChange(sortType) {
+        window._currentSearchSort = sortType;
+        renderFilteredSortedResults();
+    }
+
+    function renderFilteredSortedResults() {
+        const resultsDiv = document.getElementById('results');
+        const countEl = document.getElementById('searchResultsCount');
+        if (!resultsDiv) return;
+
+        const torrents = window._currentRawTorrents || [];
+        const targetInfo = window._currentSearchTargetInfo;
+        const nextEp = targetInfo ? targetInfo.nextEp : null;
+        const activeFilter = window._currentSearchFilter || 'all';
+        const activeSort = window._currentSearchSort || 'seeders';
+
+        // 1. Filtrage
+        const filtered = torrents.filter(t => {
+            if (activeFilter === 'all') return true;
+            if (activeFilter === '1080p') {
+                return (t.resolution && t.resolution.includes('1080')) || /1080p|1080i/i.test(t.titre || '');
+            }
+            if (activeFilter === '720p') {
+                return (t.resolution && t.resolution.includes('720')) || /720p/i.test(t.titre || '');
+            }
+            if (activeFilter === 'pack') {
+                return isTorrentPack(t);
+            }
+            return true;
+        });
+
+        if (countEl) {
+            countEl.textContent = `${filtered.length} torrent${filtered.length > 1 ? 's' : ''}`;
+        }
+
+        if (filtered.length === 0) {
+            resultsDiv.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    Aucun torrent ne correspond au filtre sélectionné (<b>${escapeHtml(activeFilter)}</b>).<br>
+                    <div style="margin-top: 15px;">
+                        <button class="btn-secondary" onclick="setSearchFilter('all')">Réinitialiser les filtres (Afficher tous)</button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // 2. Classification & MatchType
+        const mappedTorrents = filtered.map(t => {
+            let matchType = null;
+            if (nextEp) {
+                const epNum = extractEpisodeNumber(t.episode, t.titre);
+                if (epNum === nextEp) {
+                    matchType = 'exact';
+                } else {
+                    const rangeMatch = (t.episode || '').match(/Épisodes?\s*0*(\d+)\s*[-~]\s*0*(\d+)/i) ||
+                                       (t.titre || '').match(/\b(?:E|EP|Épisode|Episode)\s*0*(\d+)\s*[-~]\s*0*(\d+)\b/i);
+                    if (rangeMatch) {
+                        const start = parseInt(rangeMatch[1], 10);
+                        const end = parseInt(rangeMatch[2], 10);
+                        if (nextEp >= start && nextEp <= end) matchType = 'pack';
+                    } else if (isTorrentPack(t)) {
+                        matchType = 'batch';
+                    }
+                }
+            }
+            return { torrent: t, matchType };
+        });
+
+        // 3. Tri
+        mappedTorrents.sort((a, b) => {
+            if (activeSort === 'size_desc') {
+                return parseSizeToBytes(b.torrent.taille) - parseSizeToBytes(a.torrent.taille);
+            }
+            if (activeSort === 'size_asc') {
+                return parseSizeToBytes(a.torrent.taille) - parseSizeToBytes(b.torrent.taille);
+            }
+            if (activeSort === 'relevance' && nextEp) {
+                const rank = (m) => (m === 'exact' ? 3 : (m === 'pack' || m === 'batch' ? 2 : 1));
+                const rankDiff = rank(b.matchType) - rank(a.matchType);
+                if (rankDiff !== 0) return rankDiff;
+                return (b.torrent.seeders || 0) - (a.torrent.seeders || 0);
+            }
+            // Par défaut: seeders desc
+            if (nextEp && (a.matchType === 'exact' || b.matchType === 'exact')) {
+                if (a.matchType === 'exact' && b.matchType !== 'exact') return -1;
+                if (b.matchType === 'exact' && a.matchType !== 'exact') return 1;
+            }
+            return (b.torrent.seeders || 0) - (a.torrent.seeders || 0);
+        });
+
+        let exactMatchTorrent = null;
+        const firstExact = mappedTorrents.find(m => m.matchType === 'exact');
+        if (firstExact) exactMatchTorrent = firstExact.torrent;
+
+        // Mise à jour de la bannière directe si présente
+        const directActionContainer = document.getElementById('targetEpDirectAction');
+        if (directActionContainer) {
+            if (exactMatchTorrent) {
+                window._currentExactMatchTorrent = exactMatchTorrent;
+                directActionContainer.innerHTML = `
+                    <button class="btn-play-target-direct" onclick="playTargetEpisodeDirectly()">
+                        ▶ Lancer l'Épisode ${nextEp} direct
+                    </button>
+                `;
+            } else {
+                directActionContainer.innerHTML = '';
+            }
+        }
+
+        // 4. Rendu DOM
+        resultsDiv.innerHTML = '';
+        mappedTorrents.forEach(({ torrent: t, matchType }) => {
+            const parsed = getAnimeDetails(t);
+            const animeName = t.animeName || parsed.animeName || t.cleanTitle || 'Anime';
+            const season = t.season || parsed.season || 'Saison 1';
+            const episode = t.episode || parsed.episode || 'Épisode 1';
+            const resolution = (t.resolution || parsed.resolution || '1080p').split(' ')[0];
+            const audioLang = t.audioLang || parsed.audioLang || 'VOSTFR';
+            const posterSrc = t.poster || (targetInfo?.coverImage) || ('https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(animeName));
+
+            const isTargetMatch = matchType === 'exact';
+            const isPackMatch = matchType === 'pack' || matchType === 'batch';
+
+            const card = document.createElement('div');
+            card.className = 'card' + (isTargetMatch ? ' card-target-highlight' : '');
+            
+            let highlightBadgeHtml = '';
+            if (isTargetMatch) {
+                highlightBadgeHtml = `<span class="badge-tag-mini badge-target-direct-match">⭐ ÉPISODE ${nextEp}</span>`;
+            } else if (isPackMatch) {
+                highlightBadgeHtml = `<span class="badge-tag-mini badge-target-pack-match">📦 PACK (ÉP. ${nextEp})</span>`;
+            }
+
+            card.innerHTML = `
+                <div class="card-img-wrap">
+                    <img src="${escapeHtml(posterSrc)}" loading="lazy" alt="${escapeHtml(animeName)}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                    <div class="card-overlay-hover">
+                        <span class="btn-play-hover" style="${isTargetMatch ? 'background:var(--accent-green);color:#000;font-weight:800;' : ''}">
+                            ▶ ${isTargetMatch ? `Regarder l'Épisode ${nextEp}` : 'Voir la fiche & Regarder'}
+                        </span>
+                    </div>
+                    <div class="card-badges-top">
+                        <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                            <span class="badge-tag-mini">${resolution}</span>
+                            <span class="badge-tag-mini badge-tag-audio">${audioLang.includes('MULTI') ? 'MULTI' : (audioLang.includes('VF') ? 'VF' : 'VOSTFR')}</span>
+                        </div>
+                        ${highlightBadgeHtml}
+                    </div>
+                </div>
+                <div class="card-info">
+                    <span class="card-title" title="${escapeHtml(t.titre)}">${escapeHtml(animeName)}</span>
+                    <div class="card-ep-season">
+                        <span class="card-season-pill">${escapeHtml(season)}</span>
+                        <span class="card-episode-pill" style="${isTargetMatch ? 'background:rgba(70,211,105,0.2);color:#5eff88;border-color:rgba(70,211,105,0.5);font-weight:bold;' : ''}">
+                            ${escapeHtml(episode)}
+                        </span>
+                    </div>
+                    <div class="stats">
+                        <span class="badge-rating">⭐ ${t.rating || 'N/A'}</span>
+                        <span>${t.taille}</span>
+                        <span class="seeders">🌱 ${t.seeders}</span>
+                    </div>
+                </div>
+            `;
+
+            card.onclick = () => openAnimeDetail(t);
+            resultsDiv.appendChild(card);
+        });
+    }
+
     async function executeSearchForAnime(searchTitle, targetInfo = null) {
         const homeView = document.getElementById('homeView');
         const searchView = document.getElementById('searchView');
         const targetBanner = document.getElementById('searchTargetBanner');
+        const filterBar = document.getElementById('searchFilterBar');
         const resultsDiv = document.getElementById('results');
 
         if (homeView) homeView.style.display = 'none';
         if (searchView) searchView.style.display = 'block';
+        if (filterBar) filterBar.style.display = 'none';
 
         const type = document.getElementById('searchType')?.value || 'vostfr';
         const nextEp = targetInfo ? targetInfo.nextEp : null;
@@ -450,6 +665,7 @@
             }
 
             if (!torrents || torrents.length === 0) {
+                if (filterBar) filterBar.style.display = 'none';
                 resultsDiv.innerHTML = `
                     <div class="empty-state" style="grid-column: 1 / -1;">
                         Aucun torrent trouvé pour "${escapeHtml(searchTitle)}".<br>
@@ -464,125 +680,36 @@
                 return;
             }
 
-            // Traitement et classification des torrents pour l'épisode ciblé
-            let exactMatchTorrent = null;
-            const mappedTorrents = torrents.map(t => {
-                let matchType = null;
-                if (nextEp) {
-                    const epNum = extractEpisodeNumber(t.episode, t.titre);
-                    if (epNum === nextEp) {
-                        matchType = 'exact';
-                    } else {
-                        const isPack = /integrale|intégrale|pack|batch|saison complète|complete/i.test(t.episode || '') ||
-                                       /integrale|intégrale|pack|batch|complete|s\d+[-+]s\d+/i.test(t.titre || '');
-                        const rangeMatch = (t.episode || '').match(/Épisodes?\s*0*(\d+)\s*[-~]\s*0*(\d+)/i) ||
-                                           (t.titre || '').match(/\b(?:E|EP|Épisode|Episode)\s*0*(\d+)\s*[-~]\s*0*(\d+)\b/i);
-                        if (rangeMatch) {
-                            const start = parseInt(rangeMatch[1], 10);
-                            const end = parseInt(rangeMatch[2], 10);
-                            if (nextEp >= start && nextEp <= end) matchType = 'pack';
-                        } else if (isPack) {
-                            matchType = 'batch';
-                        }
-                    }
-                }
-                return { torrent: t, matchType };
-            });
+            // Enregistrement des torrents bruts pour filtrage et tri dynamiques
+            window._currentRawTorrents = torrents;
+            window._currentSearchTargetInfo = targetInfo;
+            window._currentSearchFilter = 'all';
+            window._currentSearchSort = 'seeders';
 
-            // Tri : exacts en tête, puis packs/batchs, puis les autres (par seeders)
-            if (nextEp) {
-                mappedTorrents.sort((a, b) => {
-                    const rank = (m) => (m === 'exact' ? 3 : (m === 'pack' || m === 'batch' ? 2 : 1));
-                    const rankDiff = rank(b.matchType) - rank(a.matchType);
-                    if (rankDiff !== 0) return rankDiff;
-                    return (b.torrent.seeders || 0) - (a.torrent.seeders || 0);
+            // Affichage et réinitialisation de la barre de filtres
+            if (filterBar) {
+                filterBar.style.display = 'flex';
+                const sortSelect = document.getElementById('searchSortSelect');
+                if (sortSelect) sortSelect.value = 'seeders';
+                document.querySelectorAll('#searchFilterBar .filter-chip').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.filter === 'all');
                 });
-                const firstExact = mappedTorrents.find(m => m.matchType === 'exact');
-                if (firstExact) exactMatchTorrent = firstExact.torrent;
+            }
 
-                // Si autoPlayDirect demandé (Binge-watching) et qu'un torrent exact est disponible
-                if (targetInfo && targetInfo.autoPlayDirect && exactMatchTorrent) {
+            // Si autoPlayDirect demandé (Binge-watching) et qu'un torrent exact est disponible
+            if (targetInfo && targetInfo.autoPlayDirect && nextEp) {
+                const exactTorrent = torrents.find(t => extractEpisodeNumber(t.episode, t.titre) === nextEp);
+                if (exactTorrent) {
                     showToast(`🚀 Lancement automatique de l'Épisode ${nextEp} !`);
-                    openAnimeDetail(exactMatchTorrent);
+                    openAnimeDetail(exactTorrent);
                     return;
                 }
             }
 
-            // Bouton d'action directe dans la bannière supérieure
-            const directActionContainer = document.getElementById('targetEpDirectAction');
-            if (directActionContainer) {
-                if (exactMatchTorrent) {
-                    window._currentExactMatchTorrent = exactMatchTorrent;
-                    directActionContainer.innerHTML = `
-                        <button class="btn-play-target-direct" onclick="playTargetEpisodeDirectly()">
-                            ▶ Lancer l'Épisode ${nextEp} direct
-                        </button>
-                    `;
-                } else {
-                    directActionContainer.innerHTML = '';
-                }
-            }
-
-            // Rendu des cartes de torrents
-            resultsDiv.innerHTML = '';
-            mappedTorrents.forEach(({ torrent: t, matchType }) => {
-                const parsed = getAnimeDetails(t);
-                const animeName = t.animeName || parsed.animeName || t.cleanTitle || 'Anime';
-                const season = t.season || parsed.season || 'Saison 1';
-                const episode = t.episode || parsed.episode || 'Épisode 1';
-                const resolution = (t.resolution || parsed.resolution || '1080p').split(' ')[0];
-                const audioLang = t.audioLang || parsed.audioLang || 'VOSTFR';
-                const posterSrc = t.poster || (targetInfo?.coverImage) || ('https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(animeName));
-
-                const isTargetMatch = matchType === 'exact';
-                const isPackMatch = matchType === 'pack' || matchType === 'batch';
-
-                const card = document.createElement('div');
-                card.className = 'card' + (isTargetMatch ? ' card-target-highlight' : '');
-                
-                let highlightBadgeHtml = '';
-                if (isTargetMatch) {
-                    highlightBadgeHtml = `<span class="badge-tag-mini badge-target-direct-match">⭐ ÉPISODE ${nextEp}</span>`;
-                } else if (isPackMatch) {
-                    highlightBadgeHtml = `<span class="badge-tag-mini badge-target-pack-match">📦 PACK (ÉP. ${nextEp})</span>`;
-                }
-
-                card.innerHTML = `
-                    <div class="card-img-wrap">
-                        <img src="${escapeHtml(posterSrc)}" loading="lazy" alt="${escapeHtml(animeName)}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
-                        <div class="card-overlay-hover">
-                            <span class="btn-play-hover" style="${isTargetMatch ? 'background:var(--accent-green);color:#000;font-weight:800;' : ''}">
-                                ▶ ${isTargetMatch ? `Regarder l'Épisode ${nextEp}` : 'Voir la fiche & Regarder'}
-                            </span>
-                        </div>
-                        <div class="card-badges-top">
-                            <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                                <span class="badge-tag-mini">${resolution}</span>
-                                <span class="badge-tag-mini badge-tag-audio">${audioLang.includes('MULTI') ? 'MULTI' : (audioLang.includes('VF') ? 'VF' : 'VOSTFR')}</span>
-                            </div>
-                            ${highlightBadgeHtml}
-                        </div>
-                    </div>
-                    <div class="card-info">
-                        <span class="card-title" title="${escapeHtml(t.titre)}">${escapeHtml(animeName)}</span>
-                        <div class="card-ep-season">
-                            <span class="card-season-pill">${escapeHtml(season)}</span>
-                            <span class="card-episode-pill" style="${isTargetMatch ? 'background:rgba(70,211,105,0.2);color:#5eff88;border-color:rgba(70,211,105,0.5);font-weight:bold;' : ''}">
-                                ${escapeHtml(episode)}
-                            </span>
-                        </div>
-                        <div class="stats">
-                            <span class="badge-rating">⭐ ${t.rating || 'N/A'}</span>
-                            <span>${t.taille}</span>
-                            <span class="seeders">🌱 ${t.seeders}</span>
-                        </div>
-                    </div>
-                `;
-
-                card.onclick = () => openAnimeDetail(t);
-                resultsDiv.appendChild(card);
-            });
+            renderFilteredSortedResults();
         } catch (err) { 
+            const filterBar = document.getElementById('searchFilterBar');
+            if (filterBar) filterBar.style.display = 'none';
             resultsDiv.innerHTML = `
                 <div class="empty-state" style="grid-column: 1 / -1; color:#ff4444;">
                     Erreur de connexion au serveur : ${escapeHtml(err.message)}
@@ -643,3 +770,18 @@
             anilistBadge.classList.remove('active');
         }
     });
+
+    // Export global pour interaction DOM et autres modules
+    window.setSearchFilter = setSearchFilter;
+    window.onSearchSortChange = onSearchSortChange;
+    window.renderFilteredSortedResults = renderFilteredSortedResults;
+    window.executeSearchForAnime = executeSearchForAnime;
+    window.playTargetEpisodeDirectly = playTargetEpisodeDirectly;
+    window.parseSizeToBytes = parseSizeToBytes;
+    window.isTorrentPack = isTorrentPack;
+    window.handleSearchClick = handleSearchClick;
+    window.searchNyaa = searchNyaa;
+    window.openAnimeDetail = openAnimeDetail;
+    window.closeDetailView = closeDetailView;
+
+

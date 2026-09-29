@@ -699,3 +699,128 @@
             border-radius: 4px;
         }
 
+        /* --- OVERLAY TACTILE DOUBLE-TAP (SEEK RAPIDE MOBILE -10S / +10S) --- */
+        .touch-seek-overlay {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 40%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 25;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .touch-seek-left {
+            left: 0;
+            border-top-right-radius: 50% 100%;
+            border-bottom-right-radius: 50% 100%;
+            background: radial-gradient(circle at left, rgba(255, 255, 255, 0.18) 0%, transparent 75%);
+        }
+        .touch-seek-right {
+            right: 0;
+            border-top-left-radius: 50% 100%;
+            border-bottom-left-radius: 50% 100%;
+            background: radial-gradient(circle at right, rgba(255, 255, 255, 0.18) 0%, transparent 75%);
+        }
+        .touch-seek-overlay.active {
+            opacity: 1;
+        }
+        .touch-seek-circle {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            background: rgba(0, 0, 0, 0.76);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1.5px solid rgba(255, 255, 255, 0.35);
+            border-radius: 50%;
+            width: 78px;
+            height: 78px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.75);
+            transform: scale(0.8);
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .touch-seek-overlay.active .touch-seek-circle {
+            transform: scale(1);
+            animation: touchRipplePulse 0.35s ease-out;
+        }
+        @keyframes touchRipplePulse {
+            0% { transform: scale(0.7); opacity: 0.6; }
+            50% { transform: scale(1.12); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .touch-seek-arrows {
+            font-size: 15px;
+            letter-spacing: -2px;
+            color: #ffffff;
+            font-weight: 800;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+        }
+        .touch-seek-text {
+            font-size: 13px;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: 0.4px;
+        }
+
+        /* --- OPTIMISATIONS RESPONSIVES MOBILE & TABLETTE --- */
+        @media (max-width: 640px) {
+            .player-volume-group {
+                display: none !important; /* Téléphones disposant de boutons physiques de volume */
+            }
+            .player-btn-skip {
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+            .player-time-label {
+                font-size: 11.5px;
+                margin-left: 2px;
+                gap: 2px;
+            }
+            .player-bar-left, .player-bar-right {
+                gap: 4px;
+            }
+            .player-btn {
+                padding: 6px 7px;
+                font-size: 14px;
+            }
+            .player-scrubber-container {
+                height: 28px; /* Zone tactile élargie pour le pouce */
+            }
+            .player-scrubber-thumb {
+                width: 15px;
+                height: 15px;
+                transform: translateY(-50%) scale(1); /* Toujours visible sur mobile */
+            }
+            .detail-player-section {
+                padding: 14px 10px;
+                border-radius: 12px;
+            }
+            .player-controls-bar {
+                gap: 8px;
+            }
+            .ani-skip-overlay-btn {
+                bottom: 60px;
+                right: 12px;
+                padding: 7px 14px;
+                font-size: 12px;
+            }
+            .player-next-ep-overlay {
+                bottom: 60px;
+                right: 12px;
+                min-width: 260px;
+                padding: 12px 16px;
+            }
+            .player-resume-banner {
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                max-width: none;
+                padding: 10px 14px;
+            }
+        }

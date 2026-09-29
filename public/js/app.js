@@ -219,10 +219,16 @@ function handleLogoClick() {
 }
 
 function showHomeScreen() {
-    document.getElementById('searchView').style.display = 'none';
-    document.getElementById('homeView').style.display = 'block';
-    document.getElementById('detailView').style.display = 'none';
-    document.getElementById('catalogView').style.display = 'block';
+    const searchView = document.getElementById('searchView');
+    if (searchView) searchView.style.display = 'none';
+    const filterBar = document.getElementById('searchFilterBar');
+    if (filterBar) filterBar.style.display = 'none';
+    const homeView = document.getElementById('homeView');
+    if (homeView) homeView.style.display = 'block';
+    const detailView = document.getElementById('detailView');
+    if (detailView) detailView.style.display = 'none';
+    const catalogView = document.getElementById('catalogView');
+    if (catalogView) catalogView.style.display = 'block';
     if (typeof renderHomeScreen === 'function') {
         renderHomeScreen();
     }
@@ -407,6 +413,22 @@ function initApp() {
     if (typeof initAnilistSession === 'function') initAnilistSession();
     if (typeof setupVideoPlayerTracking === 'function') setupVideoPlayerTracking();
     if (typeof initCustomPlayerControls === 'function') initCustomPlayerControls();
+
+    // Gestion des raccourcis d'application PWA (Shortcuts de l'icône d'accueil)
+    const urlParams = new URLSearchParams(window.location.search);
+    const requestedTab = urlParams.get('tab');
+    if (requestedTab && typeof switchHomeTab === 'function') {
+        setTimeout(() => switchHomeTab(requestedTab), 150);
+    }
+    if (urlParams.get('action') === 'search') {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            setTimeout(() => {
+                searchInput.focus();
+                searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+        }
+    }
 }
 
 if (document.readyState === 'loading') {

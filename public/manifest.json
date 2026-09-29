@@ -43,5 +43,28 @@
       "type": "image/svg+xml",
       "purpose": "any"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Rechercher un Anime",
+      "short_name": "Recherche",
+      "description": "Rechercher un anime dans Animflix",
+      "url": "/?action=search",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mes Favoris",
+      "short_name": "Favoris",
+      "description": "Voir mes animes favoris",
+      "url": "/?tab=favorites",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Historique de lecture",
+      "short_name": "Historique",
+      "description": "Reprendre mes visionnages",
+      "url": "/?tab=history",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
   ]
 }

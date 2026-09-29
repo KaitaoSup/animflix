@@ -47,6 +47,11 @@
         if (typeof checkAutoPlayNextEpisode === 'function') {
             checkAutoPlayNextEpisode(effectiveTime, totalDur);
         }
+
+        // Synchronisation de la position MediaSession (écran de verrouillage / casque Bluetooth)
+        if (typeof updateMediaSessionPositionState === 'function') {
+            updateMediaSessionPositionState();
+        }
     }
 
     let seekDebounceTimeout = null;
@@ -60,6 +65,9 @@
         
         currentStreamOffset = target;
         updatePlayerProgress();
+        if (typeof updateMediaSessionPositionState === 'function') {
+            updateMediaSessionPositionState(true);
+        }
 
         if (seekDebounceTimeout) {
             clearTimeout(seekDebounceTimeout);
@@ -149,7 +157,7 @@
         if (controlsHideTimeout) clearTimeout(controlsHideTimeout);
     }
 
-    function resetControlsTimer() {
+    function resetControlsTimer(delay = 4500) {
         showControls();
         const video = document.getElementById('videoPlayer');
         if (video && !video.paused) {
@@ -159,20 +167,38 @@
                 if (wrapper && !isScrubbing) {
                     wrapper.classList.add('hide-controls');
                 }
-            }, 2600);
+            }, delay);
         }
     }
 
     function togglePlayerFullscreen() {
         const wrapper = document.getElementById('playerVideoWrapper') || document.getElementById('videoPlayer');
         if (!wrapper) return;
-        if (document.fullscreenElement) {
-            document.exitFullscreen().catch(() => {});
+        const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+        if (isFullscreen) {
+            if (document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen().catch(() => {});
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen().catch(() => {});
+            }
+            if (screen.orientation && screen.orientation.unlock) {
+                try { screen.orientation.unlock(); } catch (e) {}
+            }
         } else {
-            if (wrapper.requestFullscreen) {
-                wrapper.requestFullscreen().catch(() => {});
-            } else if (wrapper.webkitRequestFullscreen) {
-                wrapper.webkitRequestFullscreen().catch(() => {});
+            const req = wrapper.requestFullscreen 
+                ? wrapper.requestFullscreen() 
+                : (wrapper.webkitRequestFullscreen 
+                    ? wrapper.webkitRequestFullscreen() 
+                    : (wrapper.mozRequestFullScreen ? wrapper.mozRequestFullScreen() : null));
+
+            if (req && req.then) {
+                req.then(() => {
+                    if (screen.orientation && screen.orientation.lock) {
+                        screen.orientation.lock('landscape').catch(() => {});
+                    }
+                }).catch(() => {});
             }
         }
     }
@@ -598,6 +624,168 @@
     window.dismissNextEpisodeCountdown = dismissNextEpisodeCountdown;
     window.checkAniSkipForCurrentEpisode = checkAniSkipForCurrentEpisode;
 
+    // --- INTÉGRATION DE L'API NATIVE MEDIA SESSION (ÉCRAN DE VERROUILLAGE, BLUETOOTH & OS) ---
+    let mediaSessionActionsConfigured = false;
+    let lastMediaSessionPosTime = 0;
+
+    function setupMediaSessionActions() {
+        if (!('mediaSession' in navigator) || mediaSessionActionsConfigured) return;
+        mediaSessionActionsConfigured = true;
+
+        const actions = [
+            ['play', () => {
+                const video = document.getElementById('videoPlayer');
+                if (video && video.paused) {
+                    video.play().catch(() => {});
+                }
+            }],
+            ['pause', () => {
+                const video = document.getElementById('videoPlayer');
+                if (video && !video.paused) {
+                    video.pause();
+                }
+            }],
+            ['seekbackward', (details) => {
+                const skip = details?.seekOffset || 10;
+                jumpSeekRelative(-skip);
+            }],
+            ['seekforward', (details) => {
+                const skip = details?.seekOffset || 10;
+                jumpSeekRelative(skip);
+            }],
+            ['seekto', (details) => {
+                if (details && typeof details.seekTime === 'number' && !isNaN(details.seekTime)) {
+                    seekVideoTo(details.seekTime);
+                }
+            }],
+            ['previoustrack', () => {
+                if (Array.isArray(window._currentPackFiles) && window._currentPackFiles.length > 1) {
+                    const curEp = currentDetectedEpisode;
+                    let prevFile = window._currentPackFiles.find(f => f.episode === curEp - 1);
+                    if (!prevFile) {
+                        const curIdx = window._currentPackFiles.findIndex(f => f.id === currentActiveFileIndex);
+                        if (curIdx > 0) {
+                            prevFile = window._currentPackFiles[curIdx - 1];
+                        }
+                    }
+                    if (prevFile && typeof playNextPackEpisode === 'function') {
+                        playNextPackEpisode(prevFile);
+                        return;
+                    }
+                }
+                seekVideoTo(0, true);
+            }],
+            ['nexttrack', () => {
+                if (typeof triggerNextEpisodeOverlay === 'function') {
+                    triggerNextEpisodeOverlay(true);
+                }
+            }],
+            ['stop', () => {
+                const video = document.getElementById('videoPlayer');
+                if (video) video.pause();
+                if (typeof closeDetailView === 'function') {
+                    closeDetailView();
+                }
+            }]
+        ];
+
+        for (const [action, handler] of actions) {
+            try {
+                navigator.mediaSession.setActionHandler(action, handler);
+            } catch (err) {
+                // Ignore actions non supportées
+            }
+        }
+    }
+
+    function updateMediaSession() {
+        if (!('mediaSession' in navigator)) return;
+
+        if (!currentAnimeItem && !currentActiveMagnet) {
+            navigator.mediaSession.metadata = null;
+            return;
+        }
+
+        const parsed = getAnimeDetails(currentAnimeItem);
+        const animeTitle = currentAnimeItem?.animeName || parsed.animeName || currentAnimeItem?.cleanTitle || 'Anime';
+        const epNum = currentDetectedEpisode || (currentAnimeItem ? parseAnimeDetails(currentAnimeItem.titre).episode : null) || parsed.episode || 'Épisode 1';
+        const epLabel = typeof epNum === 'number' ? `Épisode ${epNum}` : String(epNum);
+        const seasonLabel = parsed.season || 'Saison 1';
+
+        let posterUrl = currentAnimeItem?.poster || 
+                        (typeof currentAnilistMedia !== 'undefined' && currentAnilistMedia?.coverImage?.large) ||
+                        (typeof currentAnilistMedia !== 'undefined' && currentAnilistMedia?.coverImage?.medium) || '';
+
+        if (posterUrl && posterUrl.startsWith('/')) {
+            posterUrl = window.location.origin + posterUrl;
+        }
+
+        const artwork = [];
+        if (posterUrl) {
+            artwork.push(
+                { src: posterUrl, sizes: '96x96', type: 'image/jpeg' },
+                { src: posterUrl, sizes: '128x128', type: 'image/jpeg' },
+                { src: posterUrl, sizes: '192x192', type: 'image/jpeg' },
+                { src: posterUrl, sizes: '256x256', type: 'image/jpeg' },
+                { src: posterUrl, sizes: '384x384', type: 'image/jpeg' },
+                { src: posterUrl, sizes: '512x512', type: 'image/jpeg' }
+            );
+        } else {
+            artwork.push(
+                { src: window.location.origin + '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+                { src: window.location.origin + '/icons/icon-512.png', sizes: '512x512', type: 'image/png' }
+            );
+        }
+
+        try {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: `${animeTitle} — ${epLabel}`,
+                artist: animeTitle,
+                album: `${seasonLabel} • Animflix`,
+                artwork: artwork
+            });
+        } catch (e) {
+            console.warn("[MediaSession] Erreur MediaMetadata:", e);
+        }
+
+        setupMediaSessionActions();
+        updateMediaSessionPositionState(true);
+    }
+
+    function updateMediaSessionPositionState(force = false) {
+        if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession)) return;
+        const now = Date.now();
+        if (!force && (now - lastMediaSessionPosTime < 1000)) return;
+        lastMediaSessionPosTime = now;
+
+        const video = document.getElementById('videoPlayer');
+        if (!video) return;
+
+        const totalDur = currentTotalDuration > 0 ? currentTotalDuration : 1440;
+        const currentPos = Math.max(0, Math.min(totalDur, currentStreamOffset + (video.currentTime || 0)));
+
+        try {
+            navigator.mediaSession.setPositionState({
+                duration: totalDur,
+                playbackRate: video.playbackRate || 1,
+                position: currentPos
+            });
+        } catch (e) {}
+    }
+
+    function resetMediaSession() {
+        if ('mediaSession' in navigator) {
+            try {
+                navigator.mediaSession.playbackState = 'none';
+                navigator.mediaSession.metadata = null;
+            } catch (e) {}
+        }
+    }
+
+    window.updateMediaSession = updateMediaSession;
+    window.resetMediaSession = resetMediaSession;
+    window.updateMediaSessionPositionState = updateMediaSessionPositionState;
+
     async function cleanTorrServerCache() {
         if (!confirm("Voulez-vous purger tous les torrents et données en mémoire de TorrServer ?\n(Libère immédiatement la RAM et le cache de streaming)")) return;
         showToast("Purge du cache TorrServer en cours... ⏳");
@@ -702,6 +890,12 @@
             if (typeof applySubtitleCuesToTrack === 'function') {
                 applySubtitleCuesToTrack(currentStreamOffset);
             }
+            // Synchronisation de l'API native MediaSession
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'playing';
+                updateMediaSession();
+                updateMediaSessionPositionState(true);
+            }
             // Appliquer la vitesse de lecture préférée
             const prefSpeed = parseFloat(localStorage.getItem('animflix_default_speed'));
             if (!isNaN(prefSpeed) && prefSpeed > 0 && video.playbackRate !== prefSpeed) {
@@ -731,12 +925,18 @@
             const playIcon = document.getElementById('customPlayIcon');
             if (playIcon) playIcon.textContent = '▶';
             showControls();
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'paused';
+            }
             if (typeof savePlaybackProgress === 'function') {
                 savePlaybackProgress(true);
             }
         };
 
         video.onended = () => {
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'none';
+            }
             if (typeof markCurrentPlaybackCompleted === 'function') {
                 markCurrentPlaybackCompleted();
             }
@@ -785,10 +985,145 @@
             showControls();
         });
 
-        // 3. Clic / Double-clic sur la vidéo (Play/Pause et Plein écran)
+        // 3. GESTES TACTILES MOBILE (DOUBLE-TAP SEEK -10S / +10S & CONTRÔLES)
+        let lastTouchTime = 0;
+        let lastTouchSide = null;
+        let touchSeekAccumulated = 0;
+        let touchSeekTimer = null;
+        let singleTapTimer = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let isTouchMoving = false;
+        let lastTouchTimestamp = 0;
+
+        function showTouchSeekFeedback(side, seconds) {
+            const overlayLeft = document.getElementById('touchSeekOverlayLeft');
+            const overlayRight = document.getElementById('touchSeekOverlayRight');
+            const textLeft = document.getElementById('touchSeekTextLeft');
+            const textRight = document.getElementById('touchSeekTextRight');
+
+            if (touchSeekTimer) {
+                clearTimeout(touchSeekTimer);
+                touchSeekTimer = null;
+            }
+
+            if (side === 'left' && overlayLeft && textLeft) {
+                textLeft.textContent = `-${seconds}s`;
+                if (overlayRight) overlayRight.classList.remove('active');
+                overlayLeft.classList.remove('active');
+                void overlayLeft.offsetWidth; // Forcer le reflow CSS
+                overlayLeft.classList.add('active');
+            } else if (side === 'right' && overlayRight && textRight) {
+                textRight.textContent = `+${seconds}s`;
+                if (overlayLeft) overlayLeft.classList.remove('active');
+                overlayRight.classList.remove('active');
+                void overlayRight.offsetWidth; // Forcer le reflow CSS
+                overlayRight.classList.add('active');
+            }
+
+            touchSeekTimer = setTimeout(() => {
+                if (overlayLeft) overlayLeft.classList.remove('active');
+                if (overlayRight) overlayRight.classList.remove('active');
+                touchSeekAccumulated = 0;
+                lastTouchSide = null;
+            }, 650);
+        }
+
+        let controlsWereHiddenAtTouchStart = false;
+
+        video.addEventListener('touchstart', (e) => {
+            lastTouchTimestamp = Date.now();
+            isTouchMoving = false;
+            // Mémorise si les contrôles étaient masqués au moment du toucher
+            controlsWereHiddenAtTouchStart = wrapper ? wrapper.classList.contains('hide-controls') : false;
+            if (e.touches && e.touches[0]) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+
+        video.addEventListener('touchmove', (e) => {
+            if (e.touches && e.touches[0]) {
+                const diffX = Math.abs(e.touches[0].clientX - touchStartX);
+                const diffY = Math.abs(e.touches[0].clientY - touchStartY);
+                if (diffX > 15 || diffY > 15) {
+                    isTouchMoving = true;
+                }
+            }
+        }, { passive: true });
+
+        video.addEventListener('touchend', (e) => {
+            lastTouchTimestamp = Date.now();
+            if (isTouchMoving) return;
+
+            const now = Date.now();
+            const rect = video.getBoundingClientRect();
+            const clientX = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : touchStartX;
+            const ratio = (clientX - rect.left) / rect.width;
+            const side = ratio < 0.35 ? 'left' : (ratio > 0.65 ? 'right' : 'center');
+
+            const timeDiff = now - lastTouchTime;
+
+            // Détection du double-tap ou multi-tap successif (dans les 340ms)
+            if (timeDiff < 340 && (lastTouchSide === side || (lastTouchSide && lastTouchSide !== 'center' && side !== 'center'))) {
+                if (singleTapTimer) {
+                    clearTimeout(singleTapTimer);
+                    singleTapTimer = null;
+                }
+
+                const activeSide = (lastTouchSide && lastTouchSide !== 'center' && side !== 'center') ? lastTouchSide : side;
+
+                if (activeSide === 'left') {
+                    touchSeekAccumulated = (touchSeekAccumulated > 0) ? touchSeekAccumulated + 10 : 10;
+                    jumpSeekRelative(-10);
+                    showTouchSeekFeedback('left', touchSeekAccumulated);
+                } else if (activeSide === 'right') {
+                    touchSeekAccumulated = (touchSeekAccumulated > 0) ? touchSeekAccumulated + 10 : 10;
+                    jumpSeekRelative(10);
+                    showTouchSeekFeedback('right', touchSeekAccumulated);
+                } else if (activeSide === 'center') {
+                    touchSeekAccumulated = 0;
+                    toggleCustomPlayPause();
+                }
+
+                lastTouchTime = now;
+                lastTouchSide = activeSide;
+                return;
+            }
+
+            // Premier tap enregistré -> attendre pour confirmer s'il s'agit d'un simple tap
+            lastTouchTime = now;
+            lastTouchSide = side;
+
+            if (singleTapTimer) clearTimeout(singleTapTimer);
+            singleTapTimer = setTimeout(() => {
+                singleTapTimer = null;
+                // Si les contrôles étaient cachés lors du tap -> les afficher et les laisser 4.5s
+                if (controlsWereHiddenAtTouchStart) {
+                    showControls();
+                    resetControlsTimer(4500);
+                } else {
+                    // Si les contrôles étaient déjà visibles -> le tap simple les masque immédiatement
+                    wrapper.classList.add('hide-controls');
+                    if (controlsHideTimeout) {
+                        clearTimeout(controlsHideTimeout);
+                        controlsHideTimeout = null;
+                    }
+                }
+                touchSeekAccumulated = 0;
+                lastTouchSide = null;
+            }, 260);
+        });
+
+        // 4. Clic souris (Desktop) : clic simple = Play/Pause, double-clic = Plein écran
         let clickTimeout = null;
         video.addEventListener('click', (e) => {
             e.stopPropagation();
+            // Ignorer les clics émulés consécutifs à un toucher tactile mobile
+            if (Date.now() - lastTouchTimestamp < 500) {
+                return;
+            }
+
             if (clickTimeout) {
                 clearTimeout(clickTimeout);
                 clickTimeout = null;
@@ -801,9 +1136,21 @@
             }
         });
 
-        // 4. Disparition auto des contrôles
-        wrapper.addEventListener('mousemove', resetControlsTimer);
-        wrapper.addEventListener('touchstart', resetControlsTimer, { passive: true });
+        // Empêcher les clics sur l'overlay de contrôle d'interférer avec le double-tap du lecteur
+        const customPlayerOverlay = document.getElementById('customPlayerOverlay');
+        if (customPlayerOverlay) {
+            customPlayerOverlay.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                resetControlsTimer(4500);
+            }, { passive: true });
+            customPlayerOverlay.addEventListener('click', (e) => {
+                e.stopPropagation();
+                resetControlsTimer(4500);
+            });
+        }
+
+        // 5. Disparition auto des contrôles
+        wrapper.addEventListener('mousemove', () => resetControlsTimer(4000));
         wrapper.addEventListener('mouseleave', () => {
             if (!video.paused && !isScrubbing) {
                 wrapper.classList.add('hide-controls');
@@ -1017,4 +1364,14 @@
             savePlaybackProgress(true);
         }
     });
+
+    ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'].forEach(ev => {
+        document.addEventListener(ev, () => {
+            const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+            if (!isFs && screen.orientation && screen.orientation.unlock) {
+                try { screen.orientation.unlock(); } catch (e) {}
+            }
+        });
+    });
+
 
