@@ -91,7 +91,7 @@ flowchart TB
         MediaSession["MediaSession API & Touch Gestures"]
     end
 
-    subgraph Backend ["Serveur Node.js (animflix.js :3000)"]
+    subgraph Backend ["Serveur Node.js (animflix.js)"]
         Router["Routeur Express & Middlewares"]
         NyaaScraper["Scraper & Parser Nyaa.si (RSS/HTML)"]
         MetaService["Service Métadonnées & Affiches (TVMaze / Kitsu / TMDB)"]
@@ -100,7 +100,7 @@ flowchart TB
         SubExtractor["Extracteur & Convertisseur WebVTT"]
     end
 
-    subgraph P2PEngine ["Moteur de Téléchargement P2P (:8090)"]
+    subgraph P2PEngine ["Moteur de Téléchargement P2P (Port 8090)"]
         TorrServer["TorrServer MatriX (Binaire Go Autonome)"]
         RAMCache["Cache Tampon RAM / Disque"]
     end
@@ -114,25 +114,25 @@ flowchart TB
     end
 
     %% Interactions Client <-> Backend
-    UI <-->|HTTP / JSON APIs| Router
+    UI <-->|APIs HTTP et JSON| Router
     SW -.->|Mise en cache statique| UI
-    Player <-->|Flux Vidéo HTTP Range| Router
-    Player <-->|Pistes WebVTT synchronisées| SubExtractor
+    Player <-->|Flux Video HTTP Range| Router
+    Player <-->|Pistes WebVTT synchronisees| SubExtractor
     Player <--> MediaSession
 
     %% Interactions Backend <-> Moteur P2P
     MediaProcessor <-->|Flux HTTP Interne| TorrServer
-    Router <-->|Gestion des Torrents (Add/Drop/Stats)| TorrServer
+    Router <-->|Gestion et Purge des Torrents| TorrServer
 
     %% Interactions Backend <-> Externes
-    NyaaScraper <-->|Scraping Magnets & Torrents| Nyaa
-    AnilistProxy <-->|Requêtes GraphQL / OAuth| AniListAPI
-    MetaService <-->|Requêtes REST Jaquettes| TVMaze
-    MetaService <-->|Fallback Métadonnées| Kitsu
-    MetaService <-->|Fallback Métadonnées| TMDB
+    NyaaScraper <-->|Scraping Magnets et Torrents| Nyaa
+    AnilistProxy <-->|Requetes GraphQL et OAuth| AniListAPI
+    MetaService <-->|Requetes REST Jaquettes| TVMaze
+    MetaService <-->|Fallback Metadonnees Kitsu| Kitsu
+    MetaService <-->|Fallback Metadonnees TMDB| TMDB
 
     %% TorrServer P2P Swarm
-    TorrServer <-->|Échanges P2P BitTorrent| Nyaa
+    TorrServer <-->|Echanges P2P BitTorrent| Nyaa
 ```
 
 ---
@@ -145,20 +145,20 @@ sequenceDiagram
     actor User as Utilisateur
     participant Browser as Navigateur (Client PWA)
     participant Server as Serveur Express (animflix.js)
-    participant Torr as TorrServer (:8090)
+    participant Torr as TorrServer (Port 8090)
     participant FFmpeg as Moteur FFprobe / FFmpeg
 
     User->>Browser: Recherche un anime ou clique sur Découverte
     Browser->>Server: GET /api/search?q=...&type=vostfr
     Server->>Server: Scraping Nyaa + Récupération jaquettes (TVMaze/Kitsu)
-    Server-->>Browser: Liste JSON des torrents filtrés & enrichis
+    Server-->>Browser: Liste JSON des torrents filtrés et enrichis
 
-    User->>Browser: Sélectionne un épisode / torrent
+    User->>Browser: Sélectionne un épisode ou torrent
     Browser->>Server: GET /api/play-sync?magnet=...&fileIndex=...&offset=...
     Server->>Torr: Charge le torrent en mémoire P2P
     Server->>FFmpeg: FFprobe analyse les flux (vidéo, audio, sous-titres)
     Server->>FFmpeg: Extrait la piste de sous-titres en WebVTT
-    Server-->>Browser: Réponse Sync (Keyframe offset, durée, pistes audio & sous-titres)
+    Server-->>Browser: Réponse Sync (Keyframe offset, durée, pistes audio et sous-titres)
 
     Browser->>Browser: Configure le lecteur, charge la piste VTT et initialise MediaSession
     Browser->>Server: GET /api/stream?mode=direct&offset=...
@@ -170,7 +170,7 @@ sequenceDiagram
         FFmpeg-->>Browser: Flux vidéo transcodé en continu
     end
 
-    Note over Browser,Server: Progression > 85% : Mise à jour automatique AniList + Historique local
+    Note over Browser,Server: Progression à 85% : Mise à jour automatique AniList + Historique local
 ```
 
 ---
