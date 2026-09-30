@@ -75,6 +75,21 @@ Application web complète et moderne de streaming d'animes en direct à partir d
 - **Historique Local & Reprise** : Mémorisation exacte de la position de lecture à la seconde près dans `localStorage`, avec bannière de reprise automatique.
 - **Favoris Locaux Hors Ligne** : Sauvegarde d'animes favoris accessible sans compte tiers.
 
+### ⚡ 6. Feedback P2P & TorrServer en Direct
+- **Télémétrie en temps réel (`/api/torrserver/stats`)** :
+  - Débit descendant et montant instantané (Mo/s, Ko/s).
+  - Nombre de pairs actifs connectés et swarm total détecté.
+  - Nombre de seeders sources disponibles.
+  - Progression en pourcentage et volume du tampon de préchargement (preload buffer).
+- **Écran de chargement interactif (`#player-status`)** :
+  - Remplacement du simple spinner figé par des puces dynamiques en direct (Débit ⚡, Pairs 🌱, Tampon 📦 avec jauge de progression animée).
+  - Messages d'état évolutifs selon la phase réelle de TorrServer (*Recherche métadonnées & pairs*, *Mise en mémoire tampon*, *Démarrage du flux*).
+  - Détection proactive des torrents sans seeders avec alerte visuelle et invitation à basculer sur un autre flux ou VLC.
+- **Badge HUD Flottant interactif dans le lecteur** :
+  - Puce discrète avec témoin LED dynamique (Vert clignotant en streaming rapide, Jaune en buffer, Gris en veille).
+  - Carte HUD popup tactile/cliquable affichant l'ensemble des métriques BitTorrent sans interrompre le visionnage.
+  - Gestion optimisée des ressources : polling accéléré (1s) lors des transitions et rebuffering, allégé (2,5s) en lecture fluide, et coupure immédiate dès la fermeture du lecteur.
+
 ---
 
 ## 🏛️ Architecture Technique de l'Application

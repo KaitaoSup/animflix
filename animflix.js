@@ -1183,7 +1183,7 @@ app.get('/play', async (req, res) => {
   });
 });
 
-// --- ROUTES API GESTION DU CACHE TORRSERVER ---
+// --- ROUTES API GESTION DU CACHE ET TÉLÉMÉTRIE TORRSERVER ---
 app.post('/api/torrserver/drop', async (req, res) => {
   const { magnet, hash } = { ...req.query, ...req.body };
   const torrentHash = hash || (magnet ? getTorrentHash(magnet) : null);
@@ -1221,6 +1221,155 @@ app.post('/api/torrserver/clean', async (req, res) => {
     return res.json({ success: true, cleaned, message: `${cleaned} torrent(s) purgé(s) du cache TorrServer.` });
   } catch (err) {
     return res.status(500).json({ error: err.message });
+  }
+});
+
+function formatBytesSpeed(bytes) {
+  if (!bytes || bytes <= 0) return '0 Ko/s';
+  if (bytes < 1024) return `${bytes.toFixed(0)} o/s`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko/s`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} Mo/s`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} Go/s`;
+}
+
+function formatBytesSize(bytes) {
+  if (!bytes || bytes <= 0) return '0 Mo';
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} Go`;
+}
+
+app.get('/api/torrserver/stats', async (req, res) => {
+  const { hash, magnet } = req.query;
+  const torrentHash = hash || (magnet ? getTorrentHash(magnet) : null);
+
+  try {
+    if (torrentHash) {
+      let torrentData = null;
+      try {
+        const getRes = await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
+          action: "get",
+          hash: torrentHash
+        }, { timeout: 1800 });
+        if (getRes.data && getRes.data.hash) {
+          torrentData = getRes.data;
+        }
+      } catch (e) {
+        // Fallback vers action: "list" si non trouvé directement
+      }
+
+      if (!torrentData) {
+        try {
+          const listRes = await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
+            action: "list"
+          }, { timeout: 1800 });
+          const list = listRes.data || [];
+          torrentData = list.find(t => t.hash && t.hash.toLowerCase() === torrentHash.toLowerCase());
+        } catch (e) {}
+      }
+
+      if (!torrentData) {
+        return res.json({
+          online: true,
+          found: false,
+          hash: torrentHash,
+          stat: 0,
+          statLabel: "Initialisation du flux...",
+          downloadSpeed: 0,
+          downloadSpeedFormatted: "0 Ko/s",
+          uploadSpeed: 0,
+          uploadSpeedFormatted: "0 Ko/s",
+          activePeers: 0,
+          connectedSeeders: 0,
+          totalPeers: 0,
+          preloadPercent: 0,
+          loadedSizeFormatted: "0 Mo"
+        });
+      }
+
+      const stat = typeof torrentData.stat === 'number' ? torrentData.stat : 0;
+      let statLabel = "Connexion...";
+      if (stat === 0) statLabel = "Torrent ajouté";
+      else if (stat === 1) statLabel = "Recherche des métadonnées & pairs...";
+      else if (stat === 2) statLabel = "Mise en mémoire tampon (Préchargement)...";
+      else if (stat === 3) statLabel = "Lecture & P2P en direct";
+      else if (stat === 4) statLabel = "Arrêté";
+      else if (torrentData.stat_string) statLabel = torrentData.stat_string;
+
+      const preloaded = torrentData.preloaded_bytes || 0;
+      const preloadSize = torrentData.preload_size || 0;
+      let preloadPercent = 0;
+      if (preloadSize > 0) {
+        preloadPercent = Math.min(100, Math.max(0, Math.round((preloaded / preloadSize) * 100)));
+      } else if (stat === 3) {
+        preloadPercent = 100;
+      }
+
+      return res.json({
+        online: true,
+        found: true,
+        hash: torrentData.hash,
+        name: torrentData.name || torrentData.title || "",
+        stat: stat,
+        statString: torrentData.stat_string || "",
+        statLabel: statLabel,
+        downloadSpeed: torrentData.download_speed || 0,
+        downloadSpeedFormatted: formatBytesSpeed(torrentData.download_speed),
+        uploadSpeed: torrentData.upload_speed || 0,
+        uploadSpeedFormatted: formatBytesSpeed(torrentData.upload_speed),
+        activePeers: torrentData.active_peers || 0,
+        connectedSeeders: torrentData.connected_seeders || 0,
+        totalPeers: torrentData.total_peers || 0,
+        pendingPeers: torrentData.pending_peers || 0,
+        halfOpenPeers: torrentData.half_open_peers || 0,
+        preloadedBytes: preloaded,
+        preloadSize: preloadSize,
+        preloadPercent: preloadPercent,
+        loadedSize: torrentData.loaded_size || 0,
+        loadedSizeFormatted: formatBytesSize(torrentData.loaded_size),
+        torrentSize: torrentData.torrent_size || 0,
+        torrentSizeFormatted: formatBytesSize(torrentData.torrent_size)
+      });
+    }
+
+    // Statistiques globales de tous les torrents
+    const listRes = await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
+      action: "list"
+    }, { timeout: 2000 });
+    const torrents = listRes.data || [];
+    let totalDl = 0;
+    let totalUl = 0;
+    let totalPeers = 0;
+    torrents.forEach(t => {
+      totalDl += t.download_speed || 0;
+      totalUl += t.upload_speed || 0;
+      totalPeers += t.active_peers || 0;
+    });
+
+    return res.json({
+      online: true,
+      activeCount: torrents.length,
+      totalDownloadSpeed: totalDl,
+      totalDownloadSpeedFormatted: formatBytesSpeed(totalDl),
+      totalUploadSpeed: totalUl,
+      totalUploadSpeedFormatted: formatBytesSpeed(totalUl),
+      totalActivePeers: totalPeers,
+      torrents: torrents.map(t => ({
+        hash: t.hash,
+        name: t.name || t.title,
+        stat: t.stat,
+        statString: t.stat_string,
+        downloadSpeed: formatBytesSpeed(t.download_speed),
+        peers: `${t.active_peers || 0} / ${t.total_peers || 0}`,
+        size: formatBytesSize(t.torrent_size)
+      }))
+    });
+  } catch (err) {
+    return res.json({
+      online: false,
+      found: false,
+      error: "TorrServer non accessible: " + err.message
+    });
   }
 });
 

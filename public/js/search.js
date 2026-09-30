@@ -235,7 +235,10 @@
             resetSubtitlesState();
         }
 
-        // Purge automatique du torrent quitté dans TorrServer
+        // Purge automatique du torrent quitté dans TorrServer et arrêt du monitoring P2P
+        if (typeof stopTorrServerP2pPolling === 'function') {
+            stopTorrServerP2pPolling();
+        }
         if (currentActiveMagnet) {
             fetch('/api/torrserver/drop?magnet=' + encodeURIComponent(currentActiveMagnet), { method: 'POST' }).catch(() => {});
         }

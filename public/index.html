@@ -261,14 +261,61 @@
                       </div>
                   </div>
 
-                  <!-- Écran de statut TorrServer / Chargement -->
-                  <div id="player-status" style="position: absolute; background: rgba(12,12,12,0.92); backdrop-filter: blur(8px); padding: 25px 35px; border-radius: 12px; text-align: center; border: 1px solid #333; z-index: 15; max-width: 85%;">
-                      <div class="spinner" style="margin: 0 auto 15px; width: 44px; height: 44px;"></div>
-                      <div id="status-text" style="font-size: 15px; font-weight: 500;">Connexion à TorrServer & démarrage du lecteur... ⏳</div>
+                  <!-- Écran de statut TorrServer / Chargement avec feedback P2P en direct -->
+                  <div id="player-status" class="player-status-modal" style="display: none;">
+                      <div class="spinner" style="margin: 0 auto 14px; width: 42px; height: 42px;"></div>
+                      <div id="status-text" class="player-status-text">Connexion à TorrServer & démarrage du flux... ⏳</div>
+                      <div id="player-p2p-live" class="player-p2p-live" style="display: none;">
+                          <div class="player-p2p-chips">
+                              <span class="p2p-chip p2p-chip-speed" id="p2pStatusSpeed" title="Débit descendant P2P">
+                                  ⚡ <span class="p2p-val" id="p2pStatusSpeedVal">0 Ko/s</span>
+                              </span>
+                              <span class="p2p-chip p2p-chip-peers" id="p2pStatusPeers" title="Pairs actifs et sources seeders">
+                                  🌱 <span class="p2p-val" id="p2pStatusPeersVal">0 pairs</span>
+                              </span>
+                              <span class="p2p-chip p2p-chip-buffer" id="p2pStatusBuffer" title="Progression du tampon de démarrage">
+                                  📦 <span class="p2p-val" id="p2pStatusBufferVal">0%</span>
+                              </span>
+                          </div>
+                          <div class="p2p-progress-track" id="p2pProgressTrack">
+                              <div class="p2p-progress-fill" id="p2pProgressFill" style="width: 0%;"></div>
+                          </div>
+                          <div class="p2p-sub-detail" id="p2pSubDetail">Recherche du swarm BitTorrent...</div>
+                      </div>
                   </div>
 
                   <!-- Contrôles intégrés avec barre temporelle réelle et scrubber interactif -->
                   <div id="customPlayerOverlay" class="custom-player-overlay">
+                      <!-- Carte HUD Flottante P2P en direct -->
+                      <div id="playerP2pHudCard" class="player-p2p-hud-card" style="display: none;">
+                          <div class="p2p-hud-header">
+                              <div class="p2p-hud-title">⚡ TorrServer P2P Direct</div>
+                              <span class="p2p-hud-engine-status" id="p2pHudEngineStatus">Actif</span>
+                          </div>
+                          <div class="p2p-hud-grid">
+                              <div class="p2p-hud-item">
+                                  <span class="p2p-hud-label">Débit Descendant</span>
+                                  <span class="p2p-hud-val p2p-highlight" id="p2pHudDlSpeed">0 Ko/s</span>
+                              </div>
+                              <div class="p2p-hud-item">
+                                  <span class="p2p-hud-label">Débit Montant</span>
+                                  <span class="p2p-hud-val" id="p2pHudUlSpeed">0 Ko/s</span>
+                              </div>
+                              <div class="p2p-hud-item">
+                                  <span class="p2p-hud-label">Pairs Actifs / Total</span>
+                                  <span class="p2p-hud-val" id="p2pHudPeers">0 / 0</span>
+                              </div>
+                              <div class="p2p-hud-item">
+                                  <span class="p2p-hud-label">Seeders Connectés</span>
+                                  <span class="p2p-hud-val p2p-seeders" id="p2pHudSeeders">0</span>
+                              </div>
+                              <div class="p2p-hud-item full-width">
+                                  <span class="p2p-hud-label">Tampon & Transfert</span>
+                                  <span class="p2p-hud-val" id="p2pHudBufferInfo">0 Mo / 0 Mo (0%)</span>
+                              </div>
+                          </div>
+                      </div>
+
                       <!-- Barre de timeline (Scrubber) -->
                       <div class="player-scrubber-container" id="playerScrubberContainer">
                           <div class="player-scrubber-track" id="playerScrubberTrack">
@@ -315,9 +362,13 @@
                               </div>
                           </div>
 
-                          <!-- Droite : Badge info, Vitesse, PiP, CC toggle, Plein écran -->
+                          <!-- Droite : Badge info, P2P en direct, Vitesse, PiP, CC toggle, Plein écran -->
                           <div class="player-bar-right">
                               <span id="playerOverlayEpBadge" class="player-badge-ep"></span>
+                              <button class="player-btn player-btn-p2p" id="playerP2pBtn" onclick="togglePlayerP2pHud(event)" title="Statistiques P2P TorrServer en direct">
+                                  <span class="p2p-hud-dot idle" id="p2pHudDot"></span>
+                                  <span id="playerP2pSpeedBadge" class="p2p-hud-speed">P2P</span>
+                              </button>
                               <button class="player-btn player-btn-speed" id="playerSpeedBtn" onclick="cyclePlaybackSpeed()" title="Vitesse de lecture [ < / > ]">
                                   <span id="playerSpeedLabel">1x</span>
                               </button>
