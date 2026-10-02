@@ -215,8 +215,21 @@ function handleLogoClick() {
     closeDetailView();
     const searchInput = document.getElementById('searchInput');
     if (searchInput) searchInput.value = '';
-    showHomeScreen();
+    if (typeof switchHomeTab === 'function') {
+        switchHomeTab('home');
+    } else {
+        showHomeScreen();
+    }
 }
+
+function focusSearchInput() {
+    const input = document.getElementById('searchInput');
+    if (input) {
+        input.focus();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+window.focusSearchInput = focusSearchInput;
 
 function showHomeScreen() {
     const searchView = document.getElementById('searchView');

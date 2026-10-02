@@ -417,21 +417,14 @@ function getActiveHomeTab() {
     const token = localStorage.getItem('anilist_token');
     const hasAnilist = !!(token && typeof currentAnilistUser !== 'undefined' && currentAnilistUser);
 
-    if (saved && (saved === 'anilist' || saved === 'history' || saved === 'favorites' || saved === 'discover')) {
-        // Si l'utilisateur est déconnecté d'AniList mais avait sauvé l'onglet anilist, basculer intelligemment
+    if (saved && (saved === 'home' || saved === 'anilist' || saved === 'history' || saved === 'favorites' || saved === 'discover')) {
         if (saved === 'anilist' && !hasAnilist) {
-            const hist = getPlaybackHistory();
-            return hist.length > 0 ? 'history' : 'discover';
+            return 'home';
         }
         return saved;
     }
 
-    if (hasAnilist) return 'anilist';
-    const hist = getPlaybackHistory();
-    if (hist.length > 0) return 'history';
-    const favs = getFavorites();
-    if (favs.length > 0) return 'favorites';
-    return 'discover';
+    return 'home';
 }
 
 function switchHomeTab(tabName) {
@@ -457,37 +450,9 @@ function formatTimeAgo(timestamp) {
 
 // --- RENDU HTML DE L'HISTORIQUE ---
 
-function renderHistoryTabHtml(container) {
-    const history = getPlaybackHistory();
-
-    if (history.length === 0) {
-        container.innerHTML = `
-            <div class="home-watching-section">
-                <div class="home-watching-header">
-                    <div class="home-watching-title-group">
-                        <h2 class="home-watching-title">
-                            <span style="font-size: 24px;">🕒</span>
-                            Historique de visionnage
-                        </h2>
-                        <span class="home-watching-badge">0 anime</span>
-                    </div>
-                </div>
-                <div class="empty-state" style="padding: 60px 20px;">
-                    <div style="font-size: 42px; margin-bottom: 14px;">⏱️</div>
-                    <div style="font-size: 17px; font-weight: bold; color: #fff; margin-bottom: 8px;">
-                        Votre historique de lecture est vide
-                    </div>
-                    <div style="font-size: 13.5px; color: #aaa; max-width: 480px; margin: 0 auto 20px; line-height: 1.5;">
-                        Lancez un anime avec le lecteur intégré pour que votre progression et vos épisodes s'enregistrent ici automatiquement !
-                    </div>
-                </div>
-            </div>
-        `;
-        return;
-    }
-
+function renderHistoryCards(historyList) {
     let cardsHtml = '';
-    history.forEach(item => {
+    historyList.forEach(item => {
         const displayTitle = item.animeName || 'Anime';
         const poster = item.poster || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(displayTitle);
         const timeFormatted = formatTimestamp(item.currentTime);
@@ -542,6 +507,39 @@ function renderHistoryTabHtml(container) {
             </div>
         `;
     });
+    return cardsHtml;
+}
+
+function renderHistoryTabHtml(container) {
+    const history = getPlaybackHistory();
+
+    if (history.length === 0) {
+        container.innerHTML = `
+            <div class="home-watching-section">
+                <div class="home-watching-header">
+                    <div class="home-watching-title-group">
+                        <h2 class="home-watching-title">
+                            <span style="font-size: 24px;">🕒</span>
+                            Historique de visionnage
+                        </h2>
+                        <span class="home-watching-badge">0 anime</span>
+                    </div>
+                </div>
+                <div class="empty-state" style="padding: 60px 20px;">
+                    <div style="font-size: 42px; margin-bottom: 14px;">⏱️</div>
+                    <div style="font-size: 17px; font-weight: bold; color: #fff; margin-bottom: 8px;">
+                        Votre historique de lecture est vide
+                    </div>
+                    <div style="font-size: 13.5px; color: #aaa; max-width: 480px; margin: 0 auto 20px; line-height: 1.5;">
+                        Lancez un anime avec le lecteur intégré pour que votre progression et vos épisodes s'enregistrent ici automatiquement !
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    const cardsHtml = renderHistoryCards(history);
 
     container.innerHTML = `
         <div class="home-watching-section">
@@ -660,6 +658,7 @@ function renderFavoritesTabHtml(container) {
 // Export global pour interaction depuis le DOM HTML
 window.switchHomeTab = switchHomeTab;
 window.getActiveHomeTab = getActiveHomeTab;
+window.renderHistoryCards = renderHistoryCards;
 window.resumePlaybackFromBanner = resumePlaybackFromBanner;
 window.resumePlaybackFromSaved = resumePlaybackFromSaved;
 window.dismissResumeBanner = dismissResumeBanner;

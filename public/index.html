@@ -17,9 +17,9 @@
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-    <link rel="stylesheet" href="/css/style.css?v=1.3.0">
-    <link rel="stylesheet" href="/css/player.css?v=1.3.0">
-    <link rel="stylesheet" href="/css/anilist.css?v=1.3.0">
+    <link rel="stylesheet" href="/css/style.css?v=1.5.0">
+    <link rel="stylesheet" href="/css/player.css?v=1.5.0">
+    <link rel="stylesheet" href="/css/anilist.css?v=1.5.0">
 </head>
 <body>
   <div class="navbar">
@@ -499,6 +499,19 @@
                               </select>
                           </div>
 
+                          <!-- HAUTEUR / ÉLÉVATION -->
+                          <div class="sub-style-row">
+                              <label for="subStylePosition">Hauteur :</label>
+                              <select id="subStylePosition" onchange="updateSubStyle()">
+                                  <option value="78">Très haute (22% du bas)</option>
+                                  <option value="82">Haute (18% du bas)</option>
+                                  <option value="85" selected>Surélevée (15% du bas - Recommandé)</option>
+                                  <option value="89">Modérée (11% du bas)</option>
+                                  <option value="94">Basse (6% du bas)</option>
+                                  <option value="auto">Native (Au ras de l'écran)</option>
+                              </select>
+                          </div>
+
                           <!-- SYNCHRONISATION / DÉCALAGE MANUEL -->
                           <div class="sub-style-row" style="flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 6px; border-top: 1px dashed #2a2a2a; padding-top: 10px;">
                               <!-- SYNCHRO SOUS-TITRES -->
@@ -732,11 +745,11 @@
   <div id="toast"></div>
 
   <!-- SCRIPTS MODULAIRES ANIMFLIX -->
-  <script src="/js/app.js?v=1.3.0"></script>
-  <script src="/js/subtitles.js?v=1.3.0"></script>
-  <script src="/js/player.js?v=1.3.2"></script>
-  <script src="/js/history.js?v=1.3.0"></script>
-  <script src="/js/search.js?v=1.3.0"></script>
-  <script src="/js/anilist.js?v=1.3.0"></script>
+  <script src="/js/app.js?v=1.5.0"></script>
+  <script src="/js/subtitles.js?v=1.5.3"></script>
+  <script src="/js/player.js?v=1.5.0"></script>
+  <script src="/js/history.js?v=1.5.0"></script>
+  <script src="/js/search.js?v=1.5.0"></script>
+  <script src="/js/anilist.js?v=1.5.0"></script>
 </body>
 </html>

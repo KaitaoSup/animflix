@@ -77,8 +77,23 @@
         const effOffset = currentActualStartOffset - currentManualSubOffset;
         let cueCount = 0;
 
-        for (let i = 0; i < cachedEpisodeCues.length; i++) {
-            const item = cachedEpisodeCues[i];
+        // Trier les répliques par chronologie pour calcul précis des slots d'affichage
+        const sortedCues = cachedEpisodeCues
+            .slice()
+            .sort((a, b) => a.rawStart - b.rawStart || a.rawEnd - b.rawEnd);
+
+        const posVal = currentSubStyle.position || '85';
+        const isAuto = posVal === 'auto';
+        const baseLine = isAuto ? 85 : parseFloat(posVal);
+
+        // Gestionnaires d'intervalles actifs pour éviter toute superposition :
+        // Zone HAUT (panneaux, textes traduits, titres, tags \an8)
+        // Zone BAS (dialogues parlés)
+        const activeTopSlots = []; // [{ end, lineCount }]
+        const activeBottomSlots = []; // [{ end, lineCount }]
+
+        for (let i = 0; i < sortedCues.length; i++) {
+            const item = sortedCues[i];
             const rawStart = item.rawStart - effOffset;
             const rawEnd = item.rawEnd - effOffset;
             const start = Math.max(0, Math.round(rawStart * 1000) / 1000);
@@ -89,7 +104,72 @@
                     const cue = new VTTCue(start, end, item.text);
                     cue.size = 100;
                     cue.position = 50;
-                    cue.align = 'center';
+                    cue.align = item.explicitAlign || 'center';
+
+                    const lineCount = (item.text.match(/\n/g) || []).length + 1;
+
+                    if (item.isTop) {
+                        // Chercher premier slot disponible dans la zone haute
+                        let slot = -1;
+                        for (let s = 0; s < activeTopSlots.length; s++) {
+                            if (item.rawStart >= activeTopSlots[s].end - 0.15) {
+                                slot = s;
+                                break;
+                            }
+                        }
+                        if (slot === -1) {
+                            slot = activeTopSlots.length;
+                            activeTopSlots.push({ end: item.rawEnd, lineCount });
+                        } else {
+                            activeTopSlots[slot].end = item.rawEnd;
+                            activeTopSlots[slot].lineCount = lineCount;
+                        }
+
+                        if (isAuto) {
+                            cue.snapToLines = true;
+                            cue.line = 1 + slot * 2;
+                        } else {
+                            // Empilement vers le bas depuis le sommet (8%, 15%, etc.)
+                            let topPercent = 8;
+                            for (let s = 0; s < slot; s++) {
+                                topPercent += (activeTopSlots[s].lineCount * 4.5 + 3.5);
+                            }
+                            cue.snapToLines = false;
+                            cue.line = Math.min(45, Math.round(topPercent * 10) / 10);
+                            if ('lineAlign' in cue) cue.lineAlign = 'start';
+                        }
+                    } else {
+                        // Chercher premier slot disponible dans la zone basse
+                        let slot = -1;
+                        for (let s = 0; s < activeBottomSlots.length; s++) {
+                            if (item.rawStart >= activeBottomSlots[s].end - 0.15) {
+                                slot = s;
+                                break;
+                            }
+                        }
+                        if (slot === -1) {
+                            slot = activeBottomSlots.length;
+                            activeBottomSlots.push({ end: item.rawEnd, lineCount });
+                        } else {
+                            activeBottomSlots[slot].end = item.rawEnd;
+                            activeBottomSlots[slot].lineCount = lineCount;
+                        }
+
+                        if (isAuto) {
+                            cue.snapToLines = true;
+                            cue.line = -2 - slot * 2;
+                        } else {
+                            // Empilement vers le haut depuis le bas (ex: 85%, puis 77%, puis 69%...)
+                            let bottomPercent = baseLine;
+                            for (let s = 0; s < slot; s++) {
+                                bottomPercent -= (activeBottomSlots[s].lineCount * 4.5 + 3.5);
+                            }
+                            cue.snapToLines = false;
+                            cue.line = Math.max(10, Math.round(bottomPercent * 10) / 10);
+                            if ('lineAlign' in cue) cue.lineAlign = 'end';
+                        }
+                    }
+
                     currentTextTrack.addCue(cue);
                     cueCount++;
                 } catch (e) {}
@@ -302,18 +382,49 @@
                 for (const block of blocks) {
                     const lines = block.trim().split('\n');
                     for (let i = 0; i < lines.length; i++) {
-                        const match = lines[i].match(/((?:\d+:)?\d+:\d+\.\d+)\s*-->\s*((?:\d+:)?\d+:\d+\.\d+)/);
+                        const match = lines[i].match(/((?:\d+:)?\d+:\d+\.\d+)\s*-->\s*((?:\d+:)?\d+:\d+\.\d+)(.*)/);
                         if (match) {
                             const rawStart = parseVttTime(match[1]);
                             const rawEnd = parseVttTime(match[2]);
-                            const cueKey = rawStart + '_' + rawEnd;
+                            const settingsStr = (match[3] || '').trim();
+                            const rawTextLines = lines.slice(i + 1);
+                            const text = cleanSubtitleLines(rawTextLines);
 
-                            if (!seenCues.has(cueKey)) {
-                                seenCues.add(cueKey);
-                                const rawTextLines = lines.slice(i + 1);
-                                const text = cleanSubtitleLines(rawTextLines);
-                                if (text && !isNaN(rawStart) && !isNaN(rawEnd) && rawEnd > rawStart) {
-                                    cachedEpisodeCues.push({ rawStart, rawEnd, text });
+                            if (text && !isNaN(rawStart) && !isNaN(rawEnd) && rawEnd > rawStart) {
+                                let isTop = false;
+                                let explicitAlign = null;
+
+                                if (settingsStr) {
+                                    const lineMatch = settingsStr.match(/line:(-?\d+(?:\.\d+)?%?)/);
+                                    if (lineMatch) {
+                                        const rawLine = lineMatch[1];
+                                        const num = parseFloat(rawLine);
+                                        if (!isNaN(num) && num <= 30 && rawLine.includes('%')) {
+                                            isTop = true;
+                                        } else if (!isNaN(num) && num >= 0 && num <= 4 && !rawLine.includes('%')) {
+                                            isTop = true;
+                                        }
+                                    }
+                                    const alignMatch = settingsStr.match(/align:(start|center|end|left|right)/);
+                                    if (alignMatch) explicitAlign = alignMatch[1];
+                                }
+
+                                const cleanPlain = text.replace(/<[^>]*>/g, '').trim();
+                                if (!isTop && /^(\[|\()(panneau|texte|titre|pancarte|enseigne|écrit|lettre|message|avis|sign|text|title|screen|traduction|trad)\b/i.test(cleanPlain)) {
+                                    isTop = true;
+                                }
+
+                                const cueKey = rawStart.toFixed(3) + '_' + rawEnd.toFixed(3) + '_' + cleanPlain;
+
+                                if (!seenCues.has(cueKey)) {
+                                    seenCues.add(cueKey);
+                                    cachedEpisodeCues.push({
+                                        rawStart,
+                                        rawEnd,
+                                        text,
+                                        isTop,
+                                        explicitAlign
+                                    });
                                 }
                             }
                             break;
@@ -385,7 +496,8 @@
         bg: 'rgba(0, 0, 0, 0.75)',
         shadow: 'shadow',
         font: '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif',
-        layout: 'compact'
+        layout: 'compact',
+        position: '85' // Élévation en hauteur par défaut (15% au-dessus du bas de l'écran)
     };
 
     let currentSubStyle = { ...defaultSubStyle };
@@ -443,6 +555,7 @@
         const shadowEl = document.getElementById('subStyleShadow');
         const fontEl = document.getElementById('subStyleFont');
         const layoutEl = document.getElementById('subStyleLayout');
+        const positionEl = document.getElementById('subStylePosition');
 
         if (sizeEl) sizeEl.value = currentSubStyle.size;
         if (colorEl) colorEl.value = currentSubStyle.color;
@@ -450,6 +563,7 @@
         if (shadowEl) shadowEl.value = currentSubStyle.shadow;
         if (fontEl) fontEl.value = currentSubStyle.font;
         if (layoutEl) layoutEl.value = currentSubStyle.layout || 'compact';
+        if (positionEl) positionEl.value = currentSubStyle.position || '85';
 
         applySubStyle();
     }
@@ -461,6 +575,7 @@
         const shadowEl = document.getElementById('subStyleShadow');
         const fontEl = document.getElementById('subStyleFont');
         const layoutEl = document.getElementById('subStyleLayout');
+        const positionEl = document.getElementById('subStylePosition');
 
         if (sizeEl) currentSubStyle.size = sizeEl.value;
         if (colorEl) currentSubStyle.color = colorEl.value;
@@ -468,12 +583,14 @@
         if (shadowEl) currentSubStyle.shadow = shadowEl.value;
         if (fontEl) currentSubStyle.font = fontEl.value;
         if (layoutEl) currentSubStyle.layout = layoutEl.value;
+        if (positionEl) currentSubStyle.position = positionEl.value;
 
         try {
             localStorage.setItem('animflix_sub_style', JSON.stringify(currentSubStyle));
         } catch (e) {}
 
         applySubStyle();
+        applySubtitleCuesToTrack();
     }
 
     function resetSubStyle() {
@@ -482,6 +599,7 @@
             localStorage.removeItem('animflix_sub_style');
         } catch (e) {}
         loadSavedSubStyle();
+        applySubtitleCuesToTrack();
         showToast("Style des sous-titres réinitialisé");
     }
 
