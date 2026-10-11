@@ -335,6 +335,87 @@ function loadUserSettings() {
 
     const prefVoice = document.getElementById('prefDefaultVoiceBoost');
     if (prefVoice) prefVoice.value = voiceBoost;
+
+    renderSettingsProfiles();
+}
+
+// --- GESTION DES PROFILS DANS L'INTERFACE ---
+let selectedNewAvatar = '🍿';
+
+function renderSettingsProfiles() {
+    const listEl = document.getElementById('settingsProfileList');
+    if (!listEl) return;
+    const profiles = (typeof getUserProfiles === 'function') ? getUserProfiles() : [{ id: 'default', name: 'Principal', avatar: '🍿', isKid: false }];
+    const active = (typeof getActiveProfile === 'function') ? getActiveProfile() : { id: 'default' };
+
+    listEl.innerHTML = profiles.map(p => {
+        const isActive = p.id === active.id;
+        const isDefault = p.id === 'default';
+        return `
+            <div class="settings-profile-chip ${isActive ? 'active' : ''}" onclick="onSelectProfileClick('${p.id}')" title="${isActive ? 'Profil actif' : 'Basculer sur ce profil'}">
+                <span class="profile-chip-avatar">${p.avatar || '👤'}</span>
+                <span class="profile-chip-name">${escapeHtml(p.name)}</span>
+                ${p.isKid ? '<span class="profile-chip-kid">Enfant</span>' : ''}
+                ${!isDefault ? `<span class="profile-chip-del" onclick="event.stopPropagation(); onDeleteProfileClick('${p.id}', '${escapeHtml(p.name)}')" title="Supprimer ce profil">&times;</span>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function selectProfileAvatar(av) {
+    selectedNewAvatar = av;
+    document.querySelectorAll('.btn-avatar-choice').forEach(b => {
+        if (b.innerText.trim() === av) b.classList.add('active');
+        else b.classList.remove('active');
+    });
+}
+
+function openAddProfileModal() {
+    const m = document.getElementById('addProfileModal');
+    if (m) {
+        m.style.display = 'flex';
+        const inp = document.getElementById('newProfileNameInput');
+        if (inp) {
+            inp.value = '';
+            inp.focus();
+        }
+    }
+}
+
+function closeAddProfileModal() {
+    const m = document.getElementById('addProfileModal');
+    if (m) m.style.display = 'none';
+}
+
+function submitCreateProfile() {
+    const inp = document.getElementById('newProfileNameInput');
+    const name = inp?.value.trim();
+    if (!name) {
+        if (typeof showToast === 'function') showToast("⚠️ Veuillez entrer un nom de profil");
+        return;
+    }
+    const isKid = !!document.getElementById('newProfileKidCheckbox')?.checked;
+    if (typeof createUserProfile === 'function') {
+        createUserProfile(name, selectedNewAvatar, isKid);
+        closeAddProfileModal();
+        renderSettingsProfiles();
+    }
+}
+
+function onSelectProfileClick(profileId) {
+    if (typeof switchUserProfile === 'function') {
+        switchUserProfile(profileId);
+        renderSettingsProfiles();
+    }
+}
+
+function onDeleteProfileClick(profileId, name) {
+    if (confirm(`Supprimer définitivement le profil "${name}" et son historique ?`)) {
+        if (typeof deleteUserProfile === 'function') {
+            deleteUserProfile(profileId);
+            renderSettingsProfiles();
+        }
+    }
 }
 
 function saveUserSettings() {
@@ -417,6 +498,13 @@ window.toggleSettingsModal = toggleSettingsModal;
 window.closeSettingsModal = closeSettingsModal;
 window.saveUserSettings = saveUserSettings;
 window.loadUserSettings = loadUserSettings;
+window.renderSettingsProfiles = renderSettingsProfiles;
+window.selectProfileAvatar = selectProfileAvatar;
+window.openAddProfileModal = openAddProfileModal;
+window.closeAddProfileModal = closeAddProfileModal;
+window.submitCreateProfile = submitCreateProfile;
+window.onSelectProfileClick = onSelectProfileClick;
+window.onDeleteProfileClick = onDeleteProfileClick;
 
 // --- INITIALISATION DE L'APPLICATION ---
 function initApp() {

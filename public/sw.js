@@ -2,7 +2,7 @@
 // --- ANIMFLIX SERVICE WORKER (PWA SHELL, OFFLINE CACHE & STREAM BYPASS) ---
 // =========================================================================
 
-const CACHE_NAME = 'animflix-shell-v1.5.3';
+const CACHE_NAME = 'animflix-shell-v1.6.0';
 
 const PRECACHE_ASSETS = [
   '/',

@@ -5,10 +5,91 @@
 const STORAGE_KEY_HISTORY = 'animflix_playback_history';
 const STORAGE_KEY_FAVORITES = 'animflix_favorites';
 const STORAGE_KEY_HOME_TAB = 'animflix_home_tab';
+const STORAGE_KEY_PROFILES = 'animflix_user_profiles';
+const STORAGE_KEY_ACTIVE_PROFILE_ID = 'animflix_active_profile_id';
 
 let lastPlaybackSaveTime = 0;
 let pendingResumeSeconds = 0;
 let resumeBannerTimeout = null;
+
+// --- GESTION DES PROFILS UTILISATEUR LOCAUX ---
+
+function getUserProfiles() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY_PROFILES);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+    } catch (e) {}
+    return [{ id: 'default', name: 'Principal', avatar: '🍿', isKid: false }];
+}
+
+function getActiveProfile() {
+    try {
+        const id = localStorage.getItem(STORAGE_KEY_ACTIVE_PROFILE_ID) || 'default';
+        const profiles = getUserProfiles();
+        const found = profiles.find(p => p.id === id);
+        if (found) return found;
+    } catch (e) {}
+    return { id: 'default', name: 'Principal', avatar: '🍿', isKid: false };
+}
+
+function saveUserProfiles(profiles) {
+    try {
+        localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(profiles));
+    } catch (e) {}
+}
+
+function switchUserProfile(profileId) {
+    const profiles = getUserProfiles();
+    const target = profiles.find(p => p.id === profileId);
+    if (!target) return;
+    localStorage.setItem(STORAGE_KEY_ACTIVE_PROFILE_ID, profileId);
+    if (typeof showToast === 'function') {
+        showToast(`👤 Profil actif : ${target.avatar} ${target.name}`);
+    }
+    if (typeof renderHomeScreen === 'function') renderHomeScreen();
+    if (typeof renderAnilistNav === 'function') renderAnilistNav();
+}
+
+function createUserProfile(name, avatar = '👤', isKid = false) {
+    if (!name || !name.trim()) return null;
+    const profiles = getUserProfiles();
+    const id = 'p_' + Date.now().toString(36);
+    profiles.push({
+        id,
+        name: name.trim(),
+        avatar: avatar || '👤',
+        isKid: !!isKid
+    });
+    saveUserProfiles(profiles);
+    switchUserProfile(id);
+    return id;
+}
+
+function deleteUserProfile(profileId) {
+    if (profileId === 'default') return false;
+    let profiles = getUserProfiles();
+    profiles = profiles.filter(p => p.id !== profileId);
+    saveUserProfiles(profiles);
+    try {
+        localStorage.removeItem(`animflix_playback_history_${profileId}`);
+        localStorage.removeItem(`animflix_favorites_${profileId}`);
+    } catch(e) {}
+    switchUserProfile('default');
+    return true;
+}
+
+function getHistoryStorageKey() {
+    const prof = getActiveProfile();
+    return prof.id === 'default' ? STORAGE_KEY_HISTORY : `animflix_playback_history_${prof.id}`;
+}
+
+function getFavoritesStorageKey() {
+    const prof = getActiveProfile();
+    return prof.id === 'default' ? STORAGE_KEY_FAVORITES : `animflix_favorites_${prof.id}`;
+}
 
 // Extraction du hash SHA1 depuis un magnet link
 function extractTorrentHash(magnet) {
@@ -26,7 +107,8 @@ function getStreamKey(magnet, fileIndex) {
 
 function getPlaybackHistory() {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY_HISTORY);
+        const key = getHistoryStorageKey();
+        const raw = localStorage.getItem(key);
         if (!raw) return [];
         const parsed = JSON.parse(raw);
         return Array.isArray(parsed) ? parsed : [];
@@ -38,7 +120,8 @@ function getPlaybackHistory() {
 
 function savePlaybackHistoryList(list) {
     try {
-        localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(list.slice(0, 50)));
+        const key = getHistoryStorageKey();
+        localStorage.setItem(key, JSON.stringify(list.slice(0, 50)));
     } catch (e) {
         console.warn("Erreur écriture historique:", e);
     }
@@ -309,7 +392,8 @@ function dismissResumeBanner(resetProgress = false) {
 
 function getFavorites() {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY_FAVORITES);
+        const key = getFavoritesStorageKey();
+        const raw = localStorage.getItem(key);
         if (!raw) return [];
         const parsed = JSON.parse(raw);
         return Array.isArray(parsed) ? parsed : [];
@@ -321,7 +405,8 @@ function getFavorites() {
 
 function saveFavoritesList(list) {
     try {
-        localStorage.setItem(STORAGE_KEY_FAVORITES, JSON.stringify(list));
+        const key = getFavoritesStorageKey();
+        localStorage.setItem(key, JSON.stringify(list));
     } catch (e) {
         console.warn("Erreur écriture favoris:", e);
     }
@@ -417,7 +502,7 @@ function getActiveHomeTab() {
     const token = localStorage.getItem('anilist_token');
     const hasAnilist = !!(token && typeof currentAnilistUser !== 'undefined' && currentAnilistUser);
 
-    if (saved && (saved === 'home' || saved === 'anilist' || saved === 'history' || saved === 'favorites' || saved === 'discover')) {
+    if (saved && (saved === 'home' || saved === 'anilist' || saved === 'history' || saved === 'favorites' || saved === 'discover' || saved === 'schedule')) {
         if (saved === 'anilist' && !hasAnilist) {
             return 'home';
         }
@@ -672,3 +757,8 @@ window.checkAndShowResumeBanner = checkAndShowResumeBanner;
 window.savePlaybackProgress = savePlaybackProgress;
 window.markCurrentPlaybackCompleted = markCurrentPlaybackCompleted;
 window.updateFavoriteButtonState = updateFavoriteButtonState;
+window.getUserProfiles = getUserProfiles;
+window.getActiveProfile = getActiveProfile;
+window.switchUserProfile = switchUserProfile;
+window.createUserProfile = createUserProfile;
+window.deleteUserProfile = deleteUserProfile;

@@ -866,4 +866,466 @@
             white-space: nowrap;
         }
 
+        /* --- FILTRES AVANCÉS DÉCOUVERTE --- */
+        .discover-filters-container {
+            background: #111a26;
+            border: 1px solid var(--anilist-border);
+            border-radius: 12px;
+            padding: 14px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+        }
+
+        .discover-filters-main-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .discover-sort-pills {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .discover-sort-pill {
+            background: #172435;
+            color: #94a3b8;
+            border: 1px solid #23374d;
+            padding: 7px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .discover-sort-pill:hover {
+            background: #1f3249;
+            color: #fff;
+            border-color: #3b82f6;
+        }
+
+        .discover-sort-pill.active {
+            background: linear-gradient(135deg, #02a9ff 0%, #0077b6 100%);
+            color: #fff;
+            border-color: #02a9ff;
+            box-shadow: 0 4px 12px rgba(2, 169, 255, 0.35);
+        }
+
+        .discover-filters-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .discover-format-select {
+            background: #172435;
+            color: #e2e8f0;
+            border: 1px solid #23374d;
+            padding: 7px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .discover-format-select:focus {
+            border-color: var(--anilist-blue);
+        }
+
+        .discover-search-box {
+            display: flex;
+            align-items: center;
+            background: #172435;
+            border: 1px solid #23374d;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .discover-search-box input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            padding: 7px 10px;
+            font-size: 13px;
+            outline: none;
+            width: 170px;
+        }
+
+        .discover-search-box button {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            padding: 7px 10px;
+            cursor: pointer;
+            transition: color 0.15s;
+        }
+
+        .discover-search-box button:hover {
+            color: #fff;
+        }
+
+        .discover-genres-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 10px;
+        }
+
+        .discover-genres-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .discover-genres-scroll {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 2px;
+            scrollbar-width: thin;
+        }
+
+        .discover-genre-chip {
+            background: rgba(255, 255, 255, 0.04);
+            color: #94a3b8;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 4px 10px;
+            border-radius: 14px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s ease;
+        }
+
+        .discover-genre-chip:hover {
+            background: rgba(2, 169, 255, 0.15);
+            color: #fff;
+            border-color: rgba(2, 169, 255, 0.4);
+        }
+
+        .discover-genre-chip.active {
+            background: rgba(2, 169, 255, 0.25);
+            color: #38bdf8;
+            border-color: #02a9ff;
+            font-weight: 700;
+        }
+
+        .btn-reset-filters {
+            background: rgba(255, 71, 87, 0.12);
+            border: 1px solid rgba(255, 71, 87, 0.35);
+            color: #ff6b81;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-reset-filters:hover {
+            background: rgba(255, 71, 87, 0.25);
+            color: #fff;
+        }
+
+        /* --- PLANNING HEBDOMADAIRE (SIMULCAST SCHEDULE) --- */
+        .schedule-container {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            animation: fadeIn 0.25s ease-out;
+        }
+
+        .schedule-days-bar-wrapper {
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+
+        .schedule-days-bar {
+            display: flex;
+            gap: 10px;
+            min-width: min-content;
+        }
+
+        .schedule-day-pill {
+            flex: 1;
+            min-width: 105px;
+            background: #111a26;
+            border: 1px solid var(--anilist-border);
+            border-radius: 12px;
+            padding: 12px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            position: relative;
+            text-align: center;
+        }
+
+        .schedule-day-pill:hover {
+            background: #172436;
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+        }
+
+        .schedule-day-pill.active {
+            background: linear-gradient(135deg, #13243a 0%, #1a3250 100%);
+            border-color: var(--anilist-blue);
+            box-shadow: 0 6px 18px rgba(2, 169, 255, 0.3);
+        }
+
+        .schedule-day-pill.is-today {
+            border-color: #a855f7;
+        }
+
+        .schedule-day-pill.active.is-today {
+            border-color: #c084fc;
+            box-shadow: 0 6px 18px rgba(168, 85, 247, 0.35);
+        }
+
+        .schedule-day-name {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .schedule-day-date {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        .schedule-day-badge {
+            font-size: 11px;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.08);
+            color: #e2e8f0;
+            padding: 2px 7px;
+            border-radius: 10px;
+            margin-top: 2px;
+        }
+
+        .schedule-day-pill.active .schedule-day-badge {
+            background: var(--anilist-blue);
+            color: #fff;
+        }
+
+        .schedule-today-tag {
+            position: absolute;
+            top: -8px;
+            background: linear-gradient(135deg, #a855f7, #7e22ce);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 800;
+            padding: 1px 6px;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 6px rgba(168, 85, 247, 0.5);
+        }
+
+        .schedule-day-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #1f2b3b;
+            padding-bottom: 10px;
+        }
+
+        .schedule-day-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .schedule-day-title {
+            font-size: 17px;
+            font-weight: 800;
+            color: #fff;
+            margin: 0;
+            text-transform: capitalize;
+        }
+
+        .schedule-count-pill {
+            background: #172436;
+            color: #38bdf8;
+            border: 1px solid #23374d;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .schedule-card {
+            border: 1px solid #202d3f;
+            transition: all 0.2s ease;
+        }
+
+        .schedule-card:hover {
+            border-color: #a855f7;
+            box-shadow: 0 14px 28px rgba(168, 85, 247, 0.18);
+        }
+
+        .schedule-card.schedule-card-released:hover {
+            border-color: var(--anilist-blue);
+            box-shadow: 0 14px 28px rgba(2, 169, 255, 0.2);
+        }
+
+        .badge-schedule-time {
+            background: rgba(168, 85, 247, 0.25) !important;
+            color: #c084fc !important;
+            border-color: rgba(168, 85, 247, 0.45) !important;
+            font-weight: 700 !important;
+        }
+
+        .badge-schedule-released {
+            background: rgba(34, 197, 94, 0.25) !important;
+            color: #4ade80 !important;
+            border-color: rgba(34, 197, 94, 0.45) !important;
+            font-weight: 700 !important;
+        }
+
+        .badge-schedule-countdown {
+            background: rgba(245, 158, 11, 0.9) !important;
+            color: #000 !important;
+            font-weight: 800 !important;
+            border-color: #fbbf24 !important;
+        }
+
+        .schedule-ep-pill {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.04);
+            padding: 5px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .schedule-ep-num {
+            font-size: 12.5px;
+            color: #f1f5f9;
+        }
+
+        .schedule-ep-num b {
+            color: #38bdf8;
+        }
+
+        /* --- HUB PLANNING ACCUEIL --- */
+        .home-hub-schedule:hover {
+            border-color: rgba(168, 85, 247, 0.6) !important;
+            box-shadow: 0 10px 30px rgba(168, 85, 247, 0.25) !important;
+        }
+
+        /* --- MULTI-PROFILS UTILISATEURS --- */
+        .settings-profiles-group {
+            background: #171d26;
+            border: 1px solid #263345;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+        }
+
+        .settings-profiles-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .btn-add-profile {
+            background: rgba(2, 169, 255, 0.15);
+            border: 1px solid rgba(2, 169, 255, 0.4);
+            color: var(--anilist-blue);
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-add-profile:hover {
+            background: var(--anilist-blue);
+            color: #fff;
+        }
+
+        .settings-profiles-chips {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .settings-profile-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #1e2736;
+            border: 1.5px solid #2d3e54;
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .settings-profile-chip:hover {
+            border-color: var(--anilist-blue);
+            background: #253347;
+        }
+
+        .settings-profile-chip.active {
+            background: linear-gradient(135deg, #02a9ff 0%, #0077b6 100%);
+            border-color: #38bdf8;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(2, 169, 255, 0.35);
+        }
+
+        .profile-chip-avatar {
+            font-size: 15px;
+        }
+
+        .profile-chip-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+
+        .profile-chip-kid {
+            font-size: 10px;
+            background: rgba(255, 193, 7, 0.25);
+            color: #ffc107;
+            padding: 1px 5px;
+            border-radius: 8px;
+            font-weight: 700;
+        }
+
+        .profile-chip-del {
+            font-size: 14px;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 0 2px;
+            line-height: 1;
+            transition: color 0.15s;
+        }
+
+        .profile-chip-del:hover {
+            color: #ff4757;
+        }
+
+
 
