@@ -840,15 +840,16 @@ class AssToVttStream extends Transform {
         this.headerSent = true;
       }
 
-      if (line.startsWith('PlayResY:')) {
+      const lower = line.toLowerCase();
+      if (lower.startsWith('playresy:')) {
         const val = parseInt(line.split(':')[1].trim(), 10);
         if (!isNaN(val) && val > 0) this.playResY = val;
-      } else if (line.startsWith('Format:')) {
+      } else if (lower.startsWith('format:')) {
         const fields = line.substring(7).split(',').map(f => f.trim().toLowerCase());
         if (fields.includes('fontname') && fields.includes('alignment')) {
           this.styleFormatIndices = fields;
         }
-      } else if (line.startsWith('Style:')) {
+      } else if (lower.startsWith('style:')) {
         const parts = line.substring(6).split(',').map(p => p.trim());
         if (this.styleFormatIndices && parts.length >= this.styleFormatIndices.length) {
           const nameIdx = this.styleFormatIndices.indexOf('name');
@@ -857,7 +858,7 @@ class AssToVttStream extends Transform {
             this.styles.set(parts[nameIdx].toLowerCase(), parseInt(parts[alignIdx], 10) || 2);
           }
         }
-      } else if (line.startsWith('Dialogue:')) {
+      } else if (/^dialogue\s*:/i.test(line)) {
         const cue = this.parseDialogue(line);
         if (cue) {
           this.push(cue);
@@ -875,7 +876,7 @@ class AssToVttStream extends Transform {
     if (!this.headerSent) {
       this.push('WEBVTT\n\n');
     }
-    if (this.buffer && this.buffer.trim().startsWith('Dialogue:')) {
+    if (this.buffer && /^dialogue\s*:/i.test(this.buffer.trim())) {
       const cue = this.parseDialogue(this.buffer.trim());
       if (cue) this.push(cue);
     }
@@ -918,7 +919,7 @@ class AssToVttStream extends Transform {
     }
 
     // 2. Détection via Tags in-line ASS ({\an8}, \pos...)
-    if (/\\an[789]\b/.test(rawText)) {
+    if (/(?:\\an[789]|\\a[567])\b/.test(rawText)) {
       isTop = true;
     }
     const posMatch = rawText.match(/\\pos\s*\(\s*([0-9.]+)\s*,\s*([0-9.]+)\s*\)/);
@@ -957,6 +958,12 @@ class AssToVttStream extends Transform {
       const s = sParts[0].padStart(2, '0');
       const ms = (sParts[1] || '00').padEnd(3, '0').slice(0, 3);
       return `${h}:${m}:${s}.${ms}`;
+    } else if (parts.length === 2) {
+      const m = parts[0].padStart(2, '0');
+      const sParts = parts[1].split('.');
+      const s = sParts[0].padStart(2, '0');
+      const ms = (sParts[1] || '00').padEnd(3, '0').slice(0, 3);
+      return `00:${m}:${s}.${ms}`;
     }
     return assTime;
   }

@@ -62,13 +62,12 @@
         }
 
         // Vider proprement les anciennes répliques pour éviter les décalages ou conflits
-        if (currentTextTrack.cues) {
-            while (currentTextTrack.cues.length > 0) {
+        if (currentTextTrack.cues && currentTextTrack.cues.length > 0) {
+            const oldCues = Array.from(currentTextTrack.cues);
+            for (let i = 0; i < oldCues.length; i++) {
                 try {
-                    currentTextTrack.removeCue(currentTextTrack.cues[0]);
-                } catch (e) {
-                    break;
-                }
+                    currentTextTrack.removeCue(oldCues[i]);
+                } catch (e) {}
             }
         }
 
@@ -77,102 +76,165 @@
         const effOffset = currentActualStartOffset - currentManualSubOffset;
         let cueCount = 0;
 
-        // Trier les répliques par chronologie pour calcul précis des slots d'affichage
-        const sortedCues = cachedEpisodeCues
-            .slice()
-            .sort((a, b) => a.rawStart - b.rawStart || a.rawEnd - b.rawEnd);
-
         const posVal = currentSubStyle.position || '85';
         const isAuto = posVal === 'auto';
         const baseLine = isAuto ? 85 : parseFloat(posVal);
 
-        // Gestionnaires d'intervalles actifs pour éviter toute superposition :
-        // Zone HAUT (panneaux, textes traduits, titres, tags \an8)
-        // Zone BAS (dialogues parlés)
-        const activeTopSlots = []; // [{ end, lineCount }]
-        const activeBottomSlots = []; // [{ end, lineCount }]
-
-        for (let i = 0; i < sortedCues.length; i++) {
-            const item = sortedCues[i];
+        // Préparer les répliques avec l'offset temporel actif
+        const validCues = [];
+        for (let i = 0; i < cachedEpisodeCues.length; i++) {
+            const item = cachedEpisodeCues[i];
             const rawStart = item.rawStart - effOffset;
             const rawEnd = item.rawEnd - effOffset;
             const start = Math.max(0, Math.round(rawStart * 1000) / 1000);
             const end = Math.round(rawEnd * 1000) / 1000;
 
             if (!isNaN(start) && !isNaN(end) && end > start) {
-                try {
-                    const cue = new VTTCue(start, end, item.text);
-                    cue.size = 100;
-                    cue.position = 50;
-                    cue.align = item.explicitAlign || 'center';
+                validCues.push({
+                    start,
+                    end,
+                    text: item.text,
+                    isTop: !!item.isTop,
+                    explicitAlign: item.explicitAlign || null
+                });
+            }
+        }
 
-                    const lineCount = (item.text.match(/\n/g) || []).length + 1;
+        // Traite un groupe (Haut ou Bas) par segmentation temporelle pour fusionner
+        // proprement les sous-titres simultanés et éliminer toute superposition ou perte.
+        function processCueGroup(groupCues, isTop) {
+            if (groupCues.length === 0) return [];
 
-                    if (item.isTop) {
-                        // Chercher premier slot disponible dans la zone haute
-                        let slot = -1;
-                        for (let s = 0; s < activeTopSlots.length; s++) {
-                            if (item.rawStart >= activeTopSlots[s].end - 0.15) {
-                                slot = s;
-                                break;
-                            }
-                        }
-                        if (slot === -1) {
-                            slot = activeTopSlots.length;
-                            activeTopSlots.push({ end: item.rawEnd, lineCount });
-                        } else {
-                            activeTopSlots[slot].end = item.rawEnd;
-                            activeTopSlots[slot].lineCount = lineCount;
-                        }
+            const sorted = groupCues.slice().sort((a, b) => a.start - b.start || a.end - b.end);
 
-                        if (isAuto) {
-                            cue.snapToLines = true;
-                            cue.line = 1 + slot * 2;
-                        } else {
-                            // Empilement vers le bas depuis le sommet (8%, 15%, etc.)
-                            let topPercent = 8;
-                            for (let s = 0; s < slot; s++) {
-                                topPercent += (activeTopSlots[s].lineCount * 4.5 + 3.5);
-                            }
-                            cue.snapToLines = false;
-                            cue.line = Math.min(45, Math.round(topPercent * 10) / 10);
-                            if ('lineAlign' in cue) cue.lineAlign = 'start';
-                        }
-                    } else {
-                        // Chercher premier slot disponible dans la zone basse
-                        let slot = -1;
-                        for (let s = 0; s < activeBottomSlots.length; s++) {
-                            if (item.rawStart >= activeBottomSlots[s].end - 0.15) {
-                                slot = s;
-                                break;
-                            }
-                        }
-                        if (slot === -1) {
-                            slot = activeBottomSlots.length;
-                            activeBottomSlots.push({ end: item.rawEnd, lineCount });
-                        } else {
-                            activeBottomSlots[slot].end = item.rawEnd;
-                            activeBottomSlots[slot].lineCount = lineCount;
-                        }
+            // 1. Lisser les micro-chevauchements consécutifs (< 200ms) pour éviter les scintillements
+            for (let i = 0; i < sorted.length - 1; i++) {
+                const cur = sorted[i];
+                const next = sorted[i + 1];
+                if (next.start > cur.start && next.start < cur.end && (cur.end - next.start) <= 0.20) {
+                    cur.end = next.start;
+                }
+            }
 
-                        if (isAuto) {
-                            cue.snapToLines = true;
-                            cue.line = -2 - slot * 2;
-                        } else {
-                            // Empilement vers le haut depuis le bas (ex: 85%, puis 77%, puis 69%...)
-                            let bottomPercent = baseLine;
-                            for (let s = 0; s < slot; s++) {
-                                bottomPercent -= (activeBottomSlots[s].lineCount * 4.5 + 3.5);
-                            }
-                            cue.snapToLines = false;
-                            cue.line = Math.max(10, Math.round(bottomPercent * 10) / 10);
-                            if ('lineAlign' in cue) cue.lineAlign = 'end';
+            // 2. Extraire tous les points temporels charnières
+            const timeSet = new Set();
+            for (let i = 0; i < sorted.length; i++) {
+                const c = sorted[i];
+                if (c.end > c.start) {
+                    timeSet.add(c.start);
+                    timeSet.add(c.end);
+                }
+            }
+            const times = Array.from(timeSet).sort((a, b) => a - b);
+            const segments = [];
+
+            let startIdx = 0;
+            for (let t = 0; t < times.length - 1; t++) {
+                const segStart = times[t];
+                const segEnd = times[t + 1];
+                if (segEnd - segStart < 0.01) continue;
+
+                while (startIdx < sorted.length && sorted[startIdx].end <= segStart) {
+                    startIdx++;
+                }
+
+                const texts = [];
+                const seen = new Set();
+                let explicitAlign = null;
+
+                for (let i = startIdx; i < sorted.length; i++) {
+                    const c = sorted[i];
+                    if (c.start >= segEnd) break;
+                    if (c.start <= segStart && c.end >= segEnd) {
+                        const clean = c.text.trim();
+                        if (clean && !seen.has(clean)) {
+                            seen.add(clean);
+                            texts.push(clean);
+                        }
+                        if (c.explicitAlign && !explicitAlign) {
+                            explicitAlign = c.explicitAlign;
                         }
                     }
+                }
 
-                    currentTextTrack.addCue(cue);
-                    cueCount++;
-                } catch (e) {}
+                if (texts.length === 0) continue;
+
+                let combinedText;
+                if (texts.length === 1) {
+                    combinedText = texts[0];
+                } else if (isTop) {
+                    combinedText = texts.join('\n');
+                } else {
+                    const hasSentenceContinuation = texts.some((txt, idx) => idx > 0 && /^[a-zà-ÿ]/.test(txt));
+                    if (hasSentenceContinuation) {
+                        combinedText = texts.join('\n');
+                    } else {
+                        combinedText = texts.map(txt => {
+                            if (/^[-—–]/.test(txt) || /^[♪♫♩]/.test(txt) || /^(\[|\()/.test(txt)) return txt;
+                            return "- " + txt;
+                        }).join('\n');
+                    }
+                }
+
+                if (segments.length > 0) {
+                    const prev = segments[segments.length - 1];
+                    if (Math.abs(prev.end - segStart) < 0.005 && prev.text === combinedText) {
+                        prev.end = segEnd;
+                        continue;
+                    }
+                }
+
+                segments.push({
+                    start: segStart,
+                    end: segEnd,
+                    text: combinedText,
+                    isTop,
+                    explicitAlign
+                });
+            }
+
+            return segments;
+        }
+
+        const topGroup = validCues.filter(c => c.isTop);
+        const bottomGroup = validCues.filter(c => !c.isTop);
+
+        const processedTop = processCueGroup(topGroup, true);
+        const processedBottom = processCueGroup(bottomGroup, false);
+        const allProcessed = [...processedTop, ...processedBottom];
+
+        for (let i = 0; i < allProcessed.length; i++) {
+            const item = allProcessed[i];
+            try {
+                const cue = new VTTCue(item.start, item.end, item.text);
+                cue.size = 100;
+                cue.position = 50;
+                cue.align = item.explicitAlign || 'center';
+
+                if (item.isTop) {
+                    if (isAuto) {
+                        cue.snapToLines = true;
+                        cue.line = 1;
+                    } else {
+                        cue.snapToLines = false;
+                        cue.line = 8;
+                        if ('lineAlign' in cue) cue.lineAlign = 'start';
+                    }
+                } else {
+                    if (isAuto) {
+                        cue.snapToLines = true;
+                        cue.line = -2;
+                    } else {
+                        cue.snapToLines = false;
+                        cue.line = baseLine;
+                        if ('lineAlign' in cue) cue.lineAlign = 'end';
+                    }
+                }
+
+                currentTextTrack.addCue(cue);
+                cueCount++;
+            } catch (e) {
+                console.warn("Erreur ajout réplique VTTCue:", e);
             }
         }
 
@@ -182,7 +244,7 @@
                 const offsetLabel = currentManualSubOffset !== 0 
                     ? ` [Sync: ${currentManualSubOffset > 0 ? '+' : ''}${currentManualSubOffset.toFixed(1)}s]` 
                     : '';
-                subStatus.innerText = `✅ Sous-titres synchronisés (${cueCount} répliques)${offsetLabel}`;
+                subStatus.innerText = `✅ Sous-titres synchronisés (${cachedEpisodeCues.length} répliques)${offsetLabel}`;
                 subStatus.style.color = "#46d369";
             } else if (cachedEpisodeCues.length > 0) {
                 subStatus.innerText = "Sous-titres prêts pour la suite de la lecture";
@@ -370,6 +432,61 @@
             const decoder = new TextDecoder();
             let buffer = "";
             const seenCues = new Set();
+            let lastApplyTime = 0;
+
+            function processVttBlock(block) {
+                if (!block) return;
+                const lines = block.trim().split('\n');
+                for (let i = 0; i < lines.length; i++) {
+                    const match = lines[i].match(/((?:\d+:)?\d+:\d+\.\d+)\s*-->\s*((?:\d+:)?\d+:\d+\.\d+)(.*)/);
+                    if (match) {
+                        const rawStart = parseVttTime(match[1]);
+                        const rawEnd = parseVttTime(match[2]);
+                        const settingsStr = (match[3] || '').trim();
+                        const rawTextLines = lines.slice(i + 1);
+                        const text = cleanSubtitleLines(rawTextLines);
+
+                        if (text && !isNaN(rawStart) && !isNaN(rawEnd) && rawEnd > rawStart) {
+                            let isTop = false;
+                            let explicitAlign = null;
+
+                            if (settingsStr) {
+                                const lineMatch = settingsStr.match(/line:(-?\d+(?:\.\d+)?%?)/);
+                                if (lineMatch) {
+                                    const rawLine = lineMatch[1];
+                                    const num = parseFloat(rawLine);
+                                    if (!isNaN(num) && num <= 30 && rawLine.includes('%')) {
+                                        isTop = true;
+                                    } else if (!isNaN(num) && num >= 0 && num <= 4 && !rawLine.includes('%')) {
+                                        isTop = true;
+                                    }
+                                }
+                                const alignMatch = settingsStr.match(/align:(start|center|end|left|right)/);
+                                if (alignMatch) explicitAlign = alignMatch[1];
+                            }
+
+                            const cleanPlain = text.replace(/<[^>]*>/g, '').trim();
+                            if (!isTop && /^(\[|\()(panneau|texte|titre|pancarte|enseigne|écrit|lettre|message|avis|sign|text|title|screen|traduction|trad)\b/i.test(cleanPlain)) {
+                                isTop = true;
+                            }
+
+                            const cueKey = (isTop ? 'T_' : 'B_') + rawStart.toFixed(3) + '_' + rawEnd.toFixed(3) + '_' + cleanPlain;
+
+                            if (!seenCues.has(cueKey)) {
+                                seenCues.add(cueKey);
+                                cachedEpisodeCues.push({
+                                    rawStart,
+                                    rawEnd,
+                                    text,
+                                    isTop,
+                                    explicitAlign
+                                });
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -380,59 +497,19 @@
                 buffer = blocks.pop() || "";
 
                 for (const block of blocks) {
-                    const lines = block.trim().split('\n');
-                    for (let i = 0; i < lines.length; i++) {
-                        const match = lines[i].match(/((?:\d+:)?\d+:\d+\.\d+)\s*-->\s*((?:\d+:)?\d+:\d+\.\d+)(.*)/);
-                        if (match) {
-                            const rawStart = parseVttTime(match[1]);
-                            const rawEnd = parseVttTime(match[2]);
-                            const settingsStr = (match[3] || '').trim();
-                            const rawTextLines = lines.slice(i + 1);
-                            const text = cleanSubtitleLines(rawTextLines);
-
-                            if (text && !isNaN(rawStart) && !isNaN(rawEnd) && rawEnd > rawStart) {
-                                let isTop = false;
-                                let explicitAlign = null;
-
-                                if (settingsStr) {
-                                    const lineMatch = settingsStr.match(/line:(-?\d+(?:\.\d+)?%?)/);
-                                    if (lineMatch) {
-                                        const rawLine = lineMatch[1];
-                                        const num = parseFloat(rawLine);
-                                        if (!isNaN(num) && num <= 30 && rawLine.includes('%')) {
-                                            isTop = true;
-                                        } else if (!isNaN(num) && num >= 0 && num <= 4 && !rawLine.includes('%')) {
-                                            isTop = true;
-                                        }
-                                    }
-                                    const alignMatch = settingsStr.match(/align:(start|center|end|left|right)/);
-                                    if (alignMatch) explicitAlign = alignMatch[1];
-                                }
-
-                                const cleanPlain = text.replace(/<[^>]*>/g, '').trim();
-                                if (!isTop && /^(\[|\()(panneau|texte|titre|pancarte|enseigne|écrit|lettre|message|avis|sign|text|title|screen|traduction|trad)\b/i.test(cleanPlain)) {
-                                    isTop = true;
-                                }
-
-                                const cueKey = rawStart.toFixed(3) + '_' + rawEnd.toFixed(3) + '_' + cleanPlain;
-
-                                if (!seenCues.has(cueKey)) {
-                                    seenCues.add(cueKey);
-                                    cachedEpisodeCues.push({
-                                        rawStart,
-                                        rawEnd,
-                                        text,
-                                        isTop,
-                                        explicitAlign
-                                    });
-                                }
-                            }
-                            break;
-                        }
-                    }
+                    processVttBlock(block);
                 }
-                // Appliquer les répliques décodées avec le décalage temporel ACTUEL de la vidéo
-                applySubtitleCuesToTrack(currentActualStartOffset);
+
+                const now = Date.now();
+                if (now - lastApplyTime > 300) {
+                    lastApplyTime = now;
+                    applySubtitleCuesToTrack(currentActualStartOffset);
+                }
+            }
+
+            if (buffer.trim()) {
+                processVttBlock(buffer);
+                buffer = "";
             }
 
             applySubtitleCuesToTrack(currentActualStartOffset);
@@ -505,14 +582,14 @@
     function cleanSubtitleLines(rawLines) {
         if (!rawLines || rawLines.length === 0) return "";
         if (currentSubStyle.layout === 'original' || rawLines.length === 1) {
-            return rawLines.map(l => l.replace(/\\h/gi, ' ').replace(/\\N/g, '\n')).join('\n').trim();
+            return rawLines.map(l => l.replace(/\\h/gi, ' ').replace(/\\N/gi, '\n')).join('\n').trim();
         }
 
         const result = [];
         for (let idx = 0; idx < rawLines.length; idx++) {
             let line = rawLines[idx].trim();
             if (!line) continue;
-            line = line.replace(/\\h/gi, ' ').replace(/\\N/g, ' ');
+            line = line.replace(/\\h/gi, ' ').replace(/\\N/gi, ' ');
 
             if (result.length === 0) {
                 result.push(line);
