@@ -17,7 +17,7 @@
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-    <link rel="stylesheet" href="/css/style.css?v=1.5.0">
+    <link rel="stylesheet" href="/css/style.css?v=1.6.0">
     <link rel="stylesheet" href="/css/player.css?v=1.5.0">
     <link rel="stylesheet" href="/css/anilist.css?v=1.5.0">
 </head>
@@ -571,6 +571,55 @@
       </div>
   </div>
 
+  <!-- MODAL DE CONNEXION / INSCRIPTION ANIMFLIX -->
+  <div id="animflixAuthModal" class="anilist-modal-overlay" onclick="if(event.target === this) closeAnimflixAuthModal()">
+      <div class="anilist-modal-content" style="max-width: 440px;">
+          <div class="anilist-modal-header">
+              <div class="anilist-modal-title">
+                  <span id="animflixAuthModalTitle">👤 Connexion Animflix</span>
+              </div>
+              <button class="anilist-modal-close" onclick="closeAnimflixAuthModal()">&times;</button>
+          </div>
+          <div class="anilist-modal-body">
+              <div class="auth-tabs" style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #23374d; padding-bottom: 8px;">
+                  <button type="button" id="tabAuthLogin" class="filter-chip active" onclick="switchAnimflixAuthTab('login')">Se connecter</button>
+                  <button type="button" id="tabAuthRegister" class="filter-chip" onclick="switchAnimflixAuthTab('register')">Créer un compte</button>
+              </div>
+
+              <form id="animflixAuthForm" onsubmit="handleAnimflixAuthSubmit(event)">
+                  <div style="display: flex; flex-direction: column; gap: 14px;">
+                      <div>
+                          <label style="display: block; font-size: 12px; color: #aaa; margin-bottom: 6px;">Nom d'utilisateur</label>
+                          <input type="text" id="authUsernameInput" required placeholder="Ex: Otaku99" autocomplete="username" style="width: 100%; box-sizing: border-box;">
+                      </div>
+                      <div>
+                          <label style="display: block; font-size: 12px; color: #aaa; margin-bottom: 6px;">Mot de passe</label>
+                          <input type="password" id="authPasswordInput" required placeholder="••••••••" autocomplete="current-password" style="width: 100%; box-sizing: border-box;">
+                      </div>
+
+                      <div id="authRegisterAnilistNotice" style="display: none; background: rgba(2, 169, 255, 0.08); border: 1px solid rgba(2, 169, 255, 0.25); border-radius: 8px; padding: 10px 12px;">
+                          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12.5px; color: #cbe6ff;">
+                              <input type="checkbox" id="authAutoLinkAnilistCheckbox" checked>
+                              <span>Lier automatiquement mon compte AniList actuel (<b id="authDetectedAnilistName"></b>)</span>
+                          </label>
+                      </div>
+
+                      <div style="font-size: 11.5px; color: #7f93aa; line-height: 1.45;">
+                          💡 Votre compte Animflix centralise votre progression et lie votre compte AniList pour tous vos appareils (PC, mobile, Tailscale) en 1 seule connexion.
+                      </div>
+
+                      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px;">
+                          <button type="button" class="btn-secondary" onclick="closeAnimflixAuthModal()">Annuler</button>
+                          <button type="submit" id="authSubmitBtn" class="btn-anilist-nav" style="padding: 9px 18px;">
+                              Se connecter
+                          </button>
+                      </div>
+                  </div>
+              </form>
+          </div>
+      </div>
+  </div>
+
   <!-- MODAL DE CONNEXION ANILIST -->
   <div id="anilistAuthModal" class="anilist-modal-overlay" onclick="if(event.target === this) closeAnilistAuthModal()">
       <div class="anilist-modal-content">
@@ -579,7 +628,7 @@
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="vertical-align: middle;">
                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09h-2.82l.83-2.5h1.16l.83 2.5zm1.5-4.5h-4.32l2.16-6.5 2.16 6.5z" fill="#02a9ff"/>
                   </svg>
-                  <span>Connexion à AniList</span>
+                  <span>Connexion & Liaison AniList</span>
               </div>
               <button class="anilist-modal-close" onclick="closeAnilistAuthModal()">&times;</button>
           </div>
@@ -612,11 +661,17 @@
                   </details>
               </div>
 
-              <!-- OPTION 2: JETON DIRECT (TOKEN) -->
+              <!-- OPTION 2: JETON DIRECT (TOKEN - TAILSCALE & MOBILE FRIENDLY) -->
               <div class="anilist-auth-section" style="margin-top: 16px;">
-                  <div class="anilist-section-title">🔑 Option 2 : Jeton d'accès direct (Token)</div>
-                  <div style="font-size: 12.5px; color: #999; margin-bottom: 10px;">
-                      Vous possédez déjà un jeton d'accès AniList ? Collez-le directement :
+                  <div class="anilist-section-title">🔑 Option 2 : Jeton d'accès direct (Idéal pour Tailscale & Mobile)</div>
+                  <div style="font-size: 12.5px; color: #999; margin-bottom: 8px;">
+                      Vous accédez à l'application via Tailscale ou un smartphone ? Collez directement votre jeton :
+                  </div>
+                  <div style="margin-bottom: 10px;">
+                      <a href="https://anilist.co/api/v2/oauth/authorize?client_id=24891&response_type=token" target="_blank" rel="noopener" style="font-size: 12px; color: #02a9ff; text-decoration: underline; font-weight: 600;">
+                          👉 Obtenir mon jeton AniList en 1 clic
+                      </a>
+                      <span style="font-size: 11px; color: #777;"> (copiez l'<code>access_token</code> de l'URL obtenue)</span>
                   </div>
                   <div style="display: flex; gap: 8px;">
                       <input type="password" id="anilistTokenInput" placeholder="Collez votre access_token..." style="flex: 1;">
@@ -797,7 +852,8 @@
   <div id="toast"></div>
 
   <!-- SCRIPTS MODULAIRES ANIMFLIX -->
-  <script src="/js/app.js?v=1.5.0"></script>
+  <script src="/js/auth.js?v=1.6.0"></script>
+  <script src="/js/app.js?v=1.6.0"></script>
   <script src="/js/subtitles.js?v=1.5.3"></script>
   <script src="/js/player.js?v=1.5.0"></script>
   <script src="/js/history.js?v=1.5.0"></script>

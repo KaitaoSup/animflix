@@ -15,6 +15,7 @@ services:
       - TORRSERVER_URL=http://127.0.0.1:8090
       - FFMPEG_HWACCEL=auto
       - VAAPI_DEVICE=/dev/dri/renderD128
+      - DATABASE_PATH=/app/data/animflix.db
       # - NYAA_URL=https://nyaa.si
       # - TMDB_API_KEY=your_key_optional
     # Accès matériel au GPU Intel/AMD pour transcodage ultra-rapide VAAPI (0% CPU)
@@ -22,6 +23,7 @@ services:
       - /dev/dri:/dev/dri
     volumes:
       - ./cache:/app/cache
+      - ./data:/app/data
       - animflix_data:/root/.local/share/TorrServer
 
 volumes:

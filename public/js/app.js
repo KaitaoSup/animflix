@@ -505,15 +505,37 @@ window.closeAddProfileModal = closeAddProfileModal;
 window.submitCreateProfile = submitCreateProfile;
 window.onSelectProfileClick = onSelectProfileClick;
 window.onDeleteProfileClick = onDeleteProfileClick;
+window.syncNavbarHeight = syncNavbarHeight;
+
+// Synchronisation dynamique de la hauteur de la barre de navigation (évite tout chevauchement sur tablette et mobile)
+function syncNavbarHeight() {
+    const nav = document.querySelector('.navbar');
+    if (nav) {
+        const height = nav.offsetHeight;
+        if (height > 0) {
+            document.documentElement.style.setProperty('--navbar-height', `${height}px`);
+        }
+    }
+}
 
 // --- INITIALISATION DE L'APPLICATION ---
 function initApp() {
     initPwa();
+    syncNavbarHeight();
+    if (typeof initAnimflixAuth === 'function') initAnimflixAuth();
     loadUserSettings();
     if (typeof loadSavedSubStyle === 'function') loadSavedSubStyle();
     if (typeof initAnilistSession === 'function') initAnilistSession();
     if (typeof setupVideoPlayerTracking === 'function') setupVideoPlayerTracking();
     if (typeof initCustomPlayerControls === 'function') initCustomPlayerControls();
+
+    // Surveillance continue des changements de taille de la navbar (rotation tablette, zoom, wrap)
+    window.addEventListener('resize', syncNavbarHeight);
+    window.addEventListener('orientationchange', () => setTimeout(syncNavbarHeight, 150));
+    if (typeof ResizeObserver !== 'undefined') {
+        const nav = document.querySelector('.navbar');
+        if (nav) new ResizeObserver(syncNavbarHeight).observe(nav);
+    }
 
     // Gestion des raccourcis d'application PWA (Shortcuts de l'icône d'accueil)
     const urlParams = new URLSearchParams(window.location.search);

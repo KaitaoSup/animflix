@@ -1958,9 +1958,14 @@
         if (token) {
             headers['Authorization'] = 'Bearer ' + token;
         }
+        const sessionToken = localStorage.getItem('animflix_auth_token');
+        if (sessionToken) {
+            headers['x-session-token'] = sessionToken;
+        }
         const res = await fetch('/api/anilist/graphql', {
             method: 'POST',
             headers,
+            credentials: 'include',
             body: JSON.stringify({ query, variables })
         });
         const data = await res.json();
@@ -1973,6 +1978,11 @@
 
     // Initialisation session AniList
     async function initAnilistSession() {
+        if (typeof initAnimflixAuth === 'function') {
+            try {
+                await initAnimflixAuth();
+            } catch(e) {}
+        }
         checkUrlForAnilistToken();
         const token = localStorage.getItem('anilist_token');
         renderAnilistNav();
@@ -2034,7 +2044,11 @@
             if (token) {
                 localStorage.setItem('anilist_token', token);
                 history.replaceState(null, '', window.location.pathname + window.location.search);
-                showToast("🎉 Connecté avec succès à AniList !");
+                if (typeof linkAnilistToAnimflix === 'function' && window.currentAnimflixUser) {
+                    linkAnilistToAnimflix(token, true);
+                } else {
+                    showToast("🎉 Connecté avec succès à AniList !");
+                }
                 return true;
             }
         }
@@ -2051,6 +2065,10 @@
 
     // Rendu du composant de profil ou connexion dans la barre de navigation
     function renderAnilistNav() {
+        if (typeof renderUserAccountNav === 'function') {
+            renderUserAccountNav();
+            return;
+        }
         const container = document.getElementById('anilistNavContainer');
         if (!container) return;
 
@@ -2139,6 +2157,9 @@
             if (data && data.Viewer) {
                 currentAnilistUser = data.Viewer;
                 localStorage.setItem('anilist_user', JSON.stringify(currentAnilistUser));
+                if (typeof linkAnilistToAnimflix === 'function' && window.currentAnimflixUser) {
+                    linkAnilistToAnimflix(token, false).catch(() => {});
+                }
                 closeAnilistAuthModal();
                 renderAnilistNav();
                 renderHomeScreen();

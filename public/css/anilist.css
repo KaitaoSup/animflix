@@ -1327,5 +1327,30 @@
             color: #ff4757;
         }
 
+        /* --- STYLES MODALE COMPTE UTILISATEUR & AUTH TABS --- */
+        .auth-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #23374d;
+            padding-bottom: 10px;
+        }
+        .auth-tabs .filter-chip {
+            padding: 7px 16px;
+            font-size: 13px;
+            border-radius: 20px;
+            cursor: pointer;
+            background: #182230;
+            border: 1px solid #23374d;
+            color: #94a3b8;
+            transition: all 0.2s;
+        }
+        .auth-tabs .filter-chip.active {
+            background: var(--anilist-blue);
+            border-color: var(--anilist-blue);
+            color: #ffffff;
+            font-weight: 600;
+        }
+
 
 

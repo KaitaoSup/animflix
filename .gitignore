@@ -8,6 +8,9 @@ cache/
 # Base de données d'état dynamique de TorrServer (modifiée en continu lors du streaming)
 config.db
 config.db*
+animflix.db
+animflix.db*
+data/
 
 # Variables d'environnement & Clés d'API (sécurité)
 .env

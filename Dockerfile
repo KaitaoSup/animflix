@@ -4,12 +4,15 @@ FROM node:20-bookworm-slim
 # Arguments de build Docker Buildx
 ARG TARGETARCH
 
-# Installation de FFmpeg, pilotes VAAPI matériels, curl et certificats SSL
+# Installation de FFmpeg, pilotes VAAPI matériels, curl, certificats SSL et outils de compilation
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     va-driver-all \
     curl \
     ca-certificates \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -33,8 +36,8 @@ RUN npm install --omit=dev
 COPY . .
 RUN chmod +x scripts/*.sh
 
-# Création des dossiers de cache persistants
-RUN mkdir -p /app/cache/subtitles
+# Création des dossiers de cache et données persistants
+RUN mkdir -p /app/cache/subtitles /app/data
 
 # Ports exposés : 3000 (Animflix Web), 8090 (TorrServer Engine)
 EXPOSE 3000 8090

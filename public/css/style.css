@@ -14,6 +14,7 @@
             --anilist-dark: #0e1622;
             --anilist-card: #152232;
             --anilist-border: #1e334d;
+            --navbar-height: 80px;
         }
         * { box-sizing: border-box; }
         body { 
@@ -27,17 +28,21 @@
 
         /* BARRE DE NAVIGATION */
         .navbar { 
-            background: linear-gradient(180deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.75) 75%, transparent 100%); 
-            padding: 18px 40px; 
+            background: rgba(14, 14, 14, 0.94);
+            background: linear-gradient(180deg, rgba(14,14,14,0.98) 0%, rgba(14,14,14,0.92) 80%, rgba(14,14,14,0.85) 100%); 
+            padding: 16px 40px; 
             position: fixed; 
             top: 0; left: 0; right: 0; 
             z-index: 100; 
             display: flex; 
             align-items: center; 
             justify-content: space-between; 
-            gap: 20px; 
+            gap: 16px; 
             flex-wrap: wrap;
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
         .logo { 
             color: var(--primary); 
@@ -51,7 +56,7 @@
         .logo:hover { transform: scale(1.03); }
         .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .search-box { display: flex; gap: 8px; flex-wrap: wrap; }
-        input[type="text"], select { 
+        input[type="text"], input[type="password"], select { 
             padding: 10px 14px; 
             border-radius: 6px; 
             border: 1px solid #333; 
@@ -61,8 +66,8 @@
             font-size: 14px;
             transition: border-color 0.2s;
         }
-        input[type="text"]:focus, select:focus { border-color: var(--primary); }
-        input[type="text"] { width: 260px; }
+        input[type="text"]:focus, input[type="password"]:focus, select:focus { border-color: var(--primary); }
+        input[type="text"], input[type="password"] { width: 260px; }
         button { 
             padding: 10px 20px; 
             background: var(--primary); 
@@ -93,7 +98,12 @@
         .btn-secondary:hover { background: #3a3a3a; border-color: #666; }
 
         /* CONTENEUR PRINCIPAL */
-        .container { padding: 110px 40px 40px; max-width: 1500px; margin: 0 auto; }
+        .container { 
+            padding: calc(var(--navbar-height, 80px) + 24px) 40px 40px; 
+            max-width: 1500px; 
+            margin: 0 auto; 
+            transition: padding-top 0.2s ease;
+        }
 
         /* --- VUE CATALOGUE / GRILLE DE CARTES --- */
         .grid { 
@@ -1241,6 +1251,117 @@
             }
             .search-sort-select {
                 flex-grow: 1;
+            }
+        }
+
+        /* --- RESPONSIVE TABLETTE & MOBILE : NAVBAR & ONGLETS --- */
+        @media (max-width: 1150px) {
+            :root {
+                --navbar-height: 120px;
+            }
+            .navbar {
+                padding: 12px 24px;
+                gap: 12px;
+            }
+            .container {
+                padding-left: 24px;
+                padding-right: 24px;
+            }
+            .search-box input[type="text"] {
+                width: 190px;
+            }
+            #streamMode {
+                max-width: 170px;
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            :root {
+                --navbar-height: 135px;
+            }
+            .navbar {
+                padding: 10px 18px;
+                gap: 10px;
+            }
+            .container {
+                padding-left: 18px;
+                padding-right: 18px;
+            }
+            .logo {
+                font-size: 22px;
+            }
+            .controls {
+                gap: 8px;
+            }
+            .search-box {
+                gap: 6px;
+            }
+            .search-box input[type="text"] {
+                width: 150px;
+                font-size: 13px;
+                padding: 8px 10px;
+            }
+            #searchType {
+                font-size: 13px;
+                padding: 8px 10px;
+            }
+            #streamMode {
+                max-width: 135px;
+                font-size: 12px;
+                padding: 8px 8px;
+            }
+            .search-box button {
+                padding: 8px 14px;
+                font-size: 13px;
+            }
+            /* Barre d'onglets Accueil défilable horizontalement sans chevauchement */
+            .home-tabs-nav {
+                gap: 8px;
+                overflow-x: auto;
+                flex-wrap: nowrap;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 10px;
+                margin-bottom: 20px;
+                scrollbar-width: none;
+            }
+            .home-tabs-nav::-webkit-scrollbar {
+                display: none;
+            }
+            .home-tab-btn {
+                flex-shrink: 0;
+                padding: 8px 14px;
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 680px) {
+            :root {
+                --navbar-height: 160px;
+            }
+            .navbar {
+                padding: 10px 14px;
+                gap: 8px;
+            }
+            .controls {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .search-box {
+                width: 100%;
+                order: 2;
+            }
+            .search-box input[type="text"] {
+                flex: 1;
+                width: auto;
+                min-width: 0;
+            }
+            #streamMode {
+                display: none;
+            }
+            .container {
+                padding-left: 14px;
+                padding-right: 14px;
             }
         }
 

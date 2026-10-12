@@ -8,6 +8,18 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dns from 'dns';
 import { Transform } from 'stream';
+import {
+  createUser,
+  getUserByUsername,
+  verifyPassword,
+  createSession,
+  getSessionUser,
+  deleteSession,
+  updateUserAnilist,
+  unlinkUserAnilist,
+  sanitizeUser,
+  cleanupExpiredSessions
+} from './database.js';
 
 // Privilégier IPv4 pour éviter les lenteurs et blocages de résolution DNS
 if (typeof dns.setDefaultResultOrder === 'function') {
@@ -425,12 +437,215 @@ app.use((req, res, next) => {
   next();
 });
 
+// --- AUTHENTICATION & SESSION MANAGEMENT ---
+function parseCookies(req) {
+  const list = {};
+  const rc = req.headers.cookie;
+  if (rc) {
+    rc.split(';').forEach(cookie => {
+      const parts = cookie.split('=');
+      const name = parts.shift().trim();
+      const value = parts.join('=');
+      if (name) {
+        try {
+          list[name] = decodeURIComponent(value);
+        } catch (e) {
+          list[name] = value;
+        }
+      }
+    });
+  }
+  return list;
+}
+
+function getAuthUser(req) {
+  const cookies = parseCookies(req);
+  let token = cookies.animflix_session;
+  if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    token = req.headers.authorization.slice(7).trim();
+  }
+  if (!token && req.headers['x-session-token']) {
+    token = req.headers['x-session-token'];
+  }
+  if (!token) return null;
+  return getSessionUser(token);
+}
+
+function setSessionCookie(res, token) {
+  res.setHeader('Set-Cookie', `animflix_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=7776000`);
+}
+
+function clearSessionCookie(res) {
+  res.setHeader('Set-Cookie', `animflix_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+}
+
+async function verifyAnilistTokenWithApi(token) {
+  if (!token) return null;
+  const query = `
+    query {
+      Viewer {
+        id
+        name
+        avatar { large medium }
+        siteUrl
+        options {
+          displayAdultContent
+        }
+      }
+    }
+  `;
+  const response = await axios.post('https://graphql.anilist.co', { query }, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'Animflix/1.0'
+    },
+    timeout: 10000
+  });
+  if (response.data?.data?.Viewer) {
+    const viewer = response.data.data.Viewer;
+    return {
+      token,
+      id: viewer.id,
+      name: viewer.name,
+      avatar: viewer.avatar?.medium || viewer.avatar?.large || null,
+      options: viewer.options || {}
+    };
+  }
+  return null;
+}
+
+// Vérifier l'état de la session utilisateur actuelle
+app.get('/api/auth/me', (req, res) => {
+  const user = getAuthUser(req);
+  if (!user) {
+    return res.json({ loggedIn: false });
+  }
+  return res.json({ loggedIn: true, user: sanitizeUser(user) });
+});
+
+// Inscription d'un nouvel utilisateur
+app.post('/api/auth/register', async (req, res) => {
+  const { username, password, anilistToken } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: "Nom d'utilisateur et mot de passe requis." });
+  }
+
+  try {
+    let anilistData = null;
+    if (anilistToken) {
+      try {
+        anilistData = await verifyAnilistTokenWithApi(anilistToken);
+      } catch (e) {
+        console.warn("Liaison AniList optionnelle échouée à l'inscription:", e.message);
+      }
+    }
+
+    const user = createUser(username, password, anilistData);
+    const session = createSession(user.id);
+    setSessionCookie(res, session.token);
+
+    return res.json({
+      success: true,
+      user: sanitizeUser(user),
+      sessionToken: session.token
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// Connexion d'un utilisateur existant
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: "Nom d'utilisateur et mot de passe requis." });
+  }
+
+  const user = getUserByUsername(username);
+  if (!user || !verifyPassword(password, user.password_hash, user.salt)) {
+    return res.status(401).json({ error: "Identifiant ou mot de passe incorrect." });
+  }
+
+  const session = createSession(user.id);
+  setSessionCookie(res, session.token);
+
+  return res.json({
+    success: true,
+    user: sanitizeUser(user),
+    sessionToken: session.token
+  });
+});
+
+// Déconnexion
+app.post('/api/auth/logout', (req, res) => {
+  const cookies = parseCookies(req);
+  const token = cookies.animflix_session || req.headers['x-session-token'];
+  if (token) {
+    deleteSession(token);
+  }
+  clearSessionCookie(res);
+  return res.json({ success: true });
+});
+
+// Associer un compte AniList au compte Animflix connecté
+app.post('/api/auth/anilist/link', async (req, res) => {
+  const user = getAuthUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Vous devez être connecté à Animflix pour lier AniList." });
+  }
+
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: "Jeton AniList requis." });
+  }
+
+  try {
+    const anilistData = await verifyAnilistTokenWithApi(token);
+    if (!anilistData) {
+      return res.status(400).json({ error: "Jeton AniList invalide ou non reconnu." });
+    }
+
+    const updatedUser = updateUserAnilist(user.id, anilistData);
+    return res.json({
+      success: true,
+      user: sanitizeUser(updatedUser),
+      anilist: anilistData
+    });
+  } catch (error) {
+    console.error("Erreur liaison AniList:", error.message);
+    return res.status(400).json({ error: "Impossible de valider ce jeton auprès d'AniList: " + error.message });
+  }
+});
+
+// Dissocier le compte AniList
+app.post('/api/auth/anilist/unlink', (req, res) => {
+  const user = getAuthUser(req);
+  if (!user) {
+    return res.status(401).json({ error: "Non connecté." });
+  }
+
+  const updatedUser = unlinkUserAnilist(user.id);
+  return res.json({
+    success: true,
+    user: sanitizeUser(updatedUser)
+  });
+});
+
 // --- API ANILIST PROXY GRAPHQL ---
 app.post('/api/anilist/graphql', async (req, res) => {
   const { query, variables } = req.body;
   if (!query) return res.status(400).json({ error: "GraphQL query is required" });
 
-  const authHeader = req.headers.authorization;
+  let authHeader = req.headers.authorization;
+  if (!authHeader) {
+    const user = getAuthUser(req);
+    if (user && user.anilist_token) {
+      authHeader = `Bearer ${user.anilist_token}`;
+    }
+  }
+
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
