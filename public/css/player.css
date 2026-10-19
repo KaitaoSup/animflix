@@ -1152,3 +1152,203 @@
                 padding: 10px 14px;
             }
         }
+
+        /* --- ÉTAPE 1 : MINIATURES TIMELINE (VISUAL SCRUBBING), MARQUEURS CHAPITRES, HLS & CAST TV --- */
+        .player-engine-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 999px;
+            background: rgba(56, 189, 248, 0.14);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            color: #38bdf8;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+        .player-engine-badge.hls {
+            background: rgba(168, 85, 247, 0.16);
+            border-color: rgba(168, 85, 247, 0.45);
+            color: #c084fc;
+        }
+        .player-engine-badge.transcode {
+            background: rgba(245, 158, 11, 0.16);
+            border-color: rgba(245, 158, 11, 0.45);
+            color: #fbbf24;
+        }
+
+        /* Marqueurs de chapitres AniSkip (OP / ED) sur la barre de timeline */
+        .player-scrubber-markers {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
+            overflow: hidden;
+            border-radius: 4px;
+        }
+        .scrubber-chapter-marker {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            border-radius: 2px;
+            opacity: 0.85;
+            transition: opacity 0.15s ease;
+        }
+        .scrubber-marker-op {
+            background: linear-gradient(90deg, #f59e0b, #fbbf24);
+            box-shadow: 0 0 6px rgba(245, 158, 11, 0.65);
+        }
+        .scrubber-marker-ed {
+            background: linear-gradient(90deg, #06b6d4, #38bdf8);
+            box-shadow: 0 0 6px rgba(56, 189, 248, 0.65);
+        }
+
+        /* Tooltip enrichi avec miniature 16:9 au survol de la timeline */
+        .player-scrubber-tooltip {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 8px;
+            border-radius: 8px;
+            background: rgba(14, 16, 22, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+        }
+        .player-scrubber-tooltip.has-thumb {
+            padding: 6px;
+        }
+        .scrubber-thumb-wrap {
+            position: relative;
+            width: 168px;
+            height: 94px;
+            border-radius: 5px;
+            overflow: hidden;
+            background: #090b10;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .scrubber-thumb-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .scrubber-chapter-badge {
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(245, 158, 11, 0.92);
+            color: #000;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 1px 7px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        }
+        .scrubber-time-text {
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #ffffff;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.3px;
+        }
+
+        /* Boutons Téléchargement & Cast dans la fiche détail */
+        .btn-download-ep {
+            border-color: rgba(52, 211, 153, 0.4) !important;
+            color: #6ee7b7 !important;
+        }
+        .btn-download-ep:hover {
+            background: rgba(52, 211, 153, 0.16) !important;
+            border-color: #34d399 !important;
+            color: #ffffff !important;
+        }
+        .btn-cast-tv {
+            border-color: rgba(56, 189, 248, 0.4) !important;
+            color: #7dd3fc !important;
+        }
+        .btn-cast-tv:hover {
+            background: rgba(56, 189, 248, 0.16) !important;
+            border-color: #38bdf8 !important;
+            color: #ffffff !important;
+        }
+
+        /* Modale Cast / Diffusion TV */
+        .cast-modal-card {
+            max-width: 540px;
+        }
+        .cast-modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .cast-section-box {
+            background: #141c27;
+            border: 1px solid #223247;
+            border-radius: 10px;
+            padding: 14px 16px;
+        }
+        .cast-section-title {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #f8fafc;
+            margin-bottom: 6px;
+        }
+        .cast-section-desc {
+            font-size: 12px;
+            color: #94a3b8;
+            line-height: 1.45;
+            margin: 0 0 12px 0;
+        }
+        .cast-wireless-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .btn-cast-primary {
+            background: linear-gradient(135deg, #0284c7, #02a9ff);
+            color: #ffffff;
+            border: none;
+            padding: 9px 16px;
+            border-radius: 7px;
+            font-size: 12.5px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            box-shadow: 0 4px 14px rgba(2, 169, 255, 0.3);
+        }
+        .btn-cast-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(2, 169, 255, 0.45);
+        }
+        .cast-native-status {
+            font-size: 12px;
+            color: #38bdf8;
+            margin-top: 8px;
+            min-height: 16px;
+        }
+        .cast-url-label {
+            display: block;
+            font-size: 11.5px;
+            color: #cbd5e1;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .cast-url-row {
+            display: flex;
+            gap: 8px;
+        }
+        .cast-url-input {
+            flex: 1;
+            background: #0d131c;
+            border: 1px solid #2b3d54;
+            color: #38bdf8;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 7px 10px;
+            border-radius: 6px;
+        }
+

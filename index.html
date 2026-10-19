@@ -17,9 +17,9 @@
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-    <link rel="stylesheet" href="/css/style.css?v=1.6.0">
-    <link rel="stylesheet" href="/css/player.css?v=1.5.0">
-    <link rel="stylesheet" href="/css/anilist.css?v=1.5.0">
+    <link rel="stylesheet" href="/css/style.css?v=1.7.0">
+    <link rel="stylesheet" href="/css/player.css?v=1.7.0">
+    <link rel="stylesheet" href="/css/anilist.css?v=1.7.0">
 </head>
 <body>
   <div class="navbar">
@@ -35,6 +35,7 @@
               </select>
               <select id="streamMode" title="Mode de lecture">
                   <option value="direct" selected>⚡ Lecture Directe (0% CPU, Instantané)</option>
+                  <option value="hls">📡 HLS Adaptatif (.m3u8 - Fluide & iOS/TV)</option>
                   <option value="transcode">🔄 Transcodage H.264 (Compatibilité standard)</option>
               </select>
               <button onclick="handleSearchClick()">Chercher</button>
@@ -151,9 +152,16 @@
                           <label for="detailStreamMode" style="font-size: 12px; color: #aaa; margin-right: 4px;">Mode :</label>
                           <select id="detailStreamMode" onchange="onDetailStreamModeChange()">
                               <option value="direct">⚡ Lecture Directe (0% CPU)</option>
+                              <option value="hls">📡 HLS Adaptatif (.m3u8)</option>
                               <option value="transcode">🔄 Transcodage H.264</option>
                           </select>
                       </div>
+                      <button id="detailDownloadBtn" class="btn-secondary btn-download-ep" onclick="downloadCurrentEpisode()" title="Télécharger le fichier vidéo original sur votre appareil (Mode Hors-Ligne)">
+                          📥 Télécharger
+                      </button>
+                      <button id="detailCastBtn" class="btn-secondary btn-cast-tv" onclick="openCastModal()" title="Diffuser sur TV (Chromecast, AirPlay, Smart TV, VLC Réseau)">
+                          📺 Diffuser TV
+                      </button>
                       <a id="detailVlcBtn" href="#" class="vlc-btn" target="_blank" title="Lancer le flux dans VLC">
                           🟠 Ouvrir dans VLC
                       </a>
@@ -192,8 +200,15 @@
               <div class="player-area-header">
                   <div class="player-area-title">
                       <span style="color: var(--primary);">▶</span> Lecteur Multimédia Intégré
+                      <span id="playerEngineBadge" class="player-engine-badge">Direct MP4</span>
                   </div>
-                  <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                      <button onclick="downloadCurrentEpisode()" class="btn-sub-style" title="Télécharger cet épisode hors-ligne">
+                          📥 Hors-ligne
+                      </button>
+                      <button onclick="openCastModal()" class="btn-sub-style" title="Diffuser sur TV (Chromecast, AirPlay, Smart TV)">
+                          📺 Cast / TV
+                      </button>
                       <button onclick="togglePlayerFullscreen()" class="btn-sub-style" title="Plein écran [F]">
                           ⛶ Plein écran
                       </button>
@@ -202,7 +217,7 @@
 
               <!-- Écran vidéo avec contrôles personnalisés -->
               <div class="player-video-wrapper" id="playerVideoWrapper">
-                  <video id="videoPlayer" playsinline autoplay crossorigin="anonymous"></video>
+                  <video id="videoPlayer" playsinline autoplay crossorigin="anonymous" x-webkit-airplay="allow" airplay="allow"></video>
                   
                   <!-- Indicateur central Play / Pause -->
                   <div id="playerCenterIndicator" class="player-center-indicator">▶</div>
@@ -316,15 +331,22 @@
                           </div>
                       </div>
 
-                      <!-- Barre de timeline (Scrubber) -->
+                      <!-- Barre de timeline (Scrubber avec marqueurs chapitres et miniatures au survol) -->
                       <div class="player-scrubber-container" id="playerScrubberContainer">
                           <div class="player-scrubber-track" id="playerScrubberTrack">
                               <div class="player-scrubber-buffered" id="playerScrubberBuffered"></div>
+                              <div class="player-scrubber-markers" id="playerScrubberMarkers"></div>
                               <div class="player-scrubber-progress" id="playerScrubberProgress">
                                   <div class="player-scrubber-thumb"></div>
                               </div>
                           </div>
-                          <div class="player-scrubber-tooltip" id="playerScrubberTooltip">00:00</div>
+                          <div class="player-scrubber-tooltip" id="playerScrubberTooltip">
+                              <div class="scrubber-thumb-wrap" id="playerScrubberThumbWrap" style="display: none;">
+                                  <img id="playerScrubberThumbImg" src="" alt="Aperçu">
+                                  <span class="scrubber-chapter-badge" id="playerScrubberChapterBadge" style="display: none;"></span>
+                              </div>
+                              <div class="scrubber-time-text" id="playerScrubberTimeText">00:00</div>
+                          </div>
                       </div>
 
                       <!-- Ligne des boutons -->
@@ -362,7 +384,7 @@
                               </div>
                           </div>
 
-                          <!-- Droite : Badge info, P2P en direct, Vitesse, PiP, CC toggle, Plein écran -->
+                          <!-- Droite : Badge info, P2P en direct, Vitesse, Cast, Télécharger, PiP, CC toggle, Plein écran -->
                           <div class="player-bar-right">
                               <span id="playerOverlayEpBadge" class="player-badge-ep"></span>
                               <button class="player-btn player-btn-p2p" id="playerP2pBtn" onclick="togglePlayerP2pHud(event)" title="Statistiques P2P TorrServer en direct">
@@ -371,6 +393,12 @@
                               </button>
                               <button class="player-btn player-btn-speed" id="playerSpeedBtn" onclick="cyclePlaybackSpeed()" title="Vitesse de lecture [ < / > ]">
                                   <span id="playerSpeedLabel">1x</span>
+                              </button>
+                              <button class="player-btn" id="playerCastBtn" onclick="openCastModal()" title="Diffuser sur TV (Chromecast / AirPlay / Smart TV)">
+                                  <span>📺</span>
+                              </button>
+                              <button class="player-btn" id="playerDownloadBtn" onclick="downloadCurrentEpisode()" title="Télécharger l'épisode hors-ligne">
+                                  <span>📥</span>
                               </button>
                               <button class="player-btn" id="playerPipBtn" onclick="togglePictureInPicture()" title="Picture-in-Picture [P]">
                                   <span>⧉</span>
@@ -745,6 +773,7 @@
                       <span>⚡ Mode de lecture par défaut :</span>
                       <select id="prefDefaultStreamMode" class="settings-select" onchange="saveUserSettings()">
                           <option value="direct">⚡ Direct (0% CPU, Instantané)</option>
+                          <option value="hls">📡 HLS Adaptatif (.m3u8 - Fluide & iOS/TV)</option>
                           <option value="transcode">🔄 Transcodage H.264 (Compatibilité max)</option>
                       </select>
                   </label>
@@ -849,15 +878,68 @@
       </div>
   </div>
 
+  <!-- MODAL DE DIFFUSION TV / CHROMECAST / AIRPLAY / SMART TV -->
+  <div id="castModal" class="anilist-modal-overlay" style="display: none;" onclick="if(event.target === this) closeCastModal()">
+      <div class="anilist-modal-content cast-modal-card">
+          <div class="anilist-modal-header">
+              <div class="anilist-modal-title">
+                  <span>📺 Diffuser sur TV (Cast / AirPlay / Réseau)</span>
+              </div>
+              <button class="anilist-modal-close" onclick="closeCastModal()">&times;</button>
+          </div>
+          <div class="anilist-modal-body cast-modal-body">
+              <!-- Option 1 : Diffusion Sans-Fil Directe (Chromecast / AirPlay / Remote Playback API) -->
+              <div class="cast-section-box">
+                  <div class="cast-section-title">📡 1. Diffusion Sans-Fil Directe (Chromecast & AirPlay)</div>
+                  <p class="cast-section-desc">
+                      Envoyez la vidéo en cours vers un téléviseur compatible Google Cast, Apple AirPlay ou Miracast détecté par votre navigateur.
+                  </p>
+                  <div class="cast-wireless-actions">
+                      <button type="button" class="btn-cast-primary" onclick="triggerNativeCastOrAirPlay()">
+                          📺 Rechercher un écran (Cast / AirPlay)
+                      </button>
+                      <button type="button" class="btn-secondary" onclick="switchToHlsForCasting()" title="Activer le flux HLS .m3u8 pour une compatibilité maximale sur iOS, Apple TV et Smart TV">
+                          📡 Activer le mode HLS (.m3u8)
+                      </button>
+                  </div>
+                  <div id="castNativeStatusMsg" class="cast-native-status"></div>
+              </div>
+
+              <!-- Option 2 : Lien Réseau Local (LAN / Tailscale) pour Smart TV, Android TV, VLC, Infuse, MPV -->
+              <div class="cast-section-box">
+                  <div class="cast-section-title">🌐 2. Flux Réseau Direct (VLC TV, Android TV, Apple TV, Kodi)</div>
+                  <p class="cast-section-desc">
+                      Utilisez cette adresse IP réseau (au lieu de <code>localhost</code>) pour ouvrir l'épisode ou l'interface Animflix directement sur votre TV ou smartphone :
+                  </p>
+                  <div class="cast-url-group">
+                      <label class="cast-url-label">Lien du flux vidéo direct (VLC / Lecteur réseau TV) :</label>
+                      <div class="cast-url-row">
+                          <input type="text" id="castLanStreamUrlInput" readonly class="cast-url-input" onclick="this.select()">
+                          <button type="button" class="btn-secondary" onclick="copyCastUrl('castLanStreamUrlInput')">📋 Copier</button>
+                      </div>
+                  </div>
+                  <div class="cast-url-group" style="margin-top: 10px;">
+                      <label class="cast-url-label">Adresse Web Animflix sur votre réseau (Wi-Fi / Tailscale) :</label>
+                      <div class="cast-url-row">
+                          <input type="text" id="castLanAppUrlInput" readonly class="cast-url-input" onclick="this.select()">
+                          <button type="button" class="btn-secondary" onclick="copyCastUrl('castLanAppUrlInput')">📋 Copier</button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+  </div>
+
   <div id="toast"></div>
 
   <!-- SCRIPTS MODULAIRES ANIMFLIX -->
-  <script src="/js/auth.js?v=1.6.0"></script>
-  <script src="/js/app.js?v=1.6.0"></script>
-  <script src="/js/subtitles.js?v=1.5.3"></script>
-  <script src="/js/player.js?v=1.5.0"></script>
-  <script src="/js/history.js?v=1.5.0"></script>
-  <script src="/js/search.js?v=1.5.0"></script>
-  <script src="/js/anilist.js?v=1.5.0"></script>
+  <script src="/vendor/hls.min.js?v=1.5.17"></script>
+  <script src="/js/auth.js?v=1.7.0"></script>
+  <script src="/js/app.js?v=1.7.0"></script>
+  <script src="/js/subtitles.js?v=1.7.0"></script>
+  <script src="/js/player.js?v=1.7.0"></script>
+  <script src="/js/history.js?v=1.7.0"></script>
+  <script src="/js/search.js?v=1.7.0"></script>
+  <script src="/js/anilist.js?v=1.7.0"></script>
 </body>
 </html>

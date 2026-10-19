@@ -5,6 +5,7 @@ import { promisify } from 'util';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import dns from 'dns';
 import { Transform } from 'stream';
@@ -139,10 +140,14 @@ async function fetchNyaaRss(searchQuery, category) {
   throw lastError || new Error("Impossible de joindre les serveurs Nyaa");
 }
 
-// Dossier de cache persistant pour les sous-titres WebVTT
+// Dossier de cache persistant pour les sous-titres WebVTT, miniatures et segments HLS
 const SUB_CACHE_DIR = path.join(process.cwd(), 'cache', 'subtitles');
-if (!fs.existsSync(SUB_CACHE_DIR)) {
-  fs.mkdirSync(SUB_CACHE_DIR, { recursive: true });
+const THUMB_CACHE_DIR = path.join(process.cwd(), 'cache', 'thumbnails');
+const HLS_CACHE_DIR = path.join(process.cwd(), 'cache', 'hls');
+for (const dir of [SUB_CACHE_DIR, THUMB_CACHE_DIR, HLS_CACHE_DIR]) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 }
 
 // Extraction du hash SHA1 depuis un magnet link
@@ -797,7 +802,7 @@ async function analyzeStreams(videoUrl) {
       '-v', 'error',
       '-probesize', '5000000',
       '-analyzeduration', '5000000',
-      '-show_entries', 'stream=index,codec_type,codec_name,duration:format=duration:stream_tags=language,title',
+      '-show_entries', 'stream=index,codec_type,codec_name,pix_fmt,width,height,duration:format=duration:stream_tags=language,title',
       '-of', 'json',
       videoUrl
     ];
@@ -825,6 +830,12 @@ async function analyzeStreams(videoUrl) {
       duration = 1440; // 24 minutes standard fallback
     }
 
+    let videoCodec = 'h264';
+    let videoPixFmt = 'yuv420p';
+    let videoWidth = 1920;
+    let videoHeight = 1080;
+    let foundVideo = false;
+
     let subIndex = null;
     let relativeSubCount = 0;
     const subTracks = [];
@@ -837,7 +848,13 @@ async function analyzeStreams(videoUrl) {
       const lang = (s.tags?.language || '').toLowerCase();
       const title = s.tags?.title || '';
 
-      if (s.codec_type === 'subtitle') {
+      if (s.codec_type === 'video' && !foundVideo) {
+        foundVideo = true;
+        videoCodec = (s.codec_name || 'h264').toLowerCase();
+        videoPixFmt = (s.pix_fmt || 'yuv420p').toLowerCase();
+        if (s.width) videoWidth = parseInt(s.width, 10) || 1920;
+        if (s.height) videoHeight = parseInt(s.height, 10) || 1080;
+      } else if (s.codec_type === 'subtitle') {
         const isFrench = (lang === 'fre' || lang === 'fra' || title.toLowerCase().includes('french') || title.toLowerCase().includes('vostfr') || title.toLowerCase().includes('français') || title.toLowerCase().includes('vf'));
         let trackLabel = title;
         if (!trackLabel) {
@@ -881,8 +898,8 @@ async function analyzeStreams(videoUrl) {
       subIndex = 0;
     }
 
-    console.log(`✅ FFPROBE: Analyse terminée. Durée = ${duration}s, Sous-titres = ${subTracks.length}, Audio = ${audioTracks.length}`);
-    return { subIndex, subTracks, frAudioIndex, audioTracks, duration };
+    console.log(`✅ FFPROBE: Analyse terminée. Vidéo = ${videoCodec} (${videoPixFmt}), Durée = ${duration}s, Sous-titres = ${subTracks.length}, Audio = ${audioTracks.length}`);
+    return { subIndex, subTracks, frAudioIndex, audioTracks, duration, videoCodec, videoPixFmt, videoWidth, videoHeight };
   } catch (e) {
     console.log("⚠️ FFPROBE: Analyse rapide streams terminée avec fallback:", e.message);
     return {
@@ -890,7 +907,11 @@ async function analyzeStreams(videoUrl) {
       subTracks: [{ index: 0, lang: 'fre', label: 'Français (VOSTFR)', isFrench: true }],
       frAudioIndex: null,
       audioTracks: [],
-      duration: 1440
+      duration: 1440,
+      videoCodec: 'h264',
+      videoPixFmt: 'yuv420p',
+      videoWidth: 1920,
+      videoHeight: 1080
     };
   }
 }
@@ -1365,6 +1386,7 @@ app.get('/play', async (req, res) => {
 
   // Interruption immédiate de tout flux FFmpeg précédent du même client (protection contre l'avalanche de requêtes au seek)
   const clientId = req.query.clientId || req.ip;
+  stopClientHlsSession(clientId);
   if (activeClientFfmpegProcesses.has(clientId)) {
     const prev = activeClientFfmpegProcesses.get(clientId);
     try {
@@ -1582,11 +1604,450 @@ app.get('/play', async (req, res) => {
   });
 });
 
+// =========================================================================
+// --- MOTEUR DE STREAMING ADAPTATIF HLS (.M3U8 + SEGMENTS .TS) ---
+// =========================================================================
+const activeHlsSessions = new Map(); // playId -> { playId, clientId, hash, magnet, fileIndex, dir, m3u8Path, ffmpeg, createdAt, lastAccessedAt }
+const clientActiveHlsMap = new Map(); // clientId -> playId
+
+function cleanupHlsSession(playId) {
+  if (!playId) return;
+  const session = activeHlsSessions.get(playId);
+  if (session) {
+    if (session.ffmpeg) {
+      try {
+        session.ffmpeg.kill('SIGKILL');
+      } catch (e) {}
+    }
+    if (session.clientId && clientActiveHlsMap.get(session.clientId) === playId) {
+      clientActiveHlsMap.delete(session.clientId);
+    }
+    if (session.dir && fs.existsSync(session.dir)) {
+      try {
+        fs.rmSync(session.dir, { recursive: true, force: true });
+      } catch (e) {}
+    }
+    activeHlsSessions.delete(playId);
+  }
+}
+
+function stopClientHlsSession(clientId) {
+  if (!clientId) return;
+  const prevPlayId = clientActiveHlsMap.get(clientId);
+  if (prevPlayId) {
+    cleanupHlsSession(prevPlayId);
+  }
+}
+
+// Nettoyage périodique des sessions HLS inactives (> 10 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [playId, session] of activeHlsSessions.entries()) {
+    if (now - session.lastAccessedAt > 10 * 60 * 1000) {
+      cleanupHlsSession(playId);
+    }
+  }
+}, 60000).unref();
+
+// Route principale du manifeste HLS (.m3u8)
+app.get('/api/hls/:playId/index.m3u8', async (req, res) => {
+  const rawPlayId = req.params.playId || '';
+  const safePlayId = rawPlayId.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!safePlayId) return res.status(400).send("playId invalide");
+
+  let session = activeHlsSessions.get(safePlayId);
+
+  if (!session) {
+    const { magnet, type, fileIndex = 1, audioIndex, ss, audioOffset, forceTranscode } = req.query;
+    if (!magnet) return res.status(400).send("Lien magnet manquant pour initialiser la session HLS");
+
+    const clientId = req.query.clientId || req.ip;
+    stopClientHlsSession(clientId);
+    if (activeClientFfmpegProcesses.has(clientId)) {
+      try {
+        activeClientFfmpegProcesses.get(clientId).kill('SIGKILL');
+      } catch (e) {}
+      activeClientFfmpegProcesses.delete(clientId);
+    }
+
+    const parsedFileIndex = parseInt(fileIndex, 10) || 1;
+    const seekSeconds = parseFloat(ss) || 0;
+    const parsedAudioOffset = parseFloat(audioOffset) || 0;
+    const hash = getTorrentHash(magnet);
+    const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
+
+    const sessionDir = path.join(HLS_CACHE_DIR, safePlayId);
+    if (!fs.existsSync(sessionDir)) {
+      fs.mkdirSync(sessionDir, { recursive: true });
+    }
+    const m3u8Path = path.join(sessionDir, 'index.m3u8');
+
+    const streamInfo = await getStreamInfo(magnet, parsedFileIndex).catch(() => null);
+    const canCopyVideo = streamInfo &&
+      streamInfo.videoCodec === 'h264' &&
+      !(streamInfo.videoPixFmt && streamInfo.videoPixFmt.includes('10')) &&
+      forceTranscode !== '1';
+
+    // Synchronisation de la session de lecture (/api/play-sync)
+    let playSession = activePlaySessions.get(safePlayId);
+    if (!playSession) {
+      playSession = {
+        seekSeconds,
+        actualStart: seekSeconds,
+        keyframeOffset: 0,
+        resolved: true,
+        createdAt: Date.now(),
+        waiters: []
+      };
+      activePlaySessions.set(safePlayId, playSession);
+    } else {
+      playSession.seekSeconds = seekSeconds;
+      playSession.actualStart = seekSeconds;
+      playSession.resolved = true;
+      if (playSession.waiters) {
+        playSession.waiters.forEach(fn => fn());
+        playSession.waiters = [];
+      }
+    }
+
+    const hlsArgs = ['-threads', '0'];
+
+    if (seekSeconds > 0) {
+      if (canCopyVideo) {
+        hlsArgs.push('-noaccurate_seek', '-ss', `${seekSeconds}`);
+      } else {
+        hlsArgs.push('-ss', `${seekSeconds}`);
+      }
+    }
+
+    hlsArgs.push('-i', torrUrl);
+
+    // Sélection de la piste audio
+    let chosenAudioTrack = null;
+    if (audioIndex !== undefined && audioIndex !== null && audioIndex !== '') {
+      const idx = parseInt(audioIndex, 10);
+      hlsArgs.push('-map', `0:a:${idx}`);
+      chosenAudioTrack = (streamInfo?.audioTracks || []).find(a => a.index === idx);
+    } else if (type === 'vf' && streamInfo && streamInfo.frAudioIndex !== null) {
+      hlsArgs.push('-map', `0:a:${streamInfo.frAudioIndex}`);
+      chosenAudioTrack = (streamInfo?.audioTracks || []).find(a => a.index === streamInfo.frAudioIndex);
+    } else {
+      hlsArgs.push('-map', '0:a:0?');
+      chosenAudioTrack = (streamInfo?.audioTracks || [])[0];
+    }
+
+    // Configuration vidéo (Remux H.264 0% CPU ou Transcodage Matériel/Logiciel)
+    if (canCopyVideo) {
+      console.log(`📡 Lancement HLS [REMUX DIRECT 0% CPU] (Fichier: ${parsedFileIndex}, Seek: ${seekSeconds}s, playId: ${safePlayId})`);
+      hlsArgs.push(
+        '-map', '0:v:0',
+        '-c:v', 'copy',
+        '-bsf:v', 'h264_mp4toannexb'
+      );
+    } else if (detectedHwAccel === 'vaapi') {
+      console.log(`📡 Lancement HLS [VAAPI HW] (Fichier: ${parsedFileIndex}, Seek: ${seekSeconds}s, playId: ${safePlayId})`);
+      hlsArgs.unshift('-init_hw_device', `vaapi=va:${vaapiDevice}`);
+      hlsArgs.push(
+        '-map', '0:v:0',
+        '-vf', 'format=nv12,hwupload',
+        '-c:v', 'h264_vaapi',
+        '-qp', '24',
+        '-g', '72'
+      );
+    } else if (detectedHwAccel === 'nvenc') {
+      console.log(`📡 Lancement HLS [NVENC HW] (Fichier: ${parsedFileIndex}, Seek: ${seekSeconds}s, playId: ${safePlayId})`);
+      hlsArgs.push(
+        '-map', '0:v:0',
+        '-c:v', 'h264_nvenc',
+        '-preset', 'p1',
+        '-tune', 'll',
+        '-cq', '24',
+        '-g', '72'
+      );
+    } else {
+      console.log(`📡 Lancement HLS [CPU libx264] (Fichier: ${parsedFileIndex}, Seek: ${seekSeconds}s, playId: ${safePlayId})`);
+      hlsArgs.push(
+        '-map', '0:v:0',
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-tune', 'zerolatency',
+        '-crf', '25',
+        '-g', '72',
+        '-sc_threshold', '0'
+      );
+    }
+
+    if (chosenAudioTrack && chosenAudioTrack.codec === 'aac' && parsedAudioOffset === 0) {
+      hlsArgs.push('-c:a', 'copy');
+    } else {
+      hlsArgs.push('-c:a', 'aac', '-ac', '2', '-b:a', '160k');
+      if (parsedAudioOffset !== 0) {
+        if (parsedAudioOffset > 0) {
+          const delayMs = Math.round(parsedAudioOffset * 1000);
+          hlsArgs.push('-af', `adelay=${delayMs}|${delayMs}`);
+        } else {
+          const trimSec = Math.abs(parsedAudioOffset);
+          hlsArgs.push('-af', `atrim=start=${trimSec},asetpts=PTS-STARTPTS`);
+        }
+      }
+    }
+
+    hlsArgs.push(
+      '-max_muxing_queue_size', '1024',
+      '-f', 'hls',
+      '-hls_time', '3',
+      '-hls_init_time', '2',
+      '-hls_list_size', '0',
+      '-hls_playlist_type', 'event',
+      '-hls_flags', 'independent_segments+temp_file',
+      '-hls_segment_filename', path.join(sessionDir, 'seg_%05d.ts'),
+      m3u8Path
+    );
+
+    const ffmpeg = spawn('ffmpeg', hlsArgs);
+    session = {
+      playId: safePlayId,
+      clientId,
+      hash,
+      magnet,
+      fileIndex: parsedFileIndex,
+      dir: sessionDir,
+      m3u8Path,
+      ffmpeg,
+      createdAt: Date.now(),
+      lastAccessedAt: Date.now()
+    };
+
+    activeHlsSessions.set(safePlayId, session);
+    clientActiveHlsMap.set(clientId, safePlayId);
+
+    ffmpeg.stderr.on('data', (data) => {
+      const msg = data.toString();
+      if (msg.includes('Error') && !msg.includes('broken pipe')) {
+        console.log("⚠️ FFmpeg HLS Log:", msg.trim());
+      }
+    });
+  }
+
+  session.lastAccessedAt = Date.now();
+
+  // Attendre que le premier segment .ts et le fichier index.m3u8 soient générés par FFmpeg
+  const maxWaitMs = 15000;
+  const startWait = Date.now();
+  while (Date.now() - startWait < maxWaitMs) {
+    if (fs.existsSync(session.m3u8Path)) {
+      try {
+        const content = fs.readFileSync(session.m3u8Path, 'utf8');
+        if (content.includes('#EXTINF:')) {
+          res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          return res.send(content);
+        }
+      } catch (e) {}
+    }
+    await new Promise(r => setTimeout(r, 120));
+  }
+
+  return res.status(504).send("Délai dépassé lors de la génération initiale du flux HLS");
+});
+
+// Route de distribution des segments vidéo HLS (.ts)
+app.get('/api/hls/:playId/:segment', (req, res) => {
+  const safePlayId = (req.params.playId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  const segment = req.params.segment || '';
+  if (!safePlayId || !/^seg_\d+\.ts$/.test(segment)) {
+    return res.status(400).send("Segment invalide");
+  }
+
+  const session = activeHlsSessions.get(safePlayId);
+  if (session) {
+    session.lastAccessedAt = Date.now();
+  }
+
+  const segPath = path.join(HLS_CACHE_DIR, safePlayId, segment);
+  if (!fs.existsSync(segPath)) {
+    return res.status(404).send("Segment non trouvé");
+  }
+
+  res.setHeader('Content-Type', 'video/mp2t');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  fs.createReadStream(segPath).pipe(res);
+});
+
+// Arrêt explicite d'une session HLS
+app.post('/api/hls/stop', (req, res) => {
+  const { playId, clientId } = { ...req.query, ...req.body };
+  if (playId) cleanupHlsSession(String(playId).replace(/[^a-zA-Z0-9_-]/g, ''));
+  if (clientId) stopClientHlsSession(clientId);
+  res.json({ success: true });
+});
+
+// =========================================================================
+// --- MINIATURES DE PRÉVISUALISATION DE LA TIMELINE (VISUAL SCRUBBING) ---
+// =========================================================================
+const activeClientThumbProcesses = new Map(); // clientId -> ChildProcess
+
+app.get('/api/thumbnail', async (req, res) => {
+  const { magnet, fileIndex = 1, t = 0, clientId } = req.query;
+  if (!magnet) return res.status(400).send("Lien magnet manquant");
+
+  const hash = getTorrentHash(magnet);
+  const parsedFileIndex = parseInt(fileIndex, 10) || 1;
+  // Quantifier par paliers de 5 secondes pour maximiser le taux de succès du cache
+  const bucketSec = Math.max(0, Math.floor((parseFloat(t) || 0) / 5) * 5);
+  const thumbFile = path.join(THUMB_CACHE_DIR, `${hash}_f${parsedFileIndex}_t${bucketSec}.jpg`);
+
+  if (fs.existsSync(thumbFile)) {
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return fs.createReadStream(thumbFile).pipe(res);
+  }
+
+  const thumbClientKey = `thumb_${clientId || req.ip}`;
+  if (activeClientThumbProcesses.has(thumbClientKey)) {
+    try {
+      activeClientThumbProcesses.get(thumbClientKey).kill('SIGKILL');
+    } catch (e) {}
+    activeClientThumbProcesses.delete(thumbClientKey);
+  }
+
+  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
+  const thumbArgs = [
+    '-v', 'error',
+    '-noaccurate_seek',
+    '-ss', `${bucketSec}`,
+    '-i', torrUrl,
+    '-frames:v', '1',
+    '-vf', 'scale=240:-2',
+    '-q:v', '6',
+    '-f', 'image2',
+    'pipe:1'
+  ];
+
+  const ffmpeg = spawn('ffmpeg', thumbArgs);
+  activeClientThumbProcesses.set(thumbClientKey, ffmpeg);
+
+  const chunks = [];
+  ffmpeg.stdout.on('data', (chunk) => chunks.push(chunk));
+
+  ffmpeg.on('close', (code) => {
+    if (activeClientThumbProcesses.get(thumbClientKey) === ffmpeg) {
+      activeClientThumbProcesses.delete(thumbClientKey);
+    }
+    const imgBuffer = Buffer.concat(chunks);
+    if (code === 0 && imgBuffer.length > 100) {
+      try {
+        fs.writeFileSync(thumbFile, imgBuffer);
+      } catch (e) {}
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.send(imgBuffer);
+      }
+    } else if (!res.headersSent) {
+      res.status(404).end();
+    }
+  });
+
+  req.on('close', () => {
+    if (activeClientThumbProcesses.get(thumbClientKey) === ffmpeg) {
+      activeClientThumbProcesses.delete(thumbClientKey);
+      try {
+        ffmpeg.kill('SIGKILL');
+      } catch (e) {}
+    }
+  });
+});
+
+// =========================================================================
+// --- TÉLÉCHARGEMENT LOCAL HORS-LIGNE D'UN ÉPISODE (DIRECT TORRSERVER) ---
+// =========================================================================
+app.get('/api/download', async (req, res) => {
+  const { magnet, fileIndex = 1, title = 'Anime_Episode' } = req.query;
+  if (!magnet) return res.status(400).send("Lien magnet manquant");
+
+  const parsedFileIndex = parseInt(fileIndex, 10) || 1;
+  const hash = getTorrentHash(magnet);
+
+  let fileName = `${String(title).replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim()}.mkv`;
+  try {
+    const statRes = await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
+      action: "get",
+      hash
+    }, { timeout: 2500 });
+    const fileStats = statRes.data?.file_stats || [];
+    const targetFile = fileStats.find(f => f.id === parsedFileIndex) || fileStats[0];
+    if (targetFile && targetFile.path) {
+      fileName = path.basename(targetFile.path);
+    }
+  } catch (e) {}
+
+  const ext = path.extname(fileName).toLowerCase();
+  const mimeMap = {
+    '.mp4': 'video/mp4',
+    '.mkv': 'video/x-matroska',
+    '.webm': 'video/webm',
+    '.avi': 'video/x-msvideo'
+  };
+  const contentType = mimeMap[ext] || 'application/octet-stream';
+  const asciiFallback = fileName.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
+
+  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
+  const headers = {};
+  if (req.headers.range) {
+    headers['Range'] = req.headers.range;
+  }
+
+  try {
+    const upstream = await axios({
+      method: 'get',
+      url: torrUrl,
+      headers,
+      responseType: 'stream',
+      timeout: 20000
+    });
+
+    res.status(upstream.status);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+    if (upstream.headers['content-length']) {
+      res.setHeader('Content-Length', upstream.headers['content-length']);
+    }
+    if (upstream.headers['content-range']) {
+      res.setHeader('Content-Range', upstream.headers['content-range']);
+    }
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    upstream.data.pipe(res);
+    req.on('close', () => {
+      try {
+        upstream.data.destroy();
+      } catch (e) {}
+    });
+  } catch (err) {
+    console.error("⚠️ Erreur téléchargement hors-ligne:", err.message);
+    if (!res.headersSent) {
+      res.status(502).send("Impossible de récupérer le fichier vidéo depuis TorrServer");
+    }
+  }
+});
+
 // --- ROUTES API GESTION DU CACHE ET TÉLÉMÉTRIE TORRSERVER ---
 app.post('/api/torrserver/drop', async (req, res) => {
   const { magnet, hash } = { ...req.query, ...req.body };
   const torrentHash = hash || (magnet ? getTorrentHash(magnet) : null);
   if (!torrentHash) return res.status(400).json({ error: "Hash ou magnet manquant" });
+
+  // Nettoyer les éventuelles sessions HLS liées à ce torrent
+  for (const [playId, sess] of activeHlsSessions.entries()) {
+    if (sess.hash === torrentHash) {
+      cleanupHlsSession(playId);
+    }
+  }
 
   try {
     await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
@@ -1601,6 +2062,9 @@ app.post('/api/torrserver/drop', async (req, res) => {
 
 app.post('/api/torrserver/clean', async (req, res) => {
   try {
+    for (const playId of Array.from(activeHlsSessions.keys())) {
+      cleanupHlsSession(playId);
+    }
     const listRes = await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
       action: "list"
     }, { timeout: 3000 });
@@ -1792,6 +2256,32 @@ app.get('/api/torrserver/status', async (req, res) => {
   }
 });
 
+// Détection des adresses IP locales (LAN Wi-Fi/Ethernet & Tailscale) pour Cast / AirPlay / TV
+function getServerNetworkIps() {
+  let lanIp = null;
+  let tailscaleIp = null;
+  try {
+    const interfaces = os.networkInterfaces();
+    for (const [name, addrs] of Object.entries(interfaces)) {
+      if (!addrs) continue;
+      for (const addr of addrs) {
+        if (addr.family === 'IPv4' && !addr.internal) {
+          if (addr.address.startsWith('100.') || name.toLowerCase().includes('tailscale')) {
+            if (!tailscaleIp) tailscaleIp = addr.address;
+          } else if (
+            addr.address.startsWith('192.168.') ||
+            addr.address.startsWith('10.') ||
+            /^172\.(1[6-9]|2\d|3[0-1])\./.test(addr.address)
+          ) {
+            if (!lanIp) lanIp = addr.address;
+          }
+        }
+      }
+    }
+  } catch (e) {}
+  return { lanIp, tailscaleIp };
+}
+
 app.get('/api/server/status', async (req, res) => {
   let torrserverOnline = false;
   try {
@@ -1801,12 +2291,17 @@ app.get('/api/server/status', async (req, res) => {
     torrserverOnline = false;
   }
 
+  const { lanIp, tailscaleIp } = getServerNetworkIps();
+
   res.json({
-    version: '1.1.0',
+    version: '1.2.0',
     hwAccel: detectedHwAccel,
     vaapiDevice: detectedHwAccel === 'vaapi' ? vaapiDevice : null,
     torrserverOnline,
-    nyaaUrl: currentWorkingNyaaUrl
+    nyaaUrl: currentWorkingNyaaUrl,
+    lanIp,
+    tailscaleIp,
+    port: PORT
   });
 });
 

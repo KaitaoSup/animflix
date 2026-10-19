@@ -62,6 +62,39 @@
         }
         const totalDur = currentTotalDuration > 0 ? currentTotalDuration : 1440;
         const target = Math.max(0, Math.min(totalDur, Math.round(targetSeconds)));
+
+        // ⚡ SEEK INSTANTANÉ EN MÉMOIRE TAMPON (0ms In-Buffer Seek sans relancer FFmpeg)
+        const video = document.getElementById('videoPlayer');
+        if (video && video.readyState >= 1 && video.buffered && video.buffered.length > 0) {
+            const relTarget = target - currentStreamOffset;
+            if (relTarget >= 0) {
+                let isBuffered = false;
+                for (let i = 0; i < video.buffered.length; i++) {
+                    try {
+                        const startB = video.buffered.start(i);
+                        const endB = video.buffered.end(i);
+                        if (relTarget >= Math.max(0, startB - 0.25) && relTarget <= (endB - 0.35)) {
+                            isBuffered = true;
+                            break;
+                        }
+                    } catch (e) {}
+                }
+                if (isBuffered) {
+                    if (seekDebounceTimeout) {
+                        clearTimeout(seekDebounceTimeout);
+                        seekDebounceTimeout = null;
+                    }
+                    try {
+                        video.currentTime = relTarget;
+                        updatePlayerProgress();
+                        if (typeof updateMediaSessionPositionState === 'function') {
+                            updateMediaSessionPositionState(true);
+                        }
+                        return;
+                    } catch (e) {}
+                }
+            }
+        }
         
         currentStreamOffset = target;
         updatePlayerProgress();
@@ -260,13 +293,45 @@
     window.resetAudioSync = resetAudioSync;
     window.updateAudioSyncDisplay = updateAudioSyncDisplay;
 
-    // --- ANISKIP (DÉTECTION ET SAUT INTELLIGENT DE L'OPENING & ENDING) ---
+    // --- ANISKIP (DÉTECTION ET SAUT INTELLIGENT DE L'OPENING & ENDING + MARQUEURS TIMELINE) ---
     let currentAniSkipIntervals = null;
     let isAniSkipLoading = false;
+
+    function renderAniSkipTimelineMarkers() {
+        const markersEl = document.getElementById('playerScrubberMarkers');
+        if (!markersEl) return;
+        markersEl.innerHTML = '';
+
+        if (!currentAniSkipIntervals) return;
+        const totalDur = currentTotalDuration > 0 ? currentTotalDuration : 1440;
+        if (totalDur <= 0) return;
+
+        const addMarker = (interval, typeClass, label) => {
+            if (!interval || typeof interval.startTime !== 'number' || typeof interval.endTime !== 'number') return;
+            if (interval.endTime <= interval.startTime) return;
+            const leftPct = Math.max(0, Math.min(100, (interval.startTime / totalDur) * 100));
+            const widthPct = Math.max(0.5, Math.min(100 - leftPct, ((interval.endTime - interval.startTime) / totalDur) * 100));
+            const div = document.createElement('div');
+            div.className = `scrubber-chapter-marker ${typeClass}`;
+            div.style.left = `${leftPct}%`;
+            div.style.width = `${widthPct}%`;
+            div.title = label;
+            markersEl.appendChild(div);
+        };
+
+        if (currentAniSkipIntervals.op) {
+            addMarker(currentAniSkipIntervals.op, 'scrubber-marker-op', 'Opening (AniSkip)');
+        }
+        if (currentAniSkipIntervals.ed) {
+            addMarker(currentAniSkipIntervals.ed, 'scrubber-marker-ed', 'Ending (AniSkip)');
+        }
+    }
+    window.renderAniSkipTimelineMarkers = renderAniSkipTimelineMarkers;
 
     async function checkAniSkipForCurrentEpisode() {
         currentAniSkipIntervals = null;
         hideAniSkipButton();
+        renderAniSkipTimelineMarkers();
 
         let malId = currentAnilistMedia?.idMal;
         const ep = currentDetectedEpisode || 1;
@@ -315,6 +380,7 @@
                     }
                 });
                 currentAniSkipIntervals = intervals;
+                renderAniSkipTimelineMarkers();
                 console.log(`[AniSkip] Intervalles trouvés pour MAL ${malId} Ép. ${ep} :`, intervals);
             }
         } catch(err) {
@@ -1002,6 +1068,30 @@
         }
     }
 
+    // --- GESTION DU MOTEUR HLS ADAPTATIF (.M3U8 / HLS.JS & NATIF IOS/TV) ---
+    let currentHlsInstance = null;
+    let lastAutoFallbackKey = null;
+
+    function destroyCurrentHlsInstance(notifyServer = false) {
+        if (currentHlsInstance) {
+            try {
+                currentHlsInstance.destroy();
+            } catch (e) {}
+            currentHlsInstance = null;
+        }
+        if (notifyServer) {
+            const clientId = window._animflixClientId;
+            if (clientId) {
+                fetch('/api/hls/stop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clientId })
+                }).catch(() => {});
+            }
+        }
+    }
+    window.destroyCurrentHlsInstance = destroyCurrentHlsInstance;
+
     // --- LECTEUR VIDÉO ET STREAMING ---
     async function startStreamingInPlayer(magnet, titre, vlcUrl, fileIndex = null, seekSeconds = 0) {
         currentActiveMagnet = magnet;
@@ -1039,37 +1129,120 @@
         const video = document.getElementById('videoPlayer');
         const playerStatus = document.getElementById('player-status');
         const statusText = document.getElementById('status-text');
+
+        // Mise à jour du badge moteur en haut du lecteur
+        const engineBadge = document.getElementById('playerEngineBadge');
+        if (engineBadge) {
+            engineBadge.classList.remove('hls', 'transcode');
+            if (streamMode === 'hls') {
+                engineBadge.textContent = 'HLS .m3u8';
+                engineBadge.classList.add('hls');
+            } else if (streamMode === 'transcode') {
+                engineBadge.textContent = 'Transcode H.264';
+                engineBadge.classList.add('transcode');
+            } else {
+                engineBadge.textContent = 'Direct MP4';
+            }
+        }
+
         playerStatus.style.display = 'block';
         statusText.innerText = seekSeconds > 0 
             ? `Reprise à ${formatTimestamp(seekSeconds)}... ⏳`
-            : "Connexion à TorrServer & chargement du flux... ⏳";
+            : (streamMode === 'hls'
+                ? "Initialisation du flux HLS Adaptatif (.m3u8)... 📡"
+                : "Connexion à TorrServer & chargement du flux... ⏳");
 
         // Démarrage du monitoring P2P en temps réel
         startTorrServerP2pPolling(magnet);
+
+        // Nettoyage d'une éventuelle instance HLS précédente
+        destroyCurrentHlsInstance(false);
 
         const playId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         currentPlaySessionId = playId;
 
         const clientId = window._animflixClientId || (window._animflixClientId = 'c_' + Math.random().toString(36).slice(2, 10));
 
-        let webUrl = '/play?magnet=' + encodeURIComponent(magnet) + 
-                     '&mode=' + encodeURIComponent(streamMode) + 
-                     '&type=' + encodeURIComponent(type) +
-                     '&fileIndex=' + encodeURIComponent(currentActiveFileIndex) +
-                     '&playId=' + encodeURIComponent(playId) +
-                     '&clientId=' + encodeURIComponent(clientId);
+        if (streamMode === 'hls') {
+            let hlsUrl = `/api/hls/${encodeURIComponent(playId)}/index.m3u8?magnet=` + encodeURIComponent(magnet) +
+                         `&fileIndex=` + encodeURIComponent(currentActiveFileIndex) +
+                         `&clientId=` + encodeURIComponent(clientId);
 
-        if (currentActiveAudioIndex !== null && currentActiveAudioIndex !== '') {
-            webUrl += '&audioIndex=' + encodeURIComponent(currentActiveAudioIndex);
-        }
-        if (typeof currentManualAudioOffset === 'number' && currentManualAudioOffset !== 0) {
-            webUrl += '&audioOffset=' + encodeURIComponent(currentManualAudioOffset);
-        }
-        if (seekSeconds > 0) {
-            webUrl += '&ss=' + encodeURIComponent(seekSeconds);
-        }
+            if (currentActiveAudioIndex !== null && currentActiveAudioIndex !== '') {
+                hlsUrl += '&audioIndex=' + encodeURIComponent(currentActiveAudioIndex);
+            }
+            if (typeof currentManualAudioOffset === 'number' && currentManualAudioOffset !== 0) {
+                hlsUrl += '&audioOffset=' + encodeURIComponent(currentManualAudioOffset);
+            }
+            if (seekSeconds > 0) {
+                hlsUrl += '&ss=' + encodeURIComponent(seekSeconds);
+            }
 
-        video.src = webUrl;
+            if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+                const hls = new Hls({
+                    maxBufferLength: 60,
+                    maxMaxBufferLength: 180,
+                    backBufferLength: 90,
+                    enableWorker: true,
+                    lowLatencyMode: false,
+                    manifestLoadingTimeOut: 25000,
+                    manifestLoadingMaxRetry: 4,
+                    levelLoadingTimeOut: 25000,
+                    fragLoadingTimeOut: 25000
+                });
+                currentHlsInstance = hls;
+                hls.loadSource(hlsUrl);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    video.play().catch(() => {});
+                });
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    if (data && data.fatal) {
+                        switch (data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                hls.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                hls.recoverMediaError();
+                                break;
+                            default:
+                                destroyCurrentHlsInstance(false);
+                                break;
+                        }
+                    }
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                // Support natif iOS / iPadOS / Safari / Apple TV AirPlay
+                video.src = hlsUrl;
+                video.addEventListener('loadedmetadata', () => {
+                    video.play().catch(() => {});
+                }, { once: true });
+            } else {
+                showToast("⚠️ HLS non supporté sur ce navigateur, bascule en Transcodage MP4");
+                const detailSel = document.getElementById('detailStreamMode');
+                if (detailSel) detailSel.value = 'transcode';
+                return startStreamingInPlayer(magnet, titre, vlcUrl, currentActiveFileIndex, seekSeconds);
+            }
+        } else {
+            let webUrl = '/play?magnet=' + encodeURIComponent(magnet) + 
+                         '&mode=' + encodeURIComponent(streamMode) + 
+                         '&type=' + encodeURIComponent(type) +
+                         '&fileIndex=' + encodeURIComponent(currentActiveFileIndex) +
+                         '&playId=' + encodeURIComponent(playId) +
+                         '&clientId=' + encodeURIComponent(clientId);
+
+            if (currentActiveAudioIndex !== null && currentActiveAudioIndex !== '') {
+                webUrl += '&audioIndex=' + encodeURIComponent(currentActiveAudioIndex);
+            }
+            if (typeof currentManualAudioOffset === 'number' && currentManualAudioOffset !== 0) {
+                webUrl += '&audioOffset=' + encodeURIComponent(currentManualAudioOffset);
+            }
+            if (seekSeconds > 0) {
+                webUrl += '&ss=' + encodeURIComponent(seekSeconds);
+            }
+
+            video.src = webUrl;
+        }
 
         setupSubtitles(magnet, type, currentActiveFileIndex, seekSeconds);
 
@@ -1181,10 +1354,27 @@
 
         video.onerror = () => {
             if (streamTimeout) clearTimeout(streamTimeout);
-            statusText.innerHTML = "⚠️ Le navigateur ne peut pas lire ce format directement.<br><span style='font-size:13px; color:#ffa033;'>Utilisez le bouton ci-dessous pour le regarder dans <b>VLC</b> !</span>";
+            // Bascule automatique intelligente (Direct -> HLS Adaptatif) si le codec HEVC 10-bit / AV1 n'est pas décodé nativement
+            const fallbackKey = `${magnet}_${currentActiveFileIndex}`;
+            if (streamMode === 'direct' && lastAutoFallbackKey !== fallbackKey) {
+                lastAutoFallbackKey = fallbackKey;
+                const detailSel = document.getElementById('detailStreamMode');
+                const navSel = document.getElementById('streamMode');
+                if (detailSel) detailSel.value = 'hls';
+                if (navSel) navSel.value = 'hls';
+                showToast("📡 Codec non supporté en Direct : bascule automatique en HLS Adaptatif...");
+                startStreamingInPlayer(magnet, titre, vlcUrl, currentActiveFileIndex, currentStreamOffset);
+                return;
+            }
+            statusText.innerHTML = "⚠️ Le navigateur ne peut pas lire ce format directement.<br><span style='font-size:13px; color:#ffa033;'>Utilisez le mode <b>HLS / Transcodage</b> ou cliquez sur <b>Ouvrir dans VLC</b> !</span>";
         };
     }
 
+
+    // --- MINIATURES DE PRÉVISUALISATION TIMELINE (VISUAL SCRUBBING CACHE) ---
+    let thumbHoverTimer = null;
+    let lastRequestedThumbKey = null;
+    const loadedThumbnailUrls = new Set();
 
     // Initialisation du lecteur vidéo et de sa barre interactive
     function initCustomPlayerControls() {
@@ -1397,7 +1587,7 @@
             }
         });
 
-        // 5. Timeline Scrubber interactif (clic et glisser-déposer fluide)
+        // 5. Timeline Scrubber interactif (clic, glisser-déposer fluide & miniatures au survol)
         if (scrubberContainer && scrubberTrack) {
             function getRatio(e) {
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -1419,10 +1609,72 @@
                 const rect = scrubberTrack.getBoundingClientRect();
                 const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
                 const hoverSec = Math.round(ratio * (currentTotalDuration > 0 ? currentTotalDuration : 1440));
-                scrubberTooltip.textContent = formatTimestamp(hoverSec);
-                const offsetLeft = Math.max(20, Math.min(rect.width - 20, clientX - rect.left));
+
+                const timeTextEl = document.getElementById('playerScrubberTimeText');
+                const thumbWrapEl = document.getElementById('playerScrubberThumbWrap');
+                const thumbImgEl = document.getElementById('playerScrubberThumbImg');
+                const chapterBadgeEl = document.getElementById('playerScrubberChapterBadge');
+
+                if (timeTextEl) {
+                    timeTextEl.textContent = formatTimestamp(hoverSec);
+                } else {
+                    scrubberTooltip.textContent = formatTimestamp(hoverSec);
+                }
+
+                // Détection si le curseur survole l'Opening ou l'Ending AniSkip
+                if (chapterBadgeEl) {
+                    const op = currentAniSkipIntervals?.op;
+                    const ed = currentAniSkipIntervals?.ed;
+                    if (op && hoverSec >= op.startTime && hoverSec <= op.endTime) {
+                        chapterBadgeEl.textContent = '⏭️ OPENING';
+                        chapterBadgeEl.style.display = 'inline-block';
+                        chapterBadgeEl.style.background = 'rgba(245, 158, 11, 0.92)';
+                        chapterBadgeEl.style.color = '#000';
+                    } else if (ed && hoverSec >= ed.startTime && hoverSec <= ed.endTime) {
+                        chapterBadgeEl.textContent = '⏭️ ENDING';
+                        chapterBadgeEl.style.display = 'inline-block';
+                        chapterBadgeEl.style.background = 'rgba(56, 189, 248, 0.92)';
+                        chapterBadgeEl.style.color = '#000';
+                    } else {
+                        chapterBadgeEl.style.display = 'none';
+                    }
+                }
+
+                // Chargement de la miniature 16:9 par paliers de 5 secondes
+                if (currentActiveMagnet && thumbWrapEl && thumbImgEl) {
+                    const bucket = Math.max(0, Math.floor(hoverSec / 5) * 5);
+                    const clientId = window._animflixClientId || 'c_default';
+                    const thumbUrl = `/api/thumbnail?magnet=${encodeURIComponent(currentActiveMagnet)}&fileIndex=${encodeURIComponent(currentActiveFileIndex)}&t=${bucket}&clientId=${encodeURIComponent(clientId)}`;
+                    const thumbKey = `${currentActiveMagnet}_${currentActiveFileIndex}_${bucket}`;
+
+                    if (loadedThumbnailUrls.has(thumbUrl)) {
+                        if (thumbImgEl.dataset.currentUrl !== thumbUrl) {
+                            thumbImgEl.src = thumbUrl;
+                            thumbImgEl.dataset.currentUrl = thumbUrl;
+                        }
+                        thumbWrapEl.style.display = 'block';
+                        scrubberTooltip.classList.add('has-thumb');
+                    } else if (lastRequestedThumbKey !== thumbKey) {
+                        if (thumbHoverTimer) clearTimeout(thumbHoverTimer);
+                        thumbHoverTimer = setTimeout(() => {
+                            lastRequestedThumbKey = thumbKey;
+                            const preload = new Image();
+                            preload.onload = () => {
+                                loadedThumbnailUrls.add(thumbUrl);
+                                thumbImgEl.src = thumbUrl;
+                                thumbImgEl.dataset.currentUrl = thumbUrl;
+                                thumbWrapEl.style.display = 'block';
+                                scrubberTooltip.classList.add('has-thumb');
+                            };
+                            preload.src = thumbUrl;
+                        }, 110);
+                    }
+                }
+
+                const halfTooltip = thumbWrapEl && thumbWrapEl.style.display !== 'none' ? 90 : 28;
+                const offsetLeft = Math.max(halfTooltip, Math.min(rect.width - halfTooltip, clientX - rect.left));
                 scrubberTooltip.style.left = offsetLeft + 'px';
-                scrubberTooltip.style.display = 'block';
+                scrubberTooltip.style.display = 'flex';
             }
 
             scrubberContainer.addEventListener('mousedown', (e) => {
@@ -1441,6 +1693,10 @@
             });
 
             scrubberContainer.addEventListener('mouseleave', () => {
+                if (thumbHoverTimer) {
+                    clearTimeout(thumbHoverTimer);
+                    thumbHoverTimer = null;
+                }
                 if (!isScrubbing && scrubberTooltip) {
                     scrubberTooltip.style.display = 'none';
                 }
@@ -1503,6 +1759,134 @@
         }
     }
 
+    // --- TÉLÉCHARGEMENT HORS-LIGNE (LOCAL EPISODE DOWNLOAD) ---
+    function downloadCurrentEpisode() {
+        if (!currentActiveMagnet) {
+            showToast("⚠️ Aucun épisode actif à télécharger");
+            return;
+        }
+        const parsed = currentAnimeItem ? getAnimeDetails(currentAnimeItem) : {};
+        const animeTitle = currentAnimeItem?.animeName || parsed.animeName || currentAnimeItem?.titre || 'Anime';
+        const ep = currentDetectedEpisode || parsed.episode || '';
+        const cleanLabel = ep ? `${animeTitle} - Episode ${ep}` : animeTitle;
+
+        const dlUrl = `/api/download?magnet=${encodeURIComponent(currentActiveMagnet)}&fileIndex=${encodeURIComponent(currentActiveFileIndex || 1)}&title=${encodeURIComponent(cleanLabel)}`;
+        showToast("📥 Téléchargement local lancé en arrière-plan !");
+
+        const a = document.createElement('a');
+        a.href = dlUrl;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 1000);
+    }
+    window.downloadCurrentEpisode = downloadCurrentEpisode;
+
+    // --- GOOGLE CAST (CHROMECAST) / APPLE AIRPLAY / DIFFUSION SMART TV ---
+    let cachedServerStatusIps = null;
+
+    async function openCastModal() {
+        const modal = document.getElementById('castModal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+
+        const statusMsg = document.getElementById('castNativeStatusMsg');
+        if (statusMsg) statusMsg.textContent = '';
+
+        // Récupérer l'adresse IP LAN réelle (ex: 192.168.x.x) et Tailscale du serveur pour les TV
+        if (!cachedServerStatusIps) {
+            try {
+                const res = await fetch('/api/server/status');
+                if (res.ok) {
+                    cachedServerStatusIps = await res.json();
+                }
+            } catch (e) {}
+        }
+
+        const lanHost = cachedServerStatusIps?.lanIp || cachedServerStatusIps?.tailscaleIp || window.location.hostname;
+        const appPort = cachedServerStatusIps?.port || window.location.port || 3000;
+
+        const streamInput = document.getElementById('castLanStreamUrlInput');
+        const appInput = document.getElementById('castLanAppUrlInput');
+
+        if (streamInput && currentActiveMagnet) {
+            const lanStreamUrl = `http://${lanHost}:8090/stream?link=${encodeURIComponent(currentActiveMagnet)}&index=${currentActiveFileIndex || 1}&play`;
+            streamInput.value = lanStreamUrl;
+        }
+        if (appInput) {
+            appInput.value = `http://${lanHost}:${appPort}`;
+        }
+    }
+
+    function closeCastModal() {
+        const modal = document.getElementById('castModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function triggerNativeCastOrAirPlay() {
+        const video = document.getElementById('videoPlayer');
+        const statusMsg = document.getElementById('castNativeStatusMsg');
+        if (!video) return;
+
+        // 1. Apple AirPlay natif (Safari / iOS / macOS)
+        if (typeof video.webkitShowPlaybackTargetPicker === 'function') {
+            try {
+                video.webkitShowPlaybackTargetPicker();
+                if (statusMsg) statusMsg.textContent = "📡 Sélecteur AirPlay ouvert.";
+                return;
+            } catch (e) {}
+        }
+
+        // 2. HTML5 Remote Playback API (Chromecast / Android / Chrome / Edge)
+        if (video.remote && typeof video.remote.prompt === 'function') {
+            try {
+                if (statusMsg) statusMsg.textContent = "🔍 Recherche d'écrans Chromecast / Sans-fil...";
+                await video.remote.prompt();
+                if (statusMsg) statusMsg.textContent = "✅ Connecté à l'écran distant !";
+                showToast("📺 Diffusion sur l'écran distant activée !");
+                return;
+            } catch (err) {
+                if (statusMsg) {
+                    statusMsg.textContent = "ℹ️ Astuce : Vous pouvez aussi utiliser le menu 'Caster...' de votre navigateur ou copier le lien réseau ci-dessous dans VLC sur votre TV.";
+                }
+                return;
+            }
+        }
+
+        if (statusMsg) {
+            statusMsg.textContent = "ℹ️ Utilisez l'option 'Caster' de votre navigateur ou copiez le lien réseau ci-dessous sur votre Smart TV / VLC TV.";
+        }
+    }
+
+    function switchToHlsForCasting() {
+        const detailSel = document.getElementById('detailStreamMode');
+        if (detailSel) {
+            detailSel.value = 'hls';
+            if (typeof onDetailStreamModeChange === 'function') {
+                onDetailStreamModeChange();
+            }
+        }
+        closeCastModal();
+    }
+
+    function copyCastUrl(inputId) {
+        const input = document.getElementById(inputId);
+        if (!input || !input.value) return;
+        navigator.clipboard.writeText(input.value).then(() => {
+            showToast("📋 Lien réseau TV copié dans le presse-papier !");
+        }).catch(() => {
+            input.select();
+            document.execCommand('copy');
+            showToast("📋 Lien réseau TV copié !");
+        });
+    }
+
+    window.openCastModal = openCastModal;
+    window.closeCastModal = closeCastModal;
+    window.triggerNativeCastOrAirPlay = triggerNativeCastOrAirPlay;
+    window.switchToHlsForCasting = switchToHlsForCasting;
+    window.copyCastUrl = copyCastUrl;
 
     // Gestion des raccourcis clavier
     window.addEventListener('keydown', (e) => {
@@ -1516,6 +1900,11 @@
         const isDetailActive = detailView && detailView.style.display === 'block';
 
         if (e.key === 'Escape') {
+            const castModal = document.getElementById('castModal');
+            if (castModal && castModal.style.display === 'flex') {
+                closeCastModal();
+                return;
+            }
             const settingsModal = document.getElementById('settingsModal');
             if (settingsModal && settingsModal.style.display === 'flex') {
                 if (typeof closeSettingsModal === 'function') closeSettingsModal();
@@ -1603,6 +1992,7 @@
         if (typeof savePlaybackProgress === 'function') {
             savePlaybackProgress(true);
         }
+        destroyCurrentHlsInstance(true);
     });
 
     ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'].forEach(ev => {
@@ -1618,5 +2008,6 @@
     window.startTorrServerP2pPolling = startTorrServerP2pPolling;
     window.stopTorrServerP2pPolling = stopTorrServerP2pPolling;
     window.fetchTorrServerP2pStats = fetchTorrServerP2pStats;
+
 
 

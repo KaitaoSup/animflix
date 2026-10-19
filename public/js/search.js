@@ -225,6 +225,9 @@
         if (menu) menu.style.display = 'none';
 
         const video = document.getElementById('videoPlayer');
+        if (typeof destroyCurrentHlsInstance === 'function') {
+            destroyCurrentHlsInstance(true);
+        }
         video.pause();
         video.src = "";
         for (let i = 0; i < video.textTracks.length; i++) {
@@ -259,10 +262,12 @@
         const totalLabel = document.getElementById('playerDisplayTotal');
         const prog = document.getElementById('playerScrubberProgress');
         const buf = document.getElementById('playerScrubberBuffered');
+        const markers = document.getElementById('playerScrubberMarkers');
         if (curLabel) curLabel.textContent = "00:00";
         if (totalLabel) totalLabel.textContent = "--:--";
         if (prog) prog.style.width = "0%";
         if (buf) buf.style.width = "0%";
+        if (markers) markers.innerHTML = "";
         currentAnimeItem = null;
         currentAnilistMedia = null;
         hasAutoTrackedCurrentEpisode = false;
@@ -300,10 +305,14 @@
     function onDetailStreamModeChange() {
         if (!currentAnimeItem) return;
         const newMode = document.getElementById('detailStreamMode').value;
-        document.getElementById('streamMode').value = newMode;
+        const navMode = document.getElementById('streamMode');
+        if (navMode) navMode.value = newMode;
+        const video = document.getElementById('videoPlayer');
+        const curPos = Math.max(0, Math.round(currentStreamOffset + (video?.currentTime || 0)));
         const vlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(currentAnimeItem.lienMagnet) + "&index=" + currentActiveFileIndex + "&play";
-        startStreamingInPlayer(currentAnimeItem.lienMagnet, currentAnimeItem.titre, vlcUrl, currentActiveFileIndex, currentStreamOffset);
-        showToast("Mode de lecture mis à jour : " + (newMode === 'direct' ? '⚡ Direct' : '🔄 Transcodage'));
+        startStreamingInPlayer(currentAnimeItem.lienMagnet, currentAnimeItem.titre, vlcUrl, currentActiveFileIndex, curPos);
+        const modeLabel = newMode === 'direct' ? '⚡ Direct (0% CPU)' : (newMode === 'hls' ? '📡 HLS Adaptatif (.m3u8)' : '🔄 Transcodage H.264');
+        showToast("Mode de lecture mis à jour : " + modeLabel);
     }
 
     function handleSearchClick() {

@@ -2,10 +2,11 @@
 // --- ANIMFLIX SERVICE WORKER (PWA SHELL, OFFLINE CACHE & STREAM BYPASS) ---
 // =========================================================================
 
-const CACHE_NAME = 'animflix-shell-v1.7.1';
+const CACHE_NAME = 'animflix-shell-v1.8.0';
 
 const PRECACHE_ASSETS = [
   '/',
+  '/vendor/hls.min.js',
   '/css/style.css',
   '/css/player.css',
   '/css/anilist.css',
@@ -55,10 +56,13 @@ self.addEventListener('fetch', (event) => {
   // 1. NE JAMAIS INTERCEPTER les requêtes non-GET ou les flux streaming vidéo / TorrServer
   if (req.method !== 'GET') return;
 
-  // Contournement strict du cache pour tout flux vidéo, sous-titres temps réel ou API TorrServer
+  // Contournement strict du cache pour tout flux vidéo, HLS, miniatures, téléchargement ou API TorrServer
   if (
     url.pathname.startsWith('/play') ||
     url.pathname.startsWith('/stream') ||
+    url.pathname.startsWith('/api/hls/') ||
+    url.pathname.startsWith('/api/thumbnail') ||
+    url.pathname.startsWith('/api/download') ||
     url.pathname.startsWith('/api/subtitles') ||
     url.pathname.startsWith('/api/play-sync') ||
     url.pathname.startsWith('/api/torrserver') ||
@@ -85,10 +89,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Ressources statiques (CSS, JS, Icônes) : Stale-While-Revalidate
+  // 3. Ressources statiques (CSS, JS, Vendor, Icônes) : Stale-While-Revalidate
   if (
     url.pathname.startsWith('/css/') ||
     url.pathname.startsWith('/js/') ||
+    url.pathname.startsWith('/vendor/') ||
     url.pathname.startsWith('/icons/') ||
     url.pathname === '/manifest.json'
   ) {

@@ -330,6 +330,9 @@
                 const totalLabel = document.getElementById('playerDisplayTotal');
                 if (totalLabel) totalLabel.textContent = formatTimestamp(currentTotalDuration);
                 updatePlayerProgress();
+                if (typeof renderAniSkipTimelineMarkers === 'function') {
+                    renderAniSkipTimelineMarkers();
+                }
             }
 
             // 1. Mise à jour du sélecteur Audio
