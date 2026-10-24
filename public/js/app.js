@@ -336,6 +336,9 @@ function loadUserSettings() {
     const prefVoice = document.getElementById('prefDefaultVoiceBoost');
     if (prefVoice) prefVoice.value = voiceBoost;
 
+    const prefTv = document.getElementById('prefTvMode');
+    if (prefTv) prefTv.value = localStorage.getItem('animflix_tv_mode') || 'auto';
+
     renderSettingsProfiles();
 }
 

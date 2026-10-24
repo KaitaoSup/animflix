@@ -2,6 +2,23 @@
 // --- ANIMFLIX MEDIA PLAYER (CUSTOM CONTROLS, TIMELINE, SHORTCUTS) ---
 // =========================================================================
 
+    // Identifiant unique et persistant du client pour une isolation stricte des sessions multi-écrans
+    function getOrCreateClientId() {
+        let id = null;
+        try {
+            id = localStorage.getItem('animflix_client_id');
+        } catch (e) {}
+        if (!id || !/^[a-zA-Z0-9_\-]{4,64}$/.test(id)) {
+            id = 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+            try {
+                localStorage.setItem('animflix_client_id', id);
+            } catch (e) {}
+        }
+        window._animflixClientId = id;
+        return id;
+    }
+    window.getOrCreateClientId = getOrCreateClientId;
+
     function updatePlayerProgress() {
         const video = document.getElementById('videoPlayer');
         if (!video) return;
@@ -1080,7 +1097,7 @@
             currentHlsInstance = null;
         }
         if (notifyServer) {
-            const clientId = window._animflixClientId;
+            const clientId = getOrCreateClientId();
             if (clientId) {
                 fetch('/api/hls/stop', {
                     method: 'POST',
@@ -1161,7 +1178,7 @@
         const playId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         currentPlaySessionId = playId;
 
-        const clientId = window._animflixClientId || (window._animflixClientId = 'c_' + Math.random().toString(36).slice(2, 10));
+        const clientId = getOrCreateClientId();
 
         if (streamMode === 'hls') {
             let hlsUrl = `/api/hls/${encodeURIComponent(playId)}/index.m3u8?magnet=` + encodeURIComponent(magnet) +
@@ -1643,7 +1660,7 @@
                 // Chargement de la miniature 16:9 par paliers de 5 secondes
                 if (currentActiveMagnet && thumbWrapEl && thumbImgEl) {
                     const bucket = Math.max(0, Math.floor(hoverSec / 5) * 5);
-                    const clientId = window._animflixClientId || 'c_default';
+                    const clientId = getOrCreateClientId();
                     const thumbUrl = `/api/thumbnail?magnet=${encodeURIComponent(currentActiveMagnet)}&fileIndex=${encodeURIComponent(currentActiveFileIndex)}&t=${bucket}&clientId=${encodeURIComponent(clientId)}`;
                     const thumbKey = `${currentActiveMagnet}_${currentActiveFileIndex}_${bucket}`;
 

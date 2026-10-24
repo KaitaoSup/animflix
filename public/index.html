@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="/css/style.css?v=1.7.0">
     <link rel="stylesheet" href="/css/player.css?v=1.7.0">
     <link rel="stylesheet" href="/css/anilist.css?v=1.7.0">
+    <link rel="stylesheet" href="/css/tv.css?v=1.7.0">
 </head>
 <body>
   <div class="navbar">
@@ -47,6 +48,10 @@
           <!-- BOUTON PURGE CACHE TORRSERVER -->
           <button class="btn-clean-cache" onclick="cleanTorrServerCache()" title="Purger le cache et les torrents en mémoire de TorrServer">
               🧹
+          </button>
+          <!-- BOUTON MODE TV & MANETTE (10-FOOT UI) -->
+          <button id="tvModeNavBtn" class="btn-tv-nav" onclick="toggleTvMode()" title="Mode Téléviseur / Manette (10-foot UI)">
+              📺
           </button>
           <!-- BOUTON PARAMÈTRES UTILISATEUR -->
           <button class="btn-settings-nav" onclick="toggleSettingsModal()" title="Paramètres et préférences">
@@ -826,6 +831,18 @@
                   </label>
               </div>
 
+              <!-- Mode TV & Télécommande ("10-foot UI") -->
+              <div class="settings-group">
+                  <label class="settings-label">
+                      <span>📺 Mode Téléviseur & Canapé ("10-foot UI") :</span>
+                      <select id="prefTvMode" class="settings-select" onchange="onTvModePrefChange(this.value)">
+                          <option value="auto">Détection Automatique (Android TV / Écran)</option>
+                          <option value="enabled">Activé en permanence (Polices agrandies & focus net)</option>
+                          <option value="disabled">Désactivé (Interface tactile / bureau standard)</option>
+                      </select>
+                  </label>
+              </div>
+
               <!-- Informations Système & Serveur -->
               <div class="settings-server-info" id="settingsServerInfo">
                   <div class="settings-server-title">🖥️ Statut Serveur & Décodeur</div>
@@ -941,5 +958,6 @@
   <script src="/js/history.js?v=1.7.0"></script>
   <script src="/js/search.js?v=1.7.0"></script>
   <script src="/js/anilist.js?v=1.7.0"></script>
+  <script src="/js/tv.js?v=1.7.0"></script>
 </body>
 </html>
