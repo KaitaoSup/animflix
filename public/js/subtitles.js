@@ -1,8 +1,12 @@
 // =========================================================================
-// --- ANIMFLIX SUBTITLES (WEBVTT STREAMING, TIME OFFSET & STYLING) ---
+// --- ANIMFLIX SUBTITLES (LIBASS WASM & WEBVTT STREAMING, TIME OFFSET & STYLING) ---
 // =========================================================================
 
-    // --- GESTION DES SOUS-TITRES DIRECTS WEBVTT ---
+    // --- INSTANCE LIBASS WASM (JASSUB) & CONTENU ASS BRUT ---
+    let jassubInstance = null;
+    let currentRawAssContent = null;
+
+    // --- GESTION DES SOUS-TITRES DIRECTS WEBVTT (MODE REPLI OU CLASSIQUE) ---
     let cachedEpisodeCues = []; // [{ rawStart, rawEnd, text }, ...]
     let currentLoadedSubKey = null; // `${magnet}_f${fileIndex}_s${subIndex}`
     let currentLoadedSubMagnet = null;
@@ -21,6 +25,24 @@
         return 0;
     }
 
+    // Déclenchement sécurisé du rendu JASSUB (libass) sans risque de TypeError
+    function safeJassubRender(repaint = false) {
+        if (!jassubInstance) return;
+        try {
+            const video = document.getElementById('videoPlayer');
+            const data = jassubInstance._lastDemandTime || {
+                mediaTime: video ? (video.currentTime || 0) : 0,
+                width: video ? (video.videoWidth || 1920) : 1920,
+                height: video ? (video.videoHeight || 1080) : 1080
+            };
+            if (typeof jassubInstance.manualRender === 'function') {
+                jassubInstance.manualRender(data, repaint);
+            }
+        } catch (e) {
+            console.warn("[JASSUB] Erreur render:", e);
+        }
+    }
+
     // Applique les répliques en mémoire au TextTrack HTML5 avec l'offset exact et décalage manuel
     function applySubtitleCuesToTrack(seekOffset = null) {
         const video = document.getElementById('videoPlayer');
@@ -30,6 +52,22 @@
             currentActualStartOffset = parseFloat(seekOffset);
         } else if (typeof currentStreamOffset === 'number' && !isNaN(currentStreamOffset)) {
             currentActualStartOffset = currentStreamOffset;
+        }
+
+        // Si le moteur libass (JASSUB) est actif, synchroniser timeOffset et désactiver le TextTrack natif
+        if (currentSubStyle.renderer === 'libass' && jassubInstance) {
+            if (currentTextTrack) {
+                try { currentTextTrack.mode = 'disabled'; } catch (e) {}
+            }
+            if (video.textTracks) {
+                for (let i = 0; i < video.textTracks.length; i++) {
+                    try { video.textTracks[i].mode = 'disabled'; } catch (e) {}
+                }
+            }
+            const effOffset = currentActualStartOffset - currentManualSubOffset;
+            jassubInstance.timeOffset = effOffset;
+            safeJassubRender(true);
+            return;
         }
 
         const subSelect = document.getElementById('subSelect');
@@ -253,11 +291,234 @@
         }
     }
 
+    // Conversion hex CSS vers couleur BGR ASS (&HAABBGGRR&)
+    function hexToAssBgrColor(hex, alphaHex = '00') {
+        let r = 'ff', g = 'ff', b = 'ff';
+        if (!hex) return `&H${alphaHex}FFFFFF&`;
+        const cleanHex = hex.trim();
+        if (cleanHex.startsWith('#')) {
+            const raw = cleanHex.slice(1);
+            if (raw.length === 3) {
+                r = raw[0] + raw[0];
+                g = raw[1] + raw[1];
+                b = raw[2] + raw[2];
+            } else if (raw.length >= 6) {
+                r = raw.substring(0, 2);
+                g = raw.substring(2, 4);
+                b = raw.substring(4, 6);
+            }
+        } else if (cleanHex.startsWith('rgb')) {
+            const m = cleanHex.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+            if (m) {
+                r = parseInt(m[1], 10).toString(16).padStart(2, '0');
+                g = parseInt(m[2], 10).toString(16).padStart(2, '0');
+                b = parseInt(m[3], 10).toString(16).padStart(2, '0');
+            }
+        }
+        return `&H${alphaHex}${b}${g}${r}&`.toUpperCase();
+    }
+
+    // Applique les préférences de style (taille, couleur, police, position) à un fichier ASS
+    function applyStyleOverrideToAss(rawAss, style) {
+        if (!rawAss || typeof rawAss !== 'string') return rawAss;
+
+        // 1. Détection de PlayResY pour dimensionnement relatif exact
+        let playResY = 1080;
+        const playResMatch = rawAss.match(/PlayResY\s*:\s*(\d+)/i);
+        if (playResMatch) {
+            const parsed = parseInt(playResMatch[1], 10);
+            if (!isNaN(parsed) && parsed > 0) playResY = parsed;
+        }
+
+        // 2. Calcul proportionnel de la taille de police
+        let fontSize = Math.round(playResY * 0.062);
+        if (style.size === '1.0rem') fontSize = Math.round(playResY * 0.048);
+        else if (style.size === '1.3rem') fontSize = Math.round(playResY * 0.062);
+        else if (style.size === '1.65rem') fontSize = Math.round(playResY * 0.078);
+        else if (style.size === '2.0rem') fontSize = Math.round(playResY * 0.096);
+
+        // 3. Calcul de la marge inférieure (hauteur)
+        let marginV = Math.round(playResY * 0.15);
+        if (style.position === '78') marginV = Math.round(playResY * 0.22);
+        else if (style.position === '82') marginV = Math.round(playResY * 0.18);
+        else if (style.position === '85') marginV = Math.round(playResY * 0.15);
+        else if (style.position === '89') marginV = Math.round(playResY * 0.11);
+        else if (style.position === '94') marginV = Math.round(playResY * 0.06);
+        else if (style.position === 'auto') marginV = Math.round(playResY * 0.05);
+
+        // 4. Extraction du nom de police principal
+        let fontName = 'Arial';
+        if (style.font) {
+            const parts = style.font.split(',');
+            fontName = parts[0].replace(/['"]/g, '').trim() || 'Arial';
+        }
+
+        // 5. Couleurs et fond
+        const primaryColor = hexToAssBgrColor(style.color, '00');
+        const outlineColor = '&H00000000&';
+        let backColor = '&H80000000&';
+        let borderStyle = 1;
+        if (style.bg === 'transparent') {
+            backColor = '&HFF000000&';
+        } else if (style.bg && (style.bg.includes('0.95') || style.bg.includes('opaque'))) {
+            borderStyle = 3;
+            backColor = '&H00000000&';
+        }
+
+        // 6. Contour et ombrage
+        let outline = 2.5;
+        let shadow = 2.0;
+        if (style.shadow === 'outline') {
+            outline = 3.5;
+            shadow = 0;
+        } else if (style.shadow === 'shadow') {
+            outline = 2.2;
+            shadow = 2.8;
+        } else if (style.shadow === 'light') {
+            outline = 1.2;
+            shadow = 1.0;
+        } else if (style.shadow === 'none') {
+            outline = 0;
+            shadow = 0;
+        }
+
+        function buildCustomStyleLine(styleName) {
+            return `Style: ${styleName},${fontName},${fontSize},${primaryColor},&H000000FF&,${outlineColor},${backColor},1,0,0,0,100,100,0,0,${borderStyle},${outline},${shadow},2,30,30,${marginV},1`;
+        }
+
+        const lines = rawAss.split(/\r?\n/);
+        let inStyles = false;
+        let replacedAny = false;
+        const dialogueStyleRegex = /^(default|main|dialogue|dialog|texte|normal|vostfr|subtitles?|french)$/i;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (/^\[v4\+?\s*styles\]/i.test(line)) {
+                inStyles = true;
+                continue;
+            } else if (/^\[.*\]/.test(line) && inStyles) {
+                inStyles = false;
+                if (!replacedAny) {
+                    lines.splice(i, 0, buildCustomStyleLine('Default'));
+                    replacedAny = true;
+                    i++;
+                }
+                continue;
+            }
+
+            if (inStyles && /^style\s*:/i.test(line)) {
+                const parts = line.substring(6).split(',').map(s => s.trim());
+                const currentName = parts[0];
+                if (dialogueStyleRegex.test(currentName)) {
+                    lines[i] = buildCustomStyleLine(currentName);
+                    replacedAny = true;
+                }
+            }
+        }
+
+        return lines.join('\n');
+    }
+
+    // Initialisation ou mise à jour de l'instance JASSUB (libass Wasm)
+    async function initOrUpdateJassub(subContent = null) {
+        if (subContent) currentRawAssContent = subContent;
+        const video = document.getElementById('videoPlayer');
+        if (!video || !currentRawAssContent) return;
+
+        const subSelect = document.getElementById('subSelect');
+        if (subSelect && subSelect.value === "-1") {
+            if (jassubInstance) {
+                try { await jassubInstance.destroy(); } catch(e) {}
+                jassubInstance = null;
+            }
+            const oldCanvas = document.querySelector('canvas.JASSUB');
+            if (oldCanvas) oldCanvas.remove();
+            return;
+        }
+
+        const effOffset = currentActualStartOffset - currentManualSubOffset;
+        const isCustomMode = currentSubStyle.mode === 'custom';
+        const subContentToRender = isCustomMode
+            ? applyStyleOverrideToAss(currentRawAssContent, currentSubStyle)
+            : currentRawAssContent;
+
+        if (jassubInstance) {
+            try {
+                await jassubInstance.destroy();
+            } catch(e) {}
+            jassubInstance = null;
+        }
+
+        const oldCanvas = document.querySelector('canvas.JASSUB');
+        if (oldCanvas) oldCanvas.remove();
+
+        try {
+            jassubInstance = new window.JASSUB({
+                video: video,
+                subContent: subContentToRender,
+                workerUrl: '/vendor/jassub/jassub-worker.bundle.js',
+                wasmUrl: '/vendor/jassub/jassub-worker.wasm',
+                modernWasmUrl: '/vendor/jassub/jassub-worker-modern.wasm',
+                defaultFont: 'liberation sans',
+                availableFonts: {
+                    'liberation sans': '/vendor/jassub/default.woff2'
+                },
+                timeOffset: effOffset
+            });
+            await jassubInstance.ready;
+            try {
+                if (typeof jassubInstance.resize === 'function') {
+                    await jassubInstance.resize(true);
+                }
+                safeJassubRender(true);
+            } catch (e) {}
+
+            // Désactiver le TextTrack natif HTML5 pour éviter tout doublon visuel
+            if (currentTextTrack) {
+                try { currentTextTrack.mode = 'disabled'; } catch(e) {}
+            }
+            if (video.textTracks) {
+                for (let i = 0; i < video.textTracks.length; i++) {
+                    try { video.textTracks[i].mode = 'disabled'; } catch(e) {}
+                }
+            }
+
+            const subStatus = document.getElementById('sub-status');
+            if (subStatus) {
+                const modeLabel = isCustomMode ? 'Style personnalisé' : 'Original Fansub';
+                const offsetLabel = currentManualSubOffset !== 0
+                    ? ` [Sync: ${currentManualSubOffset > 0 ? '+' : ''}${currentManualSubOffset.toFixed(1)}s]`
+                    : '';
+                subStatus.innerText = `✨ Sous-titres HD actifs (libass • ${modeLabel})${offsetLabel}`;
+                subStatus.style.color = "#46d369";
+            }
+        } catch (err) {
+            console.warn("[JASSUB] Échec initialisation libass, repli sur WebVTT :", err);
+            if (jassubInstance) {
+                try { await jassubInstance.destroy(); } catch(e) {}
+                jassubInstance = null;
+            }
+            const chosenIndex = subSelect ? parseInt(subSelect.value, 10) : 0;
+            if (chosenIndex !== -1 && currentLoadedSubMagnet) {
+                currentLoadedSubKey = null;
+                currentSubStyle.renderer = 'vtt';
+                streamSubtitlesLive(currentLoadedSubMagnet, chosenIndex, currentLoadedSubFileIndex, currentActualStartOffset);
+            }
+        }
+    }
+
     function resetSubtitlesState() {
         if (currentSubAbort) {
             currentSubAbort.abort();
             currentSubAbort = null;
         }
+        if (jassubInstance) {
+            try { jassubInstance.destroy(); } catch(e) {}
+            jassubInstance = null;
+        }
+        const oldCanvas = document.querySelector('canvas.JASSUB');
+        if (oldCanvas) oldCanvas.remove();
+        currentRawAssContent = null;
         currentLoadedSubKey = null;
         currentLoadedSubMagnet = null;
         currentLoadedSubFileIndex = null;
@@ -271,8 +532,14 @@
 
     // Réaligne instantanément les sous-titres quand le serveur confirme le point clé réel (keyframe)
     function updateSubtitleOffset(actualStart) {
-        currentActualStartOffset = actualStart;
-        applySubtitleCuesToTrack(actualStart);
+        currentActualStartOffset = parseFloat(actualStart) || 0;
+        const effOffset = currentActualStartOffset - currentManualSubOffset;
+        if (jassubInstance && currentSubStyle.renderer === 'libass') {
+            jassubInstance.timeOffset = effOffset;
+            safeJassubRender(true);
+        } else {
+            applySubtitleCuesToTrack(currentActualStartOffset);
+        }
     }
 
     // Réglage manuel de décalage des sous-titres (accessible via boutons et raccourcis G / H)
@@ -282,7 +549,21 @@
         if (display) {
             display.textContent = (currentManualSubOffset >= 0 ? '+' : '') + currentManualSubOffset.toFixed(1) + 's';
         }
-        applySubtitleCuesToTrack(currentActualStartOffset);
+        const effOffset = currentActualStartOffset - currentManualSubOffset;
+        if (jassubInstance && currentSubStyle.renderer === 'libass') {
+            jassubInstance.timeOffset = effOffset;
+            safeJassubRender(true);
+            const subStatus = document.getElementById('sub-status');
+            if (subStatus) {
+                const modeLabel = currentSubStyle.mode === 'custom' ? 'Style personnalisé' : 'Original Fansub';
+                const offsetLabel = currentManualSubOffset !== 0
+                    ? ` [Sync: ${currentManualSubOffset > 0 ? '+' : ''}${currentManualSubOffset.toFixed(1)}s]`
+                    : '';
+                subStatus.innerText = `✨ Sous-titres HD actifs (libass • ${modeLabel})${offsetLabel}`;
+            }
+        } else {
+            applySubtitleCuesToTrack(currentActualStartOffset);
+        }
         showToast(`⏱️ Synchro sous-titres : ${currentManualSubOffset >= 0 ? '+' : ''}${currentManualSubOffset.toFixed(1)}s`);
     }
 
@@ -292,7 +573,18 @@
         if (display) {
             display.textContent = "0.0s";
         }
-        applySubtitleCuesToTrack(currentActualStartOffset);
+        const effOffset = currentActualStartOffset - currentManualSubOffset;
+        if (jassubInstance && currentSubStyle.renderer === 'libass') {
+            jassubInstance.timeOffset = effOffset;
+            safeJassubRender(true);
+            const subStatus = document.getElementById('sub-status');
+            if (subStatus) {
+                const modeLabel = currentSubStyle.mode === 'custom' ? 'Style personnalisé' : 'Original Fansub';
+                subStatus.innerText = `✨ Sous-titres HD actifs (libass • ${modeLabel})`;
+            }
+        } else {
+            applySubtitleCuesToTrack(currentActualStartOffset);
+        }
         showToast("⏱️ Synchronisation réinitialisée (0.0s)");
     }
 
@@ -395,12 +687,17 @@
 
     async function streamSubtitlesLive(magnet, subIndex, fileIndex = 1, seekOffset = 0) {
         const subKey = `${magnet}_f${fileIndex}_s${subIndex}`;
-
         currentActualStartOffset = parseFloat(seekOffset) || 0;
 
         // Si cette piste est déjà active ou en cours de streaming pour ce fichier
         if (subKey === currentLoadedSubKey) {
-            applySubtitleCuesToTrack(currentActualStartOffset);
+            const effOffset = currentActualStartOffset - currentManualSubOffset;
+            if (currentSubStyle.renderer === 'libass' && jassubInstance) {
+                jassubInstance.timeOffset = effOffset;
+                safeJassubRender(true);
+            } else {
+                applySubtitleCuesToTrack(currentActualStartOffset);
+            }
             return;
         }
 
@@ -415,15 +712,148 @@
         const subStatus = document.getElementById('sub-status');
         const toggleBtn = document.getElementById('toggleSubBtn');
 
-        subStatus.innerText = "⏳ Chargement des sous-titres...";
-        subStatus.style.color = "#ffa033";
-        toggleBtn.innerText = "CC ON";
-        toggleBtn.style.background = "var(--primary)";
+        if (toggleBtn) {
+            toggleBtn.innerText = "CC ON";
+            toggleBtn.style.background = "var(--primary)";
+        }
 
+        // --- MODE 1 : LIBASS WASM (JASSUB) HAUTE DÉFINITION (STREAMING TEMPS RÉEL) ---
+        if (currentSubStyle.renderer === 'libass' && typeof window.JASSUB !== 'undefined') {
+            subStatus.innerText = "⏳ Chargement des sous-titres HD (libass)...";
+            subStatus.style.color = "#ffa033";
+
+            try {
+                const subUrl = '/api/subtitles?magnet=' + encodeURIComponent(magnet) + '&fileIndex=' + fileIndex + '&subIndex=' + subIndex + '&format=ass';
+                const response = await fetch(subUrl, { signal: currentSubAbort.signal });
+                if (!response.ok || !response.body) {
+                    throw new Error("HTTP " + response.status);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let lineBuffer = "";
+                let fullAssContent = "";
+                let jassubInitialized = false;
+                let lastTrackUpdateTime = 0;
+                let lastDialogueCount = 0;
+
+                // Timeout de sécurité : si aucun flux ASS n'arrive en 12s, repli transparent sur WebVTT
+                const timeoutId = setTimeout(() => {
+                    if (!jassubInitialized) {
+                        console.warn("[JASSUB] Délai dépassé (12s), repli automatique sur WebVTT");
+                        if (currentSubAbort) currentSubAbort.abort();
+                        currentLoadedSubKey = null;
+                        currentSubStyle.renderer = 'vtt';
+                        streamSubtitlesLive(magnet, subIndex, fileIndex, currentActualStartOffset);
+                    }
+                }, 12000);
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    if (!chunk) continue;
+                    lineBuffer += chunk;
+
+                    // Découpage strict aux sauts de ligne pour ne JAMAIS couper une réplique au milieu d'une balise {\pos(...)}
+                    const lastNewlineIdx = lineBuffer.lastIndexOf('\n');
+                    if (lastNewlineIdx === -1) {
+                        // Ligne incomplète : conserver dans le buffer et attendre le chunk réseau suivant
+                        continue;
+                    }
+
+                    const readyChunk = lineBuffer.substring(0, lastNewlineIdx + 1);
+                    lineBuffer = lineBuffer.substring(lastNewlineIdx + 1);
+                    fullAssContent += readyChunk;
+                    currentRawAssContent = fullAssContent;
+
+                    const dialogueMatches = fullAssContent.match(/^Dialogue\s*:/gim);
+                    const dlgCount = dialogueMatches ? dialogueMatches.length : 0;
+
+                    // Dès que l'en-tête ASS (styles ou events) est reçu, initialiser libass immédiatement (< 200ms)
+                    if (!jassubInitialized) {
+                        const hasStyles = fullAssContent.includes('[V4+ Styles]') && fullAssContent.includes('Style:');
+                        const hasEvents = fullAssContent.includes('[Events]');
+
+                        if (hasStyles || hasEvents) {
+                            clearTimeout(timeoutId);
+                            let initAss = fullAssContent;
+                            if (!initAss.includes('[Events]')) {
+                                initAss += '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
+                            }
+                            await initOrUpdateJassub(initAss);
+                            jassubInitialized = true;
+                        }
+                    } else if (jassubInstance && jassubInstance.renderer) {
+                        // Mettre à jour les répliques dès qu'un lot de dialogues arrive
+                        if (dlgCount > lastDialogueCount) {
+                            lastDialogueCount = dlgCount;
+                            const now = Date.now();
+                            if (now - lastTrackUpdateTime > 250 || dlgCount < 30) {
+                                lastTrackUpdateTime = now;
+                                try {
+                                    const subToRender = currentSubStyle.mode === 'custom'
+                                        ? applyStyleOverrideToAss(fullAssContent, currentSubStyle)
+                                        : fullAssContent;
+                                    await jassubInstance.renderer.setTrack(subToRender);
+                                    safeJassubRender(true);
+                                } catch (e) {}
+                            }
+
+                            if (subStatus) {
+                                const modeLabel = currentSubStyle.mode === 'custom' ? 'Personnalisé' : 'Fansub';
+                                subStatus.innerText = `✨ Sous-titres HD actifs (${dlgCount} répliques • ${modeLabel})`;
+                                subStatus.style.color = "#46d369";
+                            }
+                        }
+                    }
+                }
+
+                clearTimeout(timeoutId);
+                // Traiter le reliquat éventuel de la dernière ligne
+                if (lineBuffer.trim().length > 0) {
+                    const remaining = lineBuffer + '\n';
+                    fullAssContent += remaining;
+                    currentRawAssContent = fullAssContent;
+                }
+
+                currentRawAssContent = fullAssContent;
+                if (!jassubInitialized && fullAssContent.trim().length > 0) {
+                    let initAss = fullAssContent;
+                    if (!initAss.includes('[Events]')) {
+                        initAss += '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
+                    }
+                    await initOrUpdateJassub(initAss);
+                } else if (jassubInstance && jassubInstance.renderer) {
+                    try {
+                        const subToRender = currentSubStyle.mode === 'custom'
+                            ? applyStyleOverrideToAss(fullAssContent, currentSubStyle)
+                            : fullAssContent;
+                        await jassubInstance.renderer.setTrack(subToRender);
+                        safeJassubRender(true);
+                        const finalCount = (fullAssContent.match(/^Dialogue\s*:/gim) || []).length;
+                        if (subStatus && finalCount > 0) {
+                            const modeLabel = currentSubStyle.mode === 'custom' ? 'Personnalisé' : 'Fansub';
+                            subStatus.innerText = `✨ Sous-titres HD actifs (${finalCount} répliques • ${modeLabel})`;
+                            subStatus.style.color = "#46d369";
+                        }
+                    } catch (e) {}
+                }
+                return;
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.warn("[JASSUB] Échec chargement sous-titres ASS, repli sur WebVTT :", err.message);
+                // Repli automatique sur WebVTT
+            }
+        }
+
+        // --- MODE 2 : STREAMING WEBVTT CLASSIQUE (REPLI OU SÉLECTION UTILISATEUR) ---
+        subStatus.innerText = "⏳ Chargement des sous-titres WebVTT...";
+        subStatus.style.color = "#ffa033";
         applySubtitleCuesToTrack(currentActualStartOffset);
 
         try {
-            const subUrl = '/api/subtitles?magnet=' + encodeURIComponent(magnet) + '&fileIndex=' + fileIndex + '&subIndex=' + subIndex;
+            const subUrl = '/api/subtitles?magnet=' + encodeURIComponent(magnet) + '&fileIndex=' + fileIndex + '&subIndex=' + subIndex + '&format=vtt';
             const response = await fetch(subUrl, { signal: currentSubAbort.signal });
             if (!response.ok || !response.body) {
                 subStatus.innerText = "⚠️ Sous-titres indisponibles";
@@ -528,19 +958,25 @@
         const btn = document.getElementById('toggleSubBtn');
         const customCc = document.getElementById('customCcBadge');
         const subStatus = document.getElementById('sub-status');
-        if (!currentTextTrack && cachedEpisodeCues.length > 0) {
-            applySubtitleCuesToTrack(currentActualStartOffset);
-        }
-        if (!currentTextTrack) return;
+        const subCanvas = document.querySelector('canvas.JASSUB');
 
-        if (currentTextTrack.mode === 'showing') {
-            currentTextTrack.mode = 'hidden';
+        let isCurrentlyVisible = false;
+        if (currentSubStyle.renderer === 'libass' && jassubInstance && subCanvas) {
+            isCurrentlyVisible = subCanvas.style.display !== 'none';
+        } else if (currentTextTrack) {
+            isCurrentlyVisible = currentTextTrack.mode === 'showing';
+        }
+
+        if (isCurrentlyVisible) {
+            if (currentTextTrack) currentTextTrack.mode = 'hidden';
+            if (subCanvas) subCanvas.style.display = 'none';
             if (btn) { btn.innerText = "CC OFF"; btn.style.background = "#555"; }
             if (customCc) customCc.style.opacity = '0.4';
             if (subStatus) subStatus.innerText = "Sous-titres masqués";
             showToast("Sous-titres masqués");
         } else {
-            currentTextTrack.mode = 'showing';
+            if (currentTextTrack) currentTextTrack.mode = 'showing';
+            if (subCanvas) subCanvas.style.display = 'block';
             if (btn) { btn.innerText = "CC ON"; btn.style.background = "var(--primary)"; }
             if (customCc) customCc.style.opacity = '1';
             if (subStatus) subStatus.innerText = "Sous-titres affichés";
@@ -552,10 +988,16 @@
         const subIndex = parseInt(val, 10);
         const btn = document.getElementById('toggleSubBtn');
         const subStatus = document.getElementById('sub-status');
+        const subCanvas = document.querySelector('canvas.JASSUB');
 
         if (subIndex === -1) {
             if (currentSubAbort) currentSubAbort.abort();
             if (currentTextTrack) currentTextTrack.mode = 'hidden';
+            if (jassubInstance) {
+                try { jassubInstance.destroy(); } catch(e) {}
+                jassubInstance = null;
+            }
+            if (subCanvas) subCanvas.remove();
             btn.innerText = "CC OFF";
             btn.style.background = "#555";
             subStatus.innerText = "Sous-titres désactivés";
@@ -563,6 +1005,7 @@
         } else {
             btn.innerText = "CC ON";
             btn.style.background = "var(--primary)";
+            currentLoadedSubKey = null; // Forcer le rechargement de la nouvelle piste
             if (currentActiveMagnet) {
                 streamSubtitlesLive(currentActiveMagnet, subIndex, currentActiveFileIndex, currentStreamOffset);
             }
@@ -571,6 +1014,8 @@
 
     // --- STYLE ET PERSONNALISATION DES SOUS-TITRES ---
     const defaultSubStyle = {
+        renderer: 'libass', // 'libass' (libass WebAssembly) ou 'vtt' (WebVTT classique)
+        mode: 'original',   // 'original' (Styles & polices de la team fansub) ou 'custom' (Style personnalisé)
         size: '1.3rem',
         color: '#ffffff',
         bg: 'rgba(0, 0, 0, 0.75)',
@@ -629,6 +1074,8 @@
             }
         } catch (e) {}
 
+        const rendererEl = document.getElementById('subRendererEngine');
+        const modeEl = document.getElementById('subStyleMode');
         const sizeEl = document.getElementById('subStyleSize');
         const colorEl = document.getElementById('subStyleColor');
         const bgEl = document.getElementById('subStyleBg');
@@ -637,6 +1084,8 @@
         const layoutEl = document.getElementById('subStyleLayout');
         const positionEl = document.getElementById('subStylePosition');
 
+        if (rendererEl) rendererEl.value = currentSubStyle.renderer || 'libass';
+        if (modeEl) modeEl.value = currentSubStyle.mode || 'original';
         if (sizeEl) sizeEl.value = currentSubStyle.size;
         if (colorEl) colorEl.value = currentSubStyle.color;
         if (bgEl) bgEl.value = currentSubStyle.bg;
@@ -649,6 +1098,8 @@
     }
 
     function updateSubStyle() {
+        const rendererEl = document.getElementById('subRendererEngine');
+        const modeEl = document.getElementById('subStyleMode');
         const sizeEl = document.getElementById('subStyleSize');
         const colorEl = document.getElementById('subStyleColor');
         const bgEl = document.getElementById('subStyleBg');
@@ -657,6 +1108,10 @@
         const layoutEl = document.getElementById('subStyleLayout');
         const positionEl = document.getElementById('subStylePosition');
 
+        const prevRenderer = currentSubStyle.renderer;
+
+        if (rendererEl) currentSubStyle.renderer = rendererEl.value;
+        if (modeEl) currentSubStyle.mode = modeEl.value;
         if (sizeEl) currentSubStyle.size = sizeEl.value;
         if (colorEl) currentSubStyle.color = colorEl.value;
         if (bgEl) currentSubStyle.bg = bgEl.value;
@@ -670,7 +1125,24 @@
         } catch (e) {}
 
         applySubStyle();
-        applySubtitleCuesToTrack();
+
+        // Si le moteur de rendu a changé (passage de libass à vtt ou vice-versa)
+        if (prevRenderer !== currentSubStyle.renderer) {
+            const subSelect = document.getElementById('subSelect');
+            const chosenIndex = subSelect ? parseInt(subSelect.value, 10) : 0;
+            if (chosenIndex !== -1 && currentLoadedSubMagnet) {
+                currentLoadedSubKey = null; // forcer le rechargement
+                streamSubtitlesLive(currentLoadedSubMagnet, chosenIndex, currentLoadedSubFileIndex, currentActualStartOffset);
+            }
+            return;
+        }
+
+        // Si le moteur libass est actif, réinitialiser le rendu avec le style choisi
+        if (currentSubStyle.renderer === 'libass' && currentRawAssContent) {
+            initOrUpdateJassub();
+        } else {
+            applySubtitleCuesToTrack();
+        }
     }
 
     function resetSubStyle() {
@@ -679,7 +1151,11 @@
             localStorage.removeItem('animflix_sub_style');
         } catch (e) {}
         loadSavedSubStyle();
-        applySubtitleCuesToTrack();
+        if (currentSubStyle.renderer === 'libass' && currentRawAssContent) {
+            initOrUpdateJassub();
+        } else {
+            applySubtitleCuesToTrack();
+        }
         showToast("Style des sous-titres réinitialisé");
     }
 
@@ -724,16 +1200,26 @@
 
         const preview = document.getElementById('sub-preview-box');
         if (preview) {
-            preview.style.backgroundColor = currentSubStyle.bg;
-            preview.style.color = currentSubStyle.color;
-            preview.style.fontFamily = currentSubStyle.font;
-            preview.style.fontSize = currentSubStyle.size;
-            preview.style.fontWeight = "600";
-            preview.style.textShadow = shadowCss;
-            if (currentSubStyle.layout === 'original') {
-                preview.innerHTML = "Sous-titre d'exemple<br>sur deux lignes";
+            if (currentSubStyle.renderer === 'libass' && currentSubStyle.mode === 'original') {
+                preview.style.backgroundColor = 'transparent';
+                preview.style.color = '#ffffff';
+                preview.style.fontFamily = 'inherit';
+                preview.style.fontSize = '1.1rem';
+                preview.style.fontWeight = 'bold';
+                preview.style.textShadow = '0 2px 4px rgba(0,0,0,0.9), 0 0 6px #000';
+                preview.innerHTML = "✨ Style Original Fansub actif<br><small style='font-size: 10px; color: #aaa; font-weight: normal;'>(Polices & couleurs définies par les traducteurs)</small>";
             } else {
-                preview.innerHTML = "Sous-titre VOSTFR d'exemple sur une seule ligne";
+                preview.style.backgroundColor = currentSubStyle.bg;
+                preview.style.color = currentSubStyle.color;
+                preview.style.fontFamily = currentSubStyle.font;
+                preview.style.fontSize = currentSubStyle.size;
+                preview.style.fontWeight = "600";
+                preview.style.textShadow = shadowCss;
+                if (currentSubStyle.layout === 'original') {
+                    preview.innerHTML = "Sous-titre d'exemple<br>sur deux lignes";
+                } else {
+                    preview.innerHTML = "Sous-titre VOSTFR d'exemple sur une seule ligne";
+                }
             }
         }
     }
@@ -748,3 +1234,14 @@
             applySubStyle();
         }
     }
+
+    // Export global explicite sur window pour l'interaction avec le lecteur et les modules
+    window.updateSubtitleOffset = updateSubtitleOffset;
+    window.applySubtitleCuesToTrack = applySubtitleCuesToTrack;
+    window.setupSubtitles = setupSubtitles;
+    window.streamSubtitlesLive = streamSubtitlesLive;
+    window.adjustSubtitleSync = adjustSubtitleSync;
+    window.resetSubtitleSync = resetSubtitleSync;
+    window.toggleSubtitles = toggleSubtitles;
+    window.onSubtitleChange = onSubtitleChange;
+    window.toggleSubStyleMenu = toggleSubStyleMenu;

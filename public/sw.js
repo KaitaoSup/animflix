@@ -2,14 +2,16 @@
 // --- ANIMFLIX SERVICE WORKER (PWA SHELL, OFFLINE CACHE & STREAM BYPASS) ---
 // =========================================================================
 
-const CACHE_NAME = 'animflix-shell-v1.8.0';
+const CACHE_NAME = 'animflix-shell-v1.9.1';
 
 const PRECACHE_ASSETS = [
   '/',
   '/vendor/hls.min.js',
+  '/vendor/jassub/jassub.bundle.js',
   '/css/style.css',
   '/css/player.css',
   '/css/anilist.css',
+  '/css/tv.css',
   '/js/auth.js',
   '/js/app.js',
   '/js/subtitles.js',
@@ -17,6 +19,7 @@ const PRECACHE_ASSETS = [
   '/js/history.js',
   '/js/search.js',
   '/js/anilist.js',
+  '/js/tv.js',
   '/manifest.json',
   '/icons/icon.svg',
   '/icons/icon-192.png',
@@ -66,6 +69,8 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/api/subtitles') ||
     url.pathname.startsWith('/api/play-sync') ||
     url.pathname.startsWith('/api/torrserver') ||
+    url.pathname.startsWith('/vendor/jassub/') ||
+    url.pathname.endsWith('.wasm') ||
     url.port === '8090' ||
     req.headers.has('range')
   ) {

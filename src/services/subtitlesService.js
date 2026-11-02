@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { SUB_CACHE_DIR, TORRSERVER_LOCAL_URL } from '../config/constants.js';
 import { getTorrentHash } from '../utils/network.js';
+import { getStreamInfo } from './ffmpegService.js';
 
 /**
  * Transformateur de sous-titres ASS / SSA vers WebVTT positionné
@@ -175,49 +176,87 @@ export class AssToVttStream extends Transform {
 }
 
 /**
- * Stream et met en cache les sous-titres WebVTT
+ * Stream et met en cache les sous-titres (ASS natif haute qualité ou WebVTT)
  */
-export function streamSubtitlesLive({ magnet, fileIndex = 1, subIndex = 0, req, res }) {
+export async function streamSubtitlesLive({ magnet, fileIndex = 1, subIndex = 0, format = 'ass', req, res }) {
   const hash = getTorrentHash(magnet);
   const parsedFileIndex = parseInt(fileIndex, 10) || 1;
   const parsedSubIndex = parseInt(subIndex, 10) || 0;
+  const isAss = format === 'ass';
   const cacheKey = `${hash}_f${parsedFileIndex}_s${parsedSubIndex}`;
+  const assFile = path.join(SUB_CACHE_DIR, `${cacheKey}.ass`);
   const vttFile = path.join(SUB_CACHE_DIR, `${cacheKey}.vtt`);
-  const uniqueId = Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
-  const tmpFile = path.join(SUB_CACHE_DIR, `${cacheKey}.${uniqueId}.tmp`);
 
-  // 1. Si déjà entièrement extrait et mis en cache, servir instantanément (< 1ms)
-  if (fs.existsSync(vttFile)) {
+  // 1. Si format ASS demandé et déjà en cache (.ass)
+  if (isAss && fs.existsSync(assFile)) {
+    res.setHeader('Content-Type', 'text/x-ssa; charset=utf-8');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return fs.createReadStream(assFile).pipe(res);
+  }
+
+  // 2. Si format VTT demandé et déjà en cache (.vtt)
+  if (!isAss && fs.existsSync(vttFile)) {
     res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 'public, max-age=86400');
     return fs.createReadStream(vttFile).pipe(res);
   }
 
-  // 2. Sinon, streamer en temps réel avec FFmpeg (extraction ASS puis conversion instantanée WebVTT)
+  // 3. Si format VTT demandé et .ass existe en cache : conversion instantanée sans FFmpeg
+  if (!isAss && fs.existsSync(assFile)) {
+    res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const vttStream = new AssToVttStream();
+    const assRead = fs.createReadStream(assFile);
+    assRead.pipe(vttStream);
+    return vttStream.pipe(res);
+  }
+
+  // 4. Sinon, extraction en temps réel avec FFmpeg (sortie ASS native ultra-rapide)
+  const uniqueId = Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  const tmpAssFile = path.join(SUB_CACHE_DIR, `${cacheKey}.${uniqueId}.ass.tmp`);
   const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
 
-  res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
+  const contentType = isAss ? 'text/x-ssa; charset=utf-8' : 'text/vtt; charset=utf-8';
+  res.setHeader('Content-Type', contentType);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Transfer-Encoding', 'chunked');
   res.setHeader('Cache-Control', 'no-cache');
 
   const ffmpegArgs = [
     '-v', 'error',
+    '-probesize', '1000000',
+    '-analyzeduration', '1000000',
+    '-fflags', '+nobuffer',
     '-i', torrUrl,
+    '-vn', '-an',
     '-map', `0:s:${parsedSubIndex}`,
-    '-flush_packets', '1',
-    '-f', 'ass',
-    'pipe:1'
+    '-flush_packets', '1'
   ];
 
-  const ffmpeg = spawn('ffmpeg', ffmpegArgs);
-  const fileOut = fs.createWriteStream(tmpFile);
-  const vttTransform = new AssToVttStream();
+  // Si le codec de la piste sous-titres est déjà ASS/SSA natif, copier directement (0% CPU, flux instantané)
+  const streamInfo = await getStreamInfo(magnet, parsedFileIndex).catch(() => null);
+  const targetSub = (streamInfo?.subTracks || []).find(t => t.index === parsedSubIndex) || (streamInfo?.subTracks || [])[0];
+  if (isAss && targetSub?.codec && (targetSub.codec === 'ass' || targetSub.codec === 'ssa')) {
+    ffmpegArgs.push('-c:s', 'copy');
+  }
 
-  ffmpeg.stdout.pipe(vttTransform);
-  vttTransform.pipe(res);
-  vttTransform.pipe(fileOut);
+  ffmpegArgs.push('-f', 'ass', 'pipe:1');
+
+  const ffmpeg = spawn('ffmpeg', ffmpegArgs);
+  const assFileOut = fs.createWriteStream(tmpAssFile);
+
+  if (isAss) {
+    ffmpeg.stdout.pipe(res);
+    ffmpeg.stdout.pipe(assFileOut);
+  } else {
+    const vttTransform = new AssToVttStream();
+    ffmpeg.stdout.pipe(vttTransform);
+    vttTransform.pipe(res);
+    ffmpeg.stdout.pipe(assFileOut);
+  }
 
   let ffmpegClosed = false;
   let fileOutFinished = false;
@@ -225,42 +264,45 @@ export function streamSubtitlesLive({ magnet, fileIndex = 1, subIndex = 0, req, 
 
   function tryPromoteCache() {
     if (ffmpegClosed && fileOutFinished && successCode) {
-      if (fs.existsSync(tmpFile)) {
+      if (fs.existsSync(tmpAssFile)) {
         try {
-          if (!fs.existsSync(vttFile)) {
-            fs.renameSync(tmpFile, vttFile);
+          if (!fs.existsSync(assFile)) {
+            fs.renameSync(tmpAssFile, assFile);
           } else {
-            fs.unlinkSync(tmpFile);
+            fs.unlinkSync(tmpAssFile);
           }
         } catch (e) {}
       }
     }
   }
 
-  fileOut.on('finish', () => {
+  assFileOut.on('finish', () => {
     fileOutFinished = true;
     tryPromoteCache();
   });
 
+  const safetyKillTimer = setTimeout(() => {
+    if (!ffmpegClosed) {
+      try { ffmpeg.kill('SIGKILL'); } catch (e) {}
+    }
+  }, 45000);
+
   ffmpeg.on('close', (code) => {
+    clearTimeout(safetyKillTimer);
     ffmpegClosed = true;
     if (code === 0) {
       successCode = true;
       tryPromoteCache();
     } else {
-      if (fs.existsSync(tmpFile)) {
-        try { fs.unlinkSync(tmpFile); } catch (e) {}
+      if (fs.existsSync(tmpAssFile)) {
+        try { fs.unlinkSync(tmpAssFile); } catch (e) {}
       }
     }
   });
 
   req.on('close', () => {
-    if (!successCode) {
-      ffmpeg.kill('SIGKILL');
-      fileOut.end();
-      if (fs.existsSync(tmpFile)) {
-        try { fs.unlinkSync(tmpFile); } catch (e) {}
-      }
-    }
+    try {
+      ffmpeg.stdout.unpipe(res);
+    } catch (e) {}
   });
 }

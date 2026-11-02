@@ -37,25 +37,27 @@ router.get('/api/streams', async (req, res) => {
   }
 });
 
-// --- ROUTE API STREAMING SOUS-TITRES WEBVTT ---
+// --- ROUTE API STREAMING SOUS-TITRES (ASS NATIF OU WEBVTT) ---
 router.get('/api/subtitles', (req, res) => {
-  const { magnet, fileIndex = 1, subIndex = 0 } = req.query;
+  const { magnet, fileIndex = 1, subIndex = 0, format = 'ass' } = req.query;
   if (!magnet) return res.status(400).send("Lien magnet manquant");
-  streamSubtitlesLive({ magnet, fileIndex, subIndex, req, res });
+  streamSubtitlesLive({ magnet, fileIndex, subIndex, format, req, res });
 });
 
 // --- ROUTE API SYNCHRONISATION PRÉCISE DU LECTEUR ET DES SOUS-TITRES ---
 router.get('/api/play-sync', async (req, res) => {
-  const { playId } = req.query;
+  const { playId, expectedSeek } = req.query;
   if (!playId) return res.status(400).json({ error: "playId manquant" });
+
+  const parsedExpectedSeek = parseFloat(expectedSeek) || 0;
 
   let session = activePlaySessions.get(playId);
   if (!session) {
     session = {
-      seekSeconds: 0,
-      actualStart: 0,
+      seekSeconds: parsedExpectedSeek,
+      actualStart: parsedExpectedSeek,
       keyframeOffset: 0,
-      resolved: false,
+      resolved: parsedExpectedSeek === 0,
       createdAt: Date.now(),
       waiters: []
     };
@@ -65,24 +67,24 @@ router.get('/api/play-sync', async (req, res) => {
   if (session.resolved) {
     return res.json({
       playId,
-      actualStart: session.actualStart,
+      actualStart: typeof session.actualStart === 'number' ? session.actualStart : parsedExpectedSeek,
       keyframeOffset: session.keyframeOffset || 0,
-      seekSeconds: session.seekSeconds,
+      seekSeconds: session.seekSeconds ?? parsedExpectedSeek,
       resolved: true
     });
   }
 
-  // Si le flux est encore en cours d'initialisation, attendre jusqu'à 3.5 secondes
+  // Si le flux est encore en cours d'initialisation, attendre jusqu'à 5 secondes
   await new Promise((resolve) => {
     session.waiters.push(resolve);
-    setTimeout(resolve, 3500);
+    setTimeout(resolve, 5000);
   });
 
   return res.json({
     playId,
-    actualStart: session.actualStart,
+    actualStart: typeof session.actualStart === 'number' ? session.actualStart : parsedExpectedSeek,
     keyframeOffset: session.keyframeOffset || 0,
-    seekSeconds: session.seekSeconds,
+    seekSeconds: session.seekSeconds ?? parsedExpectedSeek,
     resolved: session.resolved
   });
 });
@@ -106,7 +108,7 @@ router.get('/play', async (req, res) => {
         seekSeconds,
         actualStart: seekSeconds,
         keyframeOffset: 0,
-        resolved: false,
+        resolved: seekSeconds === 0,
         createdAt: Date.now(),
         waiters: []
       };
@@ -114,6 +116,14 @@ router.get('/play', async (req, res) => {
     } else {
       playSession.seekSeconds = seekSeconds;
       playSession.actualStart = seekSeconds;
+      if (seekSeconds === 0) {
+        playSession.resolved = true;
+        playSession.keyframeOffset = 0;
+        while (playSession.waiters && playSession.waiters.length > 0) {
+          const resolve = playSession.waiters.shift();
+          resolve();
+        }
+      }
     }
   }
 
@@ -175,27 +185,37 @@ router.get('/play', async (req, res) => {
     activeClientFfmpegProcesses.set(clientId, ffmpeg);
 
     if (playSession) {
-      let stderrBuffer = '';
-      const onData = (chunk) => {
-        if (playSession.resolved) return;
-        stderrBuffer += chunk.toString('utf8');
-        const match = stderrBuffer.match(/n:\s*0\s+pts:\s*\d+\s+pts_time:\s*([0-9.]+)/);
-        if (match) {
-          const actualPts = parseFloat(match[1]);
-          if (!isNaN(actualPts)) {
-            playSession.actualStart = actualPts;
-            playSession.keyframeOffset = Math.round((actualPts - playSession.seekSeconds) * 1000) / 1000;
+      if (seekSeconds === 0) {
+        playSession.resolved = true;
+        while (playSession.waiters && playSession.waiters.length > 0) {
+          const resolve = playSession.waiters.shift();
+          resolve();
+        }
+      } else {
+        let stderrBuffer = '';
+        const onData = (chunk) => {
+          if (playSession.resolved) return;
+          stderrBuffer += chunk.toString('utf8');
+          const match = stderrBuffer.match(/\[showinfo[^\]]*\]\s*n:\s*0\b[\s\S]*?\bpt:\s*(-?[\d\.]+)/);
+          if (match) {
+            const ptOffset = parseFloat(match[1]) || 0;
+            const actualStart = Math.max(0, Math.round((playSession.seekSeconds + ptOffset) * 1000) / 1000);
+            playSession.actualStart = actualStart;
+            playSession.keyframeOffset = ptOffset;
             playSession.resolved = true;
-            console.log(`🎯 FFmpeg Keyframe détecté : demandé = ${playSession.seekSeconds}s, effectif = ${actualPts}s (décalage = ${playSession.keyframeOffset}s)`);
+            console.log(`🎯 FFmpeg Keyframe détecté (${playId}) : demandé = ${playSession.seekSeconds}s, décalage = ${ptOffset}s -> effectif = ${actualStart}s`);
             while (playSession.waiters && playSession.waiters.length > 0) {
               const resolve = playSession.waiters.shift();
               resolve();
             }
             ffmpeg.stderr.off('data', onData);
           }
-        }
-      };
-      ffmpeg.stderr.on('data', onData);
+          if (stderrBuffer.length > 10000) {
+            stderrBuffer = stderrBuffer.slice(-5000);
+          }
+        };
+        ffmpeg.stderr.on('data', onData);
+      }
     }
 
     ffmpeg.stdout.pipe(res);
@@ -205,17 +225,47 @@ router.get('/play', async (req, res) => {
       if (activeClientFfmpegProcesses.get(clientId) === ffmpeg) {
         activeClientFfmpegProcesses.delete(clientId);
       }
+      if (playSession && !playSession.resolved) {
+        if (typeof playSession.actualStart !== 'number' || isNaN(playSession.actualStart)) {
+          playSession.actualStart = playSession.seekSeconds || 0;
+        }
+        playSession.resolved = true;
+        while (playSession.waiters && playSession.waiters.length > 0) {
+          const resolve = playSession.waiters.shift();
+          resolve();
+        }
+      }
     });
 
     ffmpeg.on('close', () => {
       if (activeClientFfmpegProcesses.get(clientId) === ffmpeg) {
         activeClientFfmpegProcesses.delete(clientId);
       }
+      if (playSession && !playSession.resolved) {
+        if (typeof playSession.actualStart !== 'number' || isNaN(playSession.actualStart)) {
+          playSession.actualStart = playSession.seekSeconds || 0;
+        }
+        playSession.resolved = true;
+        while (playSession.waiters && playSession.waiters.length > 0) {
+          const resolve = playSession.waiters.shift();
+          resolve();
+        }
+      }
     });
     return;
   }
 
   // MODE 2 : TRANSCODAGE VIDÉO H.264
+  if (playSession) {
+    playSession.actualStart = seekSeconds;
+    playSession.keyframeOffset = 0;
+    playSession.resolved = true;
+    while (playSession.waiters && playSession.waiters.length > 0) {
+      const resolve = playSession.waiters.shift();
+      resolve();
+    }
+  }
+
   const detectedHwAccel = getDetectedHwAccel();
   console.log(`🎬 Lancement FFmpeg en Mode Transcodage [${detectedHwAccel.toUpperCase()}] (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s)`);
   const streamInfo = await getStreamInfo(magnet, parsedFileIndex).catch(() => null);
@@ -351,6 +401,29 @@ router.get('/api/hls/:playId/index.m3u8', async (req, res) => {
   const parsedAudioOffset = parseFloat(audioOffset) || 0;
   const sessionDir = path.join(HLS_CACHE_DIR, playId);
   const m3u8Path = path.join(sessionDir, 'index.m3u8');
+
+  // Synchronisation de la session pour /api/play-sync
+  let playSession = activePlaySessions.get(playId);
+  if (!playSession) {
+    playSession = {
+      seekSeconds,
+      actualStart: seekSeconds,
+      keyframeOffset: 0,
+      resolved: true,
+      createdAt: Date.now(),
+      waiters: []
+    };
+    activePlaySessions.set(playId, playSession);
+  } else {
+    playSession.seekSeconds = seekSeconds;
+    playSession.actualStart = seekSeconds;
+    playSession.keyframeOffset = 0;
+    playSession.resolved = true;
+    while (playSession.waiters && playSession.waiters.length > 0) {
+      const resolve = playSession.waiters.shift();
+      resolve();
+    }
+  }
 
   // Si la session HLS existe déjà, servir directement la playlist
   if (activeHlsSessions.has(playId) && fs.existsSync(m3u8Path)) {

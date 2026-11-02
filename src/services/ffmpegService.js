@@ -143,6 +143,7 @@ export async function analyzeStreams(videoUrl) {
         subTracks.push({
           index: relativeSubCount,
           streamIndex: s.index,
+          codec: (s.codec_name || '').toLowerCase(),
           lang: lang || 'und',
           label: trackLabel,
           isFrench

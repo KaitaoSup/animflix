@@ -2247,8 +2247,8 @@
             renderAnilistDetailCard();
             updatePlayerTrackButton();
 
-            // Déclencher automatiquement la recherche AniSkip pour l'épisode en cours
-            if (typeof checkAniSkipForCurrentEpisode === 'function') {
+            // Déclencher la recherche AniSkip uniquement si les intervalles ne sont pas encore chargés
+            if (typeof checkAniSkipForCurrentEpisode === 'function' && !window.currentAniSkipIntervals) {
                 checkAniSkipForCurrentEpisode();
             }
         } catch (err) {

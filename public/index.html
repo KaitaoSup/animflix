@@ -466,6 +466,24 @@
                               </span>
                           </div>
 
+                          <!-- MOTEUR DE RENDU -->
+                          <div class="sub-style-row">
+                              <label for="subRendererEngine">Moteur :</label>
+                              <select id="subRendererEngine" onchange="updateSubStyle()">
+                                  <option value="libass" selected>✨ libass Wasm (Fansub Haute Qualité)</option>
+                                  <option value="vtt">📄 WebVTT (Standard)</option>
+                              </select>
+                          </div>
+
+                          <!-- MODE DE STYLE -->
+                          <div class="sub-style-row" id="subStyleModeRow">
+                              <label for="subStyleMode">Style :</label>
+                              <select id="subStyleMode" onchange="updateSubStyle()">
+                                  <option value="original" selected>🎬 Original Fansub (Polices & Styles)</option>
+                                  <option value="custom">🎨 Personnalisé (Mes réglages)</option>
+                              </select>
+                          </div>
+
                           <!-- TAILLE -->
                           <div class="sub-style-row">
                               <label for="subStyleSize">Taille :</label>
@@ -951,6 +969,7 @@
 
   <!-- SCRIPTS MODULAIRES ANIMFLIX -->
   <script src="/vendor/hls.min.js?v=1.5.17"></script>
+  <script src="/vendor/jassub/jassub.bundle.js?v=2.5.23"></script>
   <script src="/js/auth.js?v=1.7.0"></script>
   <script src="/js/app.js?v=1.7.0"></script>
   <script src="/js/subtitles.js?v=1.7.0"></script>

@@ -51,6 +51,12 @@
             outline: none;
             cursor: pointer;
         }
+        /* Moteur de sous-titres JASSUB (libass WebAssembly) */
+        .player-video-wrapper canvas.JASSUB {
+            position: absolute !important;
+            pointer-events: none !important;
+            z-index: 5 !important;
+        }
         .player-video-wrapper.hide-controls {
             cursor: none;
         }
@@ -118,6 +124,9 @@
             display: flex;
             align-items: center;
             cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
         }
         .player-scrubber-track {
             position: relative;

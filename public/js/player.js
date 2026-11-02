@@ -19,10 +19,12 @@
     }
     window.getOrCreateClientId = getOrCreateClientId;
 
-    function updatePlayerProgress() {
+    function updatePlayerProgress(overrideTime = null) {
         const video = document.getElementById('videoPlayer');
         if (!video) return;
-        const effectiveTime = Math.max(0, currentStreamOffset + (video.currentTime || 0));
+        const effectiveTime = (typeof overrideTime === 'number')
+            ? overrideTime
+            : Math.max(0, currentStreamOffset + (video.currentTime || 0));
         const totalDur = currentTotalDuration > 0 ? currentTotalDuration : 1440;
 
         if (!isScrubbing) {
@@ -39,29 +41,35 @@
             }
         }
 
-        // Mise à jour de la mémoire tampon (buffer)
+        // Mise à jour de la mémoire tampon (buffer) avec affichage précis de la tranche chargée
         if (video.buffered && video.buffered.length > 0 && totalDur > 0) {
             try {
+                const bufStart = video.buffered.start(0);
                 const bufEnd = video.buffered.end(video.buffered.length - 1);
-                const bufTotal = currentStreamOffset + bufEnd;
-                const bufPct = Math.min(100, Math.max(0, (bufTotal / totalDur) * 100));
+                const startSec = Math.max(0, currentStreamOffset + bufStart);
+                const endSec = Math.max(0, currentStreamOffset + bufEnd);
+                const startPct = Math.min(100, Math.max(0, (startSec / totalDur) * 100));
+                const endPct = Math.min(100, Math.max(0, (endSec / totalDur) * 100));
                 const bufEl = document.getElementById('playerScrubberBuffered');
-                if (bufEl) bufEl.style.width = bufPct + '%';
+                if (bufEl) {
+                    bufEl.style.left = startPct + '%';
+                    bufEl.style.width = Math.max(0, endPct - startPct) + '%';
+                }
             } catch (e) {}
         }
 
         // Sauvegarde automatique et périodique de la progression dans l'historique local
-        if (typeof savePlaybackProgress === 'function') {
+        if (!isScrubbing && typeof savePlaybackProgress === 'function') {
             savePlaybackProgress();
         }
 
         // Vérification dynamique AniSkip (Opening / Ending)
-        if (typeof updateAniSkipButton === 'function') {
+        if (!isScrubbing && typeof updateAniSkipButton === 'function') {
             updateAniSkipButton(effectiveTime);
         }
 
         // Vérification de fin d'épisode pour l'enchaînement automatique (Binge-Watching)
-        if (typeof checkAutoPlayNextEpisode === 'function') {
+        if (!isScrubbing && typeof checkAutoPlayNextEpisode === 'function') {
             checkAutoPlayNextEpisode(effectiveTime, totalDur);
         }
 
@@ -79,6 +87,11 @@
         }
         const totalDur = currentTotalDuration > 0 ? currentTotalDuration : 1440;
         const target = Math.max(0, Math.min(totalDur, Math.round(targetSeconds)));
+
+        // Masquer immédiatement le bouton AniSkip si la cible de saut est hors de l'opening
+        if (!currentAniSkipIntervals?.op || target >= currentAniSkipIntervals.op.endTime) {
+            hideAniSkipButton();
+        }
 
         // ⚡ SEEK INSTANTANÉ EN MÉMOIRE TAMPON (0ms In-Buffer Seek sans relancer FFmpeg)
         const video = document.getElementById('videoPlayer');
@@ -113,8 +126,8 @@
             }
         }
         
-        currentStreamOffset = target;
-        updatePlayerProgress();
+        // Rafraîchissement visuel immédiat de la timeline vers la cible demandée
+        updatePlayerProgress(target);
         if (typeof updateMediaSessionPositionState === 'function') {
             updateMediaSessionPositionState(true);
         }
@@ -125,6 +138,7 @@
         }
 
         const executeSeek = () => {
+            currentStreamOffset = target;
             const currentVlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(currentActiveMagnet) + "&index=" + currentActiveFileIndex + "&play";
             startStreamingInPlayer(currentActiveMagnet, currentAnimeItem?.titre || 'Anime', currentVlcUrl, currentActiveFileIndex, target);
         };
@@ -313,6 +327,8 @@
     // --- ANISKIP (DÉTECTION ET SAUT INTELLIGENT DE L'OPENING & ENDING + MARQUEURS TIMELINE) ---
     let currentAniSkipIntervals = null;
     let isAniSkipLoading = false;
+    let hasSkippedCurrentOp = false;
+    let hasSkippedCurrentEd = false;
 
     function renderAniSkipTimelineMarkers() {
         const markersEl = document.getElementById('playerScrubberMarkers');
@@ -346,9 +362,10 @@
     window.renderAniSkipTimelineMarkers = renderAniSkipTimelineMarkers;
 
     async function checkAniSkipForCurrentEpisode() {
-        currentAniSkipIntervals = null;
-        hideAniSkipButton();
-        renderAniSkipTimelineMarkers();
+        if (!currentAniSkipIntervals) {
+            hideAniSkipButton();
+            renderAniSkipTimelineMarkers();
+        }
 
         let malId = currentAnilistMedia?.idMal;
         const ep = currentDetectedEpisode || 1;
@@ -397,6 +414,7 @@
                     }
                 });
                 currentAniSkipIntervals = intervals;
+                window.currentAniSkipIntervals = intervals;
                 renderAniSkipTimelineMarkers();
                 console.log(`[AniSkip] Intervalles trouvés pour MAL ${malId} Ép. ${ep} :`, intervals);
             }
@@ -411,7 +429,7 @@
         const btn = document.getElementById('aniSkipOverlayBtn');
         if (!btn) return;
 
-        if (!currentAniSkipIntervals) {
+        if (!currentAniSkipIntervals || isScrubbing) {
             btn.style.display = 'none';
             return;
         }
@@ -425,34 +443,60 @@
         const op = currentAniSkipIntervals.op;
         const ed = currentAniSkipIntervals.ed;
 
+        // Gestion Opening
         if (op && effectiveTime >= op.startTime && effectiveTime < op.endTime) {
-            if (skipPref === 'auto') {
+            // Si l'opening a déjà été passé et que le flux commence sur le keyframe de fin (marge de 3.5s)
+            if (hasSkippedCurrentOp && effectiveTime >= (op.endTime - 3.5)) {
+                btn.style.display = 'none';
+                return;
+            }
+
+            // Auto-skip uniquement la première fois qu'on entre dans l'opening en lecture normale
+            if (!hasSkippedCurrentOp && skipPref === 'auto') {
+                hasSkippedCurrentOp = true;
+                hideAniSkipButton();
                 seekVideoTo(op.endTime, true);
                 showToast("⏭️ Opening passé automatiquement (AniSkip)");
                 return;
             }
+
             const remaining = Math.max(1, Math.round(op.endTime - effectiveTime));
             const textSpan = document.getElementById('aniSkipText');
             if (textSpan) textSpan.textContent = `Passer l'Opening (${remaining}s)`;
             btn.style.display = 'inline-flex';
             btn.onclick = () => {
+                hasSkippedCurrentOp = true;
+                hideAniSkipButton();
                 seekVideoTo(op.endTime, true);
                 showToast("⏭️ Opening passé !");
             };
             return;
         }
 
+        // Gestion Ending
         if (ed && effectiveTime >= ed.startTime && effectiveTime < ed.endTime) {
-            if (skipPref === 'auto') {
+            // Si l'ending a déjà été passé et que le flux commence sur le keyframe de fin (marge de 3.5s)
+            if (hasSkippedCurrentEd && effectiveTime >= (ed.endTime - 3.5)) {
+                btn.style.display = 'none';
+                return;
+            }
+
+            // Auto-skip uniquement la première fois qu'on entre dans l'ending en lecture normale
+            if (!hasSkippedCurrentEd && skipPref === 'auto') {
+                hasSkippedCurrentEd = true;
+                hideAniSkipButton();
                 seekVideoTo(ed.endTime, true);
                 showToast("⏭️ Ending passé automatiquement (AniSkip)");
                 return;
             }
+
             const remaining = Math.max(1, Math.round(ed.endTime - effectiveTime));
             const textSpan = document.getElementById('aniSkipText');
             if (textSpan) textSpan.textContent = `Passer l'Ending (${remaining}s)`;
             btn.style.display = 'inline-flex';
             btn.onclick = () => {
+                hasSkippedCurrentEd = true;
+                hideAniSkipButton();
                 seekVideoTo(ed.endTime, true);
                 showToast("⏭️ Ending passé !");
             };
@@ -1119,7 +1163,29 @@
         hasAutoTrackedCurrentEpisode = false;
         hasNextEpisodeTriggered = false;
         dismissNextEpisodeCountdown();
-        checkAniSkipForCurrentEpisode();
+
+        // Cacher immédiatement le bouton AniSkip si la lecture reprend hors de l'opening
+        if (!currentAniSkipIntervals?.op || seekSeconds >= currentAniSkipIntervals.op.endTime) {
+            hideAniSkipButton();
+        }
+
+        const epKey = `${magnet}_${currentActiveFileIndex}`;
+        const isNewEp = (window._currentPlayingEpisodeKey !== epKey);
+        window._currentPlayingEpisodeKey = epKey;
+
+        if (isNewEp) {
+            hasSkippedCurrentOp = false;
+            hasSkippedCurrentEd = false;
+            currentAniSkipIntervals = null;
+            window.currentAniSkipIntervals = null;
+            checkAniSkipForCurrentEpisode();
+        } else if (seekSeconds === 0) {
+            hasSkippedCurrentOp = false;
+            hasSkippedCurrentEd = false;
+        } else if (!currentAniSkipIntervals) {
+            checkAniSkipForCurrentEpisode();
+        }
+
         updatePlayerTrackButton();
 
         if (seekSeconds > 0 && typeof dismissResumeBanner === 'function') {
@@ -1264,7 +1330,7 @@
         setupSubtitles(magnet, type, currentActiveFileIndex, seekSeconds);
 
         // Synchronisation directe avec le point clé exact (Keyframe) détecté par le serveur
-        fetch('/api/play-sync?playId=' + encodeURIComponent(playId))
+        fetch('/api/play-sync?playId=' + encodeURIComponent(playId) + '&expectedSeek=' + encodeURIComponent(seekSeconds))
             .then(res => res.json())
             .then(data => {
                 if (currentPlaySessionId === playId && data && data.resolved && typeof data.actualStart === 'number') {
@@ -1286,6 +1352,7 @@
             const hudDot = document.getElementById('p2pHudDot');
             if (hudDot) hudDot.className = 'p2p-hud-dot active';
             resetControlsTimer();
+            updatePlayerProgress();
             if (typeof applySubtitleCuesToTrack === 'function') {
                 applySubtitleCuesToTrack(currentStreamOffset);
             }
@@ -1317,6 +1384,7 @@
             const hudDot = document.getElementById('p2pHudDot');
             if (hudDot) hudDot.className = 'p2p-hud-dot active';
             video.play().catch(() => {});
+            updatePlayerProgress();
             if (typeof applySubtitleCuesToTrack === 'function') {
                 applySubtitleCuesToTrack(currentStreamOffset);
             }
@@ -1607,8 +1675,14 @@
         // 5. Timeline Scrubber interactif (clic, glisser-déposer fluide & miniatures au survol)
         if (scrubberContainer && scrubberTrack) {
             function getRatio(e) {
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                let clientX = e.clientX;
+                if (e.touches && e.touches.length > 0) {
+                    clientX = e.touches[0].clientX;
+                } else if (e.changedTouches && e.changedTouches.length > 0) {
+                    clientX = e.changedTouches[0].clientX;
+                }
                 const rect = scrubberTrack.getBoundingClientRect();
+                if (!rect.width) return 0;
                 return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
             }
 
@@ -1622,8 +1696,14 @@
 
             function updateTooltip(e) {
                 if (!scrubberTooltip) return;
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                let clientX = e.clientX;
+                if (e.touches && e.touches.length > 0) {
+                    clientX = e.touches[0].clientX;
+                } else if (e.changedTouches && e.changedTouches.length > 0) {
+                    clientX = e.changedTouches[0].clientX;
+                }
                 const rect = scrubberTrack.getBoundingClientRect();
+                if (!rect.width) return;
                 const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
                 const hoverSec = Math.round(ratio * (currentTotalDuration > 0 ? currentTotalDuration : 1440));
 
@@ -1696,6 +1776,8 @@
 
             scrubberContainer.addEventListener('mousedown', (e) => {
                 if (e.button !== 0) return;
+                e.preventDefault();
+                e.stopPropagation();
                 isScrubbing = true;
                 scrubberContainer.classList.add('scrubbing');
                 const ratio = getRatio(e);
@@ -1721,6 +1803,7 @@
 
             window.addEventListener('mousemove', (e) => {
                 if (isScrubbing) {
+                    e.preventDefault();
                     resetControlsTimer();
                     const ratio = getRatio(e);
                     updateScrubVisual(ratio);
@@ -1737,6 +1820,10 @@
                     const targetSec = Math.round(ratio * (currentTotalDuration > 0 ? currentTotalDuration : 1440));
                     seekVideoTo(targetSec);
                 }
+            });
+
+            scrubberContainer.addEventListener('click', (e) => {
+                e.stopPropagation();
             });
 
             // Touch events pour tablettes et mobiles
@@ -1762,11 +1849,9 @@
                     isScrubbing = false;
                     scrubberContainer.classList.remove('scrubbing');
                     if (scrubberTooltip) scrubberTooltip.style.display = 'none';
-                    if (e.changedTouches && e.changedTouches[0]) {
-                        const rect = scrubberTrack.getBoundingClientRect();
-                        const ratio = Math.max(0, Math.min(1, (e.changedTouches[0].clientX - rect.left) / rect.width));
-                        seekVideoTo(Math.round(ratio * (currentTotalDuration > 0 ? currentTotalDuration : 1440)));
-                    }
+                    const ratio = getRatio(e);
+                    const targetSec = Math.round(ratio * (currentTotalDuration > 0 ? currentTotalDuration : 1440));
+                    seekVideoTo(targetSec);
                 }
             });
         }
