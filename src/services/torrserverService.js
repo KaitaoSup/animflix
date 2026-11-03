@@ -5,6 +5,7 @@ import { getTorrentHash, formatBytesSpeed, formatBytesSize } from '../utils/netw
 import { torrentFilesCache } from '../utils/cache.js';
 import { extractFileEpisodeNumber } from '../utils/animeParser.js';
 import { activeHlsSessions, cleanupHlsSession } from '../utils/sessionManager.js';
+import { cleanDiskCaches } from '../utils/diskCacheCleaner.js';
 
 const VIDEO_EXTENSIONS = new Set(['.mkv', '.mp4', '.avi', '.webm', '.mov', '.m4v', '.ts']);
 
@@ -158,7 +159,15 @@ export async function cleanTorrServerCache() {
     }
   }
 
-  return { success: true, cleaned, message: `${cleaned} torrent(s) purgé(s) du cache TorrServer.` };
+  const disk = await cleanDiskCaches({ all: true });
+  const freedMb = (disk.freed / 1024 / 1024).toFixed(1);
+
+  return {
+    success: true,
+    cleaned,
+    filesRemoved: disk.removed,
+    message: `${cleaned} torrent(s) purgé(s) du cache TorrServer, ${disk.removed} fichier(s) de cache supprimé(s) (${freedMb} Mo).`
+  };
 }
 
 /**

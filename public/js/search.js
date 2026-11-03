@@ -735,7 +735,7 @@
 
 
     async function cleanTorrServerCache() {
-        if (!confirm("Voulez-vous purger tous les torrents et données en mémoire de TorrServer ?\n(Libère immédiatement la RAM et le cache de streaming)")) return;
+        if (!confirm("Voulez-vous purger tous les torrents et données en mémoire de TorrServer ?\n(Libère immédiatement la RAM, le cache de streaming, les sous-titres et miniatures en cache)")) return;
         showToast("Purge du cache TorrServer en cours... ⏳");
         try {
             const res = await fetch('/api/torrserver/clean', { method: 'POST' });

@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 import { VAAPI_DEVICE, FFMPEG_HWACCEL_PREF, TORRSERVER_LOCAL_URL, THUMB_CACHE_DIR, HLS_CACHE_DIR } from '../config/constants.js';
+import { touchCacheFile } from '../utils/diskCacheCleaner.js';
 import { streamsCache } from '../utils/cache.js';
 import { getTorrentHash } from '../utils/network.js';
 import {
@@ -259,6 +260,7 @@ export async function generateThumbnail({ magnet, fileIndex = 1, timestamp = 0, 
   const thumbPath = path.join(THUMB_CACHE_DIR, thumbFileName);
 
   if (fs.existsSync(thumbPath)) {
+    touchCacheFile(thumbPath);
     return thumbPath;
   }
 

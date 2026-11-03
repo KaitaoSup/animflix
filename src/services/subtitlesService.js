@@ -5,6 +5,7 @@ import path from 'path';
 import { SUB_CACHE_DIR, TORRSERVER_LOCAL_URL } from '../config/constants.js';
 import { getTorrentHash } from '../utils/network.js';
 import { getCachedStreamInfo } from './ffmpegService.js';
+import { touchCacheFile } from '../utils/diskCacheCleaner.js';
 
 /**
  * Transformateur de sous-titres ASS / SSA vers WebVTT positionné
@@ -189,6 +190,7 @@ export async function streamSubtitlesLive({ magnet, fileIndex = 1, subIndex = 0,
 
   // 1. Si format ASS demandé et déjà en cache (.ass)
   if (isAss && fs.existsSync(assFile)) {
+    touchCacheFile(assFile);
     res.setHeader('Content-Type', 'text/x-ssa; charset=utf-8');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -197,6 +199,7 @@ export async function streamSubtitlesLive({ magnet, fileIndex = 1, subIndex = 0,
 
   // 2. Si format VTT demandé et déjà en cache (.vtt)
   if (!isAss && fs.existsSync(vttFile)) {
+    touchCacheFile(vttFile);
     res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -205,6 +208,7 @@ export async function streamSubtitlesLive({ magnet, fileIndex = 1, subIndex = 0,
 
   // 3. Si format VTT demandé et .ass existe en cache : conversion instantanée sans FFmpeg
   if (!isAss && fs.existsSync(assFile)) {
+    touchCacheFile(assFile);
     res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 'public, max-age=86400');

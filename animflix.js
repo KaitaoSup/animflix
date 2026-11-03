@@ -3,6 +3,7 @@ import { PORT } from './src/config/constants.js';
 import { checkHardwareAcceleration } from './src/services/ffmpegService.js';
 import { killAllProcesses } from './src/utils/sessionManager.js';
 import { createApp } from './src/app.js';
+import { startDiskCacheCleaner } from './src/utils/diskCacheCleaner.js';
 
 // Privilégier IPv4 pour éviter les lenteurs et blocages de résolution DNS
 if (typeof dns.setDefaultResultOrder === 'function') {
@@ -21,6 +22,7 @@ if (typeof process.loadEnvFile === 'function') {
 const app = createApp();
 
 const server = app.listen(PORT, async () => {
+  startDiskCacheCleaner();
   await checkHardwareAcceleration();
   console.log(`✅ Serveur Animflix modulaire prêt sur http://localhost:${PORT} !`);
 });
