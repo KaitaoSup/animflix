@@ -15,6 +15,48 @@ export function getTorrentHash(magnet) {
   return Math.abs(hash).toString(16);
 }
 
+// infoHash BitTorrent v1 : 40 caractères hexadécimaux ou 32 caractères base32
+const INFO_HASH_RE = /^(?:[a-f0-9]{40}|[a-z2-7]{32})$/i;
+const MAX_MAGNET_LENGTH = 4096;
+
+/**
+ * Vérifie qu'une valeur est un infoHash BitTorrent valide
+ */
+export function isValidInfoHash(value) {
+  return typeof value === 'string' && INFO_HASH_RE.test(value);
+}
+
+/**
+ * Vérifie qu'une valeur est un lien magnet BitTorrent valide (refuse les URL http/file/etc.
+ * que TorrServer accepterait sinon et irait télécharger côté serveur)
+ */
+export function isValidMagnet(value) {
+  if (typeof value !== 'string' || value.length > MAX_MAGNET_LENGTH) return false;
+  if (!value.toLowerCase().startsWith('magnet:?')) return false;
+  const params = new URLSearchParams(value.slice('magnet:?'.length));
+  return params.getAll('xt').some(xt => {
+    const m = /^urn:btih:(.+)$/i.exec(xt);
+    return m !== null && isValidInfoHash(m[1]);
+  });
+}
+
+/**
+ * Middleware Express : rejette toute requête dont les paramètres `magnet` / `hash`
+ * (query ou body) sont présents mais invalides
+ */
+export function validateTorrentParams(req, res, next) {
+  for (const source of [req.query, req.body]) {
+    if (!source || typeof source !== 'object') continue;
+    if (source.magnet !== undefined && source.magnet !== '' && !isValidMagnet(source.magnet)) {
+      return res.status(400).json({ error: "Lien magnet invalide" });
+    }
+    if (source.hash !== undefined && source.hash !== '' && !isValidInfoHash(source.hash)) {
+      return res.status(400).json({ error: "Hash de torrent invalide" });
+    }
+  }
+  next();
+}
+
 /**
  * Détection des adresses IP locales (LAN Wi-Fi/Ethernet & Tailscale) pour Cast / AirPlay / TV
  */

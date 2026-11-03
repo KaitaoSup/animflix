@@ -6,6 +6,7 @@ import searchRoutes from './routes/searchRoutes.js';
 import streamRoutes from './routes/streamRoutes.js';
 import torrserverRoutes from './routes/torrserverRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
+import { validateTorrentParams } from './utils/network.js';
 
 export function createApp() {
   const app = express();
@@ -26,6 +27,9 @@ export function createApp() {
 
   // Middleware d'authentification utilisateur
   app.use(authMiddleware);
+
+  // Validation des liens magnet / hash avant tout appel à TorrServer ou FFmpeg
+  app.use(validateTorrentParams);
 
   // Servir les fichiers statiques (CSS, JS, Icônes, Vendor) mis en cache par le navigateur
   app.use(express.static(PUBLIC_DIR, { maxAge: '1h', index: false }));
