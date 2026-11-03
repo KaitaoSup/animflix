@@ -83,7 +83,7 @@ export async function analyzeStreams(videoUrl, { timeoutMs = 15000 } = {}) {
       '-v', 'error',
       '-probesize', '5000000',
       '-analyzeduration', '5000000',
-      '-show_entries', 'stream=index,codec_type,codec_name,pix_fmt,width,height,duration:format=duration:stream_tags=language,title',
+      '-show_entries', 'stream=index,codec_type,codec_name,pix_fmt,width,height,duration:format=duration:stream_tags=language,title:stream_disposition=forced,default',
       '-of', 'json',
       videoUrl
     ];
@@ -147,7 +147,8 @@ export async function analyzeStreams(videoUrl, { timeoutMs = 15000 } = {}) {
           codec: (s.codec_name || '').toLowerCase(),
           lang: lang || 'und',
           label: trackLabel,
-          isFrench
+          isFrench,
+          forced: s.disposition?.forced === 1
         });
 
         if (subIndex === null && isFrench) {

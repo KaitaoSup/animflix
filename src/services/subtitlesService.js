@@ -8,6 +8,26 @@ import { getCachedStreamInfo } from './ffmpegService.js';
 import { touchCacheFile } from '../utils/diskCacheCleaner.js';
 
 /**
+ * Retire les segments en mode dessin vectoriel ({\p1} m 0 0 l 10 0 ... jusqu'à {\p0}) :
+ * ce sont les masques des panneaux, illisibles une fois convertis en texte WebVTT.
+ */
+export function stripAssDrawings(rawText) {
+  if (!/\\p[1-9]/.test(rawText)) return rawText;
+  let drawing = false;
+  let out = '';
+  for (const part of rawText.split(/(\{[^}]*\})/)) {
+    if (part.startsWith('{') && part.endsWith('}')) {
+      const modes = part.match(/\\p(\d+)/g);
+      if (modes) drawing = parseInt(modes[modes.length - 1].slice(2), 10) > 0;
+      out += part;
+    } else if (!drawing) {
+      out += part;
+    }
+  }
+  return out;
+}
+
+/**
  * Transformateur de sous-titres ASS / SSA vers WebVTT positionné
  */
 export class AssToVttStream extends Transform {
@@ -143,7 +163,7 @@ export class AssToVttStream extends Transform {
       isTop = true;
     }
 
-    let text = rawText
+    let text = stripAssDrawings(rawText)
       .replace(/\{[^\}]*\}/g, '')
       .replace(/\\N/g, '\n')
       .replace(/\\n/g, '\n')

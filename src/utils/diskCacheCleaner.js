@@ -1,8 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { SUB_CACHE_DIR, THUMB_CACHE_DIR } from '../config/constants.js';
+import { SUB_CACHE_DIR, THUMB_CACHE_DIR, FONT_CACHE_DIR } from '../config/constants.js';
 
-// --- NETTOYAGE AUTOMATIQUE DU CACHE DISQUE (SOUS-TITRES & MINIATURES) ---
+// --- NETTOYAGE AUTOMATIQUE DU CACHE DISQUE (SOUS-TITRES, MINIATURES & POLICES) ---
 // La date de modification (mtime) sert de "dernière utilisation" : elle est
 // rafraîchie à chaque lecture depuis le cache via touchCacheFile().
 
@@ -13,7 +13,7 @@ const SWEEP_INTERVAL_MS = 60 * 60 * 1000; // 1h
 // Les .tmp récents appartiennent à une extraction FFmpeg en cours : ne jamais y toucher
 const TMP_GRACE_MS = 60 * 60 * 1000;
 
-export const MANAGED_CACHE_DIRS = [SUB_CACHE_DIR, THUMB_CACHE_DIR];
+export const MANAGED_CACHE_DIRS = [SUB_CACHE_DIR, THUMB_CACHE_DIR, FONT_CACHE_DIR];
 
 /**
  * Marque un fichier du cache comme utilisé (repousse son expiration)

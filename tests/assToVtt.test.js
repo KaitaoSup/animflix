@@ -60,4 +60,24 @@ describe('AssToVttStream Transform', () => {
 
     assert.strictEqual(output, vttInput);
   });
+
+  it('ignore les masques vectoriels ({\\p1}) des panneaux mais garde le texte', async () => {
+    const assInput = [
+      '[Events]',
+      'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+      'Dialogue: 0,0:01:46.67,0:01:48.17,signs,sign,0,0,0,,{\\clip(1227,59,1229,247)\\pos(960,540)\\an5\\p1\\c&HF6F7F4&}m 297.49 -376.15 l 407.12 -387.24 407.94 -209.43',
+      'Dialogue: 0,0:01:50.00,0:01:52.00,signs,sign,0,0,0,,{\\p1}m 0 0 l 10 0 10 10{\\p0\\pos(960,200)}Boulangerie',
+      'Dialogue: 0,0:01:25.02,0:01:27.03,signs,sign,0,0,0,,{\\fnNunito Bold\\pos(1004.8,247.2)}Renako'
+    ].join('\n');
+
+    const stream = Readable.from([assInput]).pipe(new AssToVttStream());
+    let output = '';
+    for await (const chunk of stream) output += chunk.toString('utf8');
+
+    assert.ok(!output.includes('m 297.49'));
+    assert.ok(!output.includes('00:01:46.670'));
+    assert.ok(output.includes('Boulangerie'));
+    assert.ok(!output.includes('l 10 0'));
+    assert.ok(output.includes('Renako'));
+  });
 });

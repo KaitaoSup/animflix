@@ -55,6 +55,11 @@
     let currentLoadedSubKey = null; // `${magnet}_f${fileIndex}_s${subIndex}`
     let currentLoadedSubMagnet = null;
     let currentLoadedSubFileIndex = null;
+    let currentSubTracks = []; // pistes de sous-titres du fichier courant (réponse /api/streams)
+    // Polices embarquées par la team dans le MKV (pièces jointes), transmises à libass
+    let currentFontUrls = [];
+    let currentFontsKey = null;
+    let currentFontsPromise = null;
     let currentManualSubOffset = 0.0; // Secondes (ajustable avec raccourcis G / H ou interface)
     let currentActualStartOffset = 0.0;
 
@@ -461,20 +466,25 @@
             return 'Style: ' + values.join(',');
         }
 
-        // Styles de dialogue : nom évocateur, ou style très utilisé (≥ 15 % des répliques, ou le plus utilisé)
-        const totalDialogues = [...usage.values()].reduce((a, b) => a + b, 0);
+        // Styles de dialogue : nom évocateur, ou style très utilisé (≥ 15 % des répliques, ou le plus utilisé).
+        // Les styles de panneaux / karaokés / génériques (et ceux de la piste panneaux fusionnée) ne sont jamais
+        // restylés, même s'ils sont majoritaires (un épisode chargé en typesetting a souvent plus de lignes "signs").
+        const dialogueNameRegex = /(default|main|dialog|dial|texte|normal|vostfr|subtitle|french|italique|italic|flashback|narrat|pens[ée]e|thought)/i;
+        const signNameRegex = /(sign|panneau|titre|title|kara|song|lyric|romaji|logo|credit)|(^|[\s_\-])(ts|op|ed|note)([\s_\-\d]|$)/i;
+        const isSignStyleKey = (key) => key.startsWith(SIGNS_STYLE_PREFIX) || signNameRegex.test(key);
+        let totalDialogues = 0;
         let topStyle = null;
         let topCount = 0;
         for (const [name, count] of usage) {
+            if (isSignStyleKey(name)) continue;
+            totalDialogues += count;
             if (count > topCount) { topStyle = name; topCount = count; }
         }
-        const dialogueNameRegex = /(default|main|dialog|dial|texte|normal|vostfr|subtitle|french|italique|italic|flashback|narrat|pens[ée]e|thought)/i;
-        const signNameRegex = /(sign|panneau|titre|title|kara|song|lyric|romaji|logo|credit)|(^|[\s_\-])(ts|op|ed|note)([\s_\-\d]|$)/i;
         const isDialogueStyle = (name) => {
             const key = name.trim().replace(/^\*/, '').toLowerCase();
+            if (isSignStyleKey(key)) return false; // panneaux, karaokés, titres : jamais restylés
             const count = usage.get(key) || 0;
             if (key === topStyle) return true;
-            if (signNameRegex.test(key)) return false; // panneaux, karaokés, titres : jamais restylés
             if (totalDialogues > 0 && count / totalDialogues >= 0.15) return true;
             return dialogueNameRegex.test(key);
         };
@@ -520,6 +530,213 @@
         let newHeader = lines.join('\n');
         if (events && !newHeader.endsWith('\n')) newHeader += '\n';
         return newHeader + events;
+    }
+
+    // --- PISTE « PANNEAUX » COMPAGNON ---
+    // Beaucoup de releases séparent les dialogues et les panneaux / textes à l'écran (typesetting)
+    // dans deux pistes distinctes : « VOSTFR » + « VOSTFR (Panneaux / Forced / Signs) ».
+    // Quand la piste choisie ne contient que les dialogues, la piste panneaux est chargée et fusionnée.
+    const SIGNS_TRACK_REGEX = /(forced|forc[ée]s?|signs?\b|panneaux?|pancartes?|typeset|incrust|\bts\b|songs?\b|chansons?|karaok)/i;
+    const FULL_TRACK_REGEX = /(full|complets?|int[ée]gral|\btout\b|\ball\b)/i;
+    const SIGNS_STYLE_PREFIX = 'zsigns_';
+
+    function isSignsTrack(t) {
+        return !!t && (t.forced === true || SIGNS_TRACK_REGEX.test(t.label || ''));
+    }
+
+    // Renvoie l'index de la piste panneaux à fusionner avec `subIndex`, ou null
+    function findCompanionSignsTrack(subIndex) {
+        const tracks = currentSubTracks || [];
+        const chosen = tracks.find(t => t.index === subIndex);
+        if (!chosen || isSignsTrack(chosen) || FULL_TRACK_REGEX.test(chosen.label || '')) return null;
+        const textCodecs = ['ass', 'ssa', 'subrip', 'srt', 'webvtt', 'mov_text', 'text', ''];
+        if (!textCodecs.includes(chosen.codec || '')) return null;
+
+        const sameLang = (t) => t.lang === chosen.lang || t.lang === 'und' || chosen.lang === 'und'
+            || (!!t.isFrench && !!chosen.isFrench);
+        const candidates = tracks.filter(t => t.index !== subIndex && isSignsTrack(t)
+            && textCodecs.includes(t.codec || '') && sameLang(t));
+        if (candidates.length === 0) return null;
+        // Préférer une piste ASS de même langue explicite
+        candidates.sort((a, b) => {
+            const score = (t) => (t.lang === chosen.lang ? 2 : 0) + ((t.codec === 'ass' || t.codec === 'ssa') ? 1 : 0);
+            return score(b) - score(a);
+        });
+        return candidates[0].index;
+    }
+
+    // Découpe un fichier ASS : styles (avec leur Format), événements (avec leur Format), PlayRes
+    function parseAssForMerge(assText) {
+        const result = { styleFormat: null, styles: [], eventFormat: null, events: [], playResX: null, playResY: null };
+        let section = '';
+        for (const rawLine of assText.split(/\r?\n/)) {
+            const line = rawLine.trim();
+            if (!line) continue;
+            if (/^\[.*\]$/.test(line)) { section = line.toLowerCase(); continue; }
+            if (section === '[script info]') {
+                const m = line.match(/^PlayRes([XY])\s*:\s*(\d+)/i);
+                if (m) result[m[1].toUpperCase() === 'X' ? 'playResX' : 'playResY'] = parseInt(m[2], 10);
+            } else if (/^\[v4\+?\s*styles\]$/.test(section)) {
+                if (/^format\s*:/i.test(line)) result.styleFormat = line.replace(/^format\s*:/i, '').split(',').map(f => f.trim().toLowerCase());
+                else if (/^style\s*:/i.test(line)) result.styles.push(line.replace(/^style\s*:/i, '').split(',').map(v => v.trim()));
+            } else if (section === '[events]') {
+                if (/^format\s*:/i.test(line)) result.eventFormat = line.replace(/^format\s*:/i, '').split(',').map(f => f.trim().toLowerCase());
+                else if (/^dialogue\s*:/i.test(line)) result.events.push(line.replace(/^dialogue\s*:\s*/i, ''));
+            }
+        }
+        return result;
+    }
+
+    const DEFAULT_ASS_EVENT_FORMAT = ['layer', 'start', 'end', 'style', 'name', 'marginl', 'marginr', 'marginv', 'effect', 'text'];
+
+    function splitAssEvent(rest, fieldCount) {
+        const fields = [];
+        let pos = 0;
+        for (let i = 0; i < fieldCount - 1; i++) {
+            const next = rest.indexOf(',', pos);
+            if (next === -1) return null;
+            fields.push(rest.substring(pos, next));
+            pos = next + 1;
+        }
+        fields.push(rest.substring(pos));
+        return fields;
+    }
+
+    // Clé de déduplication d'une réplique (début, fin, texte) indépendante du style
+    function assEventKey(fields, format) {
+        const get = (name) => (fields[format.indexOf(name)] || '').trim();
+        return get('start') + '|' + get('end') + '|' + get('text');
+    }
+
+    // Fusionne les styles et répliques de la piste panneaux dans la piste de dialogues.
+    // Les styles importés sont préfixés pour éviter toute collision (ex: deux styles "Default" différents)
+    // et ne sont jamais touchés par le mode « style personnalisé ».
+    function mergeSignsIntoAss(mainAss, signsAss) {
+        if (!mainAss || !signsAss || !/^Dialogue\s*:/im.test(signsAss)) return mainAss;
+        const signs = parseAssForMerge(signsAss);
+        if (signs.events.length === 0) return mainAss;
+        const main = parseAssForMerge(mainAss);
+
+        if (signs.playResY && main.playResY && signs.playResY !== main.playResY && !mergeSignsIntoAss._warned) {
+            mergeSignsIntoAss._warned = true;
+            console.warn(`[Sous-titres] PlayResY différent entre dialogues (${main.playResY}) et panneaux (${signs.playResY}) : positions approximatives`);
+        }
+
+        // Styles : remappés sur le Format de la piste principale
+        const mainStyleFormat = main.styleFormat || DEFAULT_ASS_STYLE_FORMAT.map(f => f.toLowerCase());
+        const signsStyleFormat = signs.styleFormat || DEFAULT_ASS_STYLE_FORMAT.map(f => f.toLowerCase());
+        const signsStyleNames = new Set();
+        const styleLines = [];
+        for (const values of signs.styles) {
+            const nameIdx = signsStyleFormat.indexOf('name');
+            const name = (values[nameIdx >= 0 ? nameIdx : 0] || 'Default').replace(/^\*/, '');
+            signsStyleNames.add(name.toLowerCase());
+            const mapped = mainStyleFormat.map(field => {
+                if (field === 'name') return SIGNS_STYLE_PREFIX + name;
+                const idx = signsStyleFormat.indexOf(field);
+                return idx >= 0 && values[idx] !== undefined ? values[idx] : '0';
+            });
+            styleLines.push('Style: ' + mapped.join(','));
+        }
+
+        // Répliques : remappées sur le Format d'événements principal, sans doublons
+        const mainEventFormat = main.eventFormat || DEFAULT_ASS_EVENT_FORMAT;
+        const signsEventFormat = signs.eventFormat || DEFAULT_ASS_EVENT_FORMAT;
+        const existing = new Set();
+        for (const ev of main.events) {
+            const f = splitAssEvent(ev, mainEventFormat.length);
+            if (f) existing.add(assEventKey(f, mainEventFormat));
+        }
+        const eventLines = [];
+        for (const ev of signs.events) {
+            const f = splitAssEvent(ev, signsEventFormat.length);
+            if (!f) continue;
+            const key = assEventKey(f, signsEventFormat);
+            if (existing.has(key)) continue;
+            existing.add(key);
+            const mapped = mainEventFormat.map(field => {
+                const idx = signsEventFormat.indexOf(field);
+                let val = idx >= 0 && f[idx] !== undefined ? f[idx] : (field === 'text' ? '' : '0');
+                if (field === 'style') {
+                    const styleName = val.trim().replace(/^\*/, '');
+                    if (signsStyleNames.has(styleName.toLowerCase())) val = SIGNS_STYLE_PREFIX + styleName;
+                } else if (field !== 'text') {
+                    val = val.trim();
+                }
+                return val;
+            });
+            eventLines.push('Dialogue: ' + mapped.join(','));
+        }
+        if (eventLines.length === 0) return mainAss;
+
+        // Insertion des styles à la fin de la section [V4+ Styles] (ou création de la section)
+        let merged = mainAss;
+        if (styleLines.length > 0) {
+            const stylesHeader = merged.match(/^\[V4\+?\s*Styles\][^\n]*\n/im);
+            if (stylesHeader) {
+                const sectionStart = stylesHeader.index + stylesHeader[0].length;
+                const nextSection = merged.slice(sectionStart).search(/^\[/m);
+                let insertAt = nextSection === -1 ? merged.length : sectionStart + nextSection;
+                // Reculer avant les lignes vides séparant les sections
+                while (insertAt > sectionStart && /\s/.test(merged[insertAt - 1])) insertAt--;
+                merged = merged.slice(0, insertAt) + '\n' + styleLines.join('\n') + merged.slice(insertAt);
+            } else {
+                const block = '[V4+ Styles]\nFormat: ' + DEFAULT_ASS_STYLE_FORMAT.join(', ') + '\n' + styleLines.join('\n') + '\n\n';
+                const eventsIdx = merged.search(/^\[Events\]/im);
+                merged = eventsIdx === -1 ? merged + '\n' + block : merged.slice(0, eventsIdx) + block + merged.slice(eventsIdx);
+            }
+        }
+
+        // Ajout des répliques en fin de section [Events]
+        if (!/^\[Events\]/im.test(merged)) {
+            merged += '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
+        }
+        if (!merged.endsWith('\n')) merged += '\n';
+        return merged + eventLines.join('\n') + '\n';
+    }
+
+    // --- POLICES EMBARQUÉES DE LA TEAM (PIÈCES JOINTES MKV) ---
+    // Sans elles, libass remplace toutes les polices des dialogues et panneaux par la police par défaut.
+    function loadEmbeddedFonts(magnet, fileIndex) {
+        const key = magnet + '_f' + fileIndex;
+        if (key === currentFontsKey && currentFontsPromise) return currentFontsPromise;
+        currentFontsKey = key;
+        currentFontUrls = [];
+        currentFontsPromise = (async () => {
+            // Le serveur répond 503 tant que le torrent est trop lent pour lire l'en-tête : quelques essais espacés
+            for (let attempt = 0; attempt < 4; attempt++) {
+                if (currentFontsKey !== key) return;
+                try {
+                    const res = await fetch('/api/fonts?magnet=' + encodeURIComponent(magnet) + '&fileIndex=' + fileIndex);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (currentFontsKey !== key) return;
+                        currentFontUrls = (data.fonts || []).map(f => new URL(f.url, location.href).href);
+                        if (currentFontUrls.length > 0) {
+                            console.log(`[Sous-titres] ${currentFontUrls.length} police(s) embarquée(s) de la team chargée(s)`);
+                            await applyEmbeddedFonts(jassubInstance);
+                        }
+                        return;
+                    }
+                    if (res.status !== 503) return;
+                } catch (e) {}
+                await new Promise(r => setTimeout(r, 6000));
+            }
+        })();
+        return currentFontsPromise;
+    }
+
+    // Ajoute les polices embarquées à une instance JASSUB (une seule fois par instance et par fichier)
+    async function applyEmbeddedFonts(instance) {
+        if (!instance || !instance.renderer || currentFontUrls.length === 0) return;
+        if (instance._animflixFontsKey === currentFontsKey) return;
+        instance._animflixFontsKey = currentFontsKey;
+        try {
+            await instance.renderer.addFonts(currentFontUrls);
+            if (instance === jassubInstance) safeJassubRender(true);
+        } catch (e) {
+            console.warn("[JASSUB] Impossible d'ajouter les polices embarquées :", e);
+        }
     }
 
     // Initialisation ou mise à jour de l'instance JASSUB (libass Wasm).
@@ -588,6 +805,9 @@
                 safeJassubRender(true);
             } catch (e) {}
 
+            // Polices de la team : ajoutées sans bloquer le premier affichage (téléchargement parfois lourd)
+            applyEmbeddedFonts(instance);
+
             applyJassubCanvasVisibility();
 
             // Désactiver le TextTrack natif HTML5 pour éviter tout doublon visuel
@@ -635,6 +855,10 @@
         currentLoadedSubKey = null;
         currentLoadedSubMagnet = null;
         currentLoadedSubFileIndex = null;
+        currentSubTracks = [];
+        currentFontUrls = [];
+        currentFontsKey = null;
+        currentFontsPromise = null;
         cachedEpisodeCues = [];
         currentActualStartOffset = 0.0;
         currentManualSubOffset = 0.0;
@@ -752,6 +976,7 @@
             const info = await res.json();
             const subTracks = info.subTracks || [];
             const audioTracks = info.audioTracks || [];
+            currentSubTracks = subTracks;
 
             if (info.probeFailed) {
                 // Pistes inconnues pour l'instant : réessayer, sans écraser la liste si c'est déjà un nouvel essai
@@ -868,94 +1093,122 @@
             toggleBtn.style.background = "var(--primary)";
         }
 
+        const signsIndex = findCompanionSignsTrack(subIndex);
+        if (signsIndex !== null) {
+            console.log(`[Sous-titres] Piste panneaux compagnon détectée (piste ${signsIndex}), fusion avec la piste ${subIndex}`);
+        }
+        const buildSubUrl = (idx, format) => '/api/subtitles?magnet=' + encodeURIComponent(magnet) + '&fileIndex=' + fileIndex + '&subIndex=' + idx + '&format=' + format;
+
+        // Lit un flux texte et transmet uniquement des lignes complètes (jamais une réplique coupée au milieu d'une balise)
+        async function readTextLines(url, signal, onLines) {
+            const response = await fetch(url, { signal });
+            if (!response.ok || !response.body) throw new Error("HTTP " + response.status);
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let lineBuffer = "";
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                if (!chunk) continue;
+                lineBuffer += chunk;
+                const lastNewlineIdx = lineBuffer.lastIndexOf('\n');
+                if (lastNewlineIdx === -1) continue;
+                const readyChunk = lineBuffer.substring(0, lastNewlineIdx + 1);
+                lineBuffer = lineBuffer.substring(lastNewlineIdx + 1);
+                await onLines(readyChunk);
+            }
+            const tail = lineBuffer + decoder.decode();
+            if (tail.trim().length > 0) await onLines(tail + '\n');
+        }
+
         // --- MODE 1 : LIBASS WASM (JASSUB) HAUTE DÉFINITION (STREAMING TEMPS RÉEL) ---
         if (isLibassActive() && typeof window.JASSUB !== 'undefined') {
             subStatus.innerText = "⏳ Chargement des sous-titres HD (libass)...";
             subStatus.style.color = "#ffa033";
+            loadEmbeddedFonts(magnet, fileIndex);
+
+            const streamSignal = currentSubAbort.signal;
+            let fullAssContent = "";
+            let signsAssContent = "";
+            let jassubInitialized = false;
+            let lastTrackUpdateTime = 0;
+            let dlgCount = 0;
+            let signsCount = 0;
+            let appliedCount = 0;
+            let trackUpdateTimer = null;
+            let trackUpdateInFlight = false;
+            const styleUsage = new Map();
+            const totalCount = () => dlgCount + signsCount;
+
+            const ensureEventsSection = (txt) => txt.includes('[Events]')
+                ? txt
+                : txt + '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
+
+            // Contenu complet à rendre : dialogues + panneaux de la piste compagnon
+            const buildMergedAss = () => signsAssContent
+                ? mergeSignsIntoAss(ensureEventsSection(fullAssContent), signsAssContent)
+                : fullAssContent;
+
+            const updateStatus = () => {
+                if (!subStatus || subtitlesHidden) return;
+                const modeLabel = currentSubStyle.mode === 'custom' ? 'Personnalisé' : 'Fansub';
+                const signsLabel = signsCount > 0 ? ` + ${signsCount} panneaux` : '';
+                subStatus.innerText = `✨ Sous-titres HD actifs (${dlgCount} répliques${signsLabel} • ${modeLabel})`;
+                subStatus.style.color = "#46d369";
+            };
+
+            // Envoie le contenu accumulé au worker libass (au plus toutes les 300 ms au début, puis 1,5 s)
+            const pushTrackUpdate = async () => {
+                trackUpdateTimer = null;
+                if (streamSignal.aborted || trackUpdateInFlight) return;
+                if (!jassubInstance || !jassubInstance.renderer) return;
+                if (totalCount() === appliedCount) return;
+                trackUpdateInFlight = true;
+                lastTrackUpdateTime = Date.now();
+                appliedCount = totalCount();
+                try {
+                    const merged = buildMergedAss();
+                    currentRawAssContent = merged;
+                    const subToRender = currentSubStyle.mode === 'custom'
+                        ? applyStyleOverrideToAss(merged, currentSubStyle, styleUsage)
+                        : merged;
+                    await jassubInstance.renderer.setTrack(subToRender);
+                    safeJassubRender(true);
+                } catch (e) {}
+                trackUpdateInFlight = false;
+                updateStatus();
+                if (totalCount() !== appliedCount) scheduleTrackUpdate();
+            };
+
+            const scheduleTrackUpdate = () => {
+                if (!jassubInitialized || trackUpdateTimer || streamSignal.aborted) return;
+                const interval = totalCount() < 50 ? 300 : 1500;
+                const wait = Math.max(0, interval - (Date.now() - lastTrackUpdateTime));
+                trackUpdateTimer = setTimeout(pushTrackUpdate, wait);
+            };
+            streamSignal.addEventListener('abort', () => clearTimeout(trackUpdateTimer), { once: true });
+
+            // Délai de sécurité : si aucun en-tête ASS n'arrive en 12s, repli sur WebVTT pour cette piste
+            const timeoutId = setTimeout(() => {
+                if (!jassubInitialized && !streamSignal.aborted) {
+                    console.warn("[JASSUB] Délai dépassé (12s), repli automatique sur WebVTT");
+                    activateLibassFallback(magnet, subIndex, fileIndex);
+                }
+            }, 12000);
+
+            // Piste panneaux compagnon : lue en parallèle, une erreur n'affecte jamais les dialogues
+            const signsPromise = signsIndex === null ? Promise.resolve() : readTextLines(buildSubUrl(signsIndex, 'ass'), streamSignal, (lines) => {
+                signsAssContent += lines;
+                signsCount += (lines.match(/^Dialogue\s*:/gim) || []).length;
+                scheduleTrackUpdate();
+            }).catch(err => {
+                if (err.name !== 'AbortError') console.warn("[JASSUB] Piste panneaux indisponible :", err.message);
+            });
 
             try {
-                const subUrl = '/api/subtitles?magnet=' + encodeURIComponent(magnet) + '&fileIndex=' + fileIndex + '&subIndex=' + subIndex + '&format=ass';
-                const response = await fetch(subUrl, { signal: currentSubAbort.signal });
-                if (!response.ok || !response.body) {
-                    throw new Error("HTTP " + response.status);
-                }
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                const streamSignal = currentSubAbort.signal;
-                let lineBuffer = "";
-                let fullAssContent = "";
-                let jassubInitialized = false;
-                let lastTrackUpdateTime = 0;
-                let dlgCount = 0;
-                let appliedDialogueCount = 0;
-                let trackUpdateTimer = null;
-                let trackUpdateInFlight = false;
-                const styleUsage = new Map();
-
-                const ensureEventsSection = (txt) => txt.includes('[Events]')
-                    ? txt
-                    : txt + '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
-
-                const updateStatus = () => {
-                    if (!subStatus || subtitlesHidden) return;
-                    const modeLabel = currentSubStyle.mode === 'custom' ? 'Personnalisé' : 'Fansub';
-                    subStatus.innerText = `✨ Sous-titres HD actifs (${dlgCount} répliques • ${modeLabel})`;
-                    subStatus.style.color = "#46d369";
-                };
-
-                // Envoie le contenu accumulé au worker libass (au plus toutes les 300 ms au début, puis 1,5 s)
-                const pushTrackUpdate = async () => {
-                    trackUpdateTimer = null;
-                    if (streamSignal.aborted || trackUpdateInFlight) return;
-                    if (!jassubInstance || !jassubInstance.renderer) return;
-                    if (dlgCount === appliedDialogueCount) return;
-                    trackUpdateInFlight = true;
-                    lastTrackUpdateTime = Date.now();
-                    appliedDialogueCount = dlgCount;
-                    try {
-                        const subToRender = currentSubStyle.mode === 'custom'
-                            ? applyStyleOverrideToAss(fullAssContent, currentSubStyle, styleUsage)
-                            : fullAssContent;
-                        await jassubInstance.renderer.setTrack(subToRender);
-                        safeJassubRender(true);
-                    } catch (e) {}
-                    trackUpdateInFlight = false;
-                    updateStatus();
-                    if (dlgCount !== appliedDialogueCount) scheduleTrackUpdate();
-                };
-
-                const scheduleTrackUpdate = () => {
-                    if (trackUpdateTimer || streamSignal.aborted) return;
-                    const interval = dlgCount < 50 ? 300 : 1500;
-                    const wait = Math.max(0, interval - (Date.now() - lastTrackUpdateTime));
-                    trackUpdateTimer = setTimeout(pushTrackUpdate, wait);
-                };
-                streamSignal.addEventListener('abort', () => clearTimeout(trackUpdateTimer), { once: true });
-
-                // Délai de sécurité : si aucun en-tête ASS n'arrive en 12s, repli sur WebVTT pour cette piste
-                const timeoutId = setTimeout(() => {
-                    if (!jassubInitialized && !streamSignal.aborted) {
-                        console.warn("[JASSUB] Délai dépassé (12s), repli automatique sur WebVTT");
-                        activateLibassFallback(magnet, subIndex, fileIndex);
-                    }
-                }, 12000);
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    const chunk = decoder.decode(value, { stream: true });
-                    if (!chunk) continue;
-                    lineBuffer += chunk;
-
-                    // Découpage strict aux sauts de ligne pour ne JAMAIS couper une réplique au milieu d'une balise {\pos(...)}
-                    const lastNewlineIdx = lineBuffer.lastIndexOf('\n');
-                    if (lastNewlineIdx === -1) continue;
-
-                    const readyChunk = lineBuffer.substring(0, lastNewlineIdx + 1);
-                    lineBuffer = lineBuffer.substring(lastNewlineIdx + 1);
+                await readTextLines(buildSubUrl(subIndex, 'ass'), streamSignal, async (readyChunk) => {
                     fullAssContent += readyChunk;
-                    currentRawAssContent = fullAssContent;
 
                     // Comptage incrémental (uniquement sur le nouveau morceau)
                     dlgCount += (readyChunk.match(/^Dialogue\s*:/gim) || []).length;
@@ -969,44 +1222,41 @@
                         if (hasStyles || hasEvents) {
                             clearTimeout(timeoutId);
                             jassubInitialized = true;
-                            appliedDialogueCount = dlgCount;
+                            appliedCount = totalCount();
                             lastTrackUpdateTime = Date.now();
-                            await initOrUpdateJassub(ensureEventsSection(fullAssContent));
+                            await initOrUpdateJassub(ensureEventsSection(buildMergedAss()));
                             if (streamSignal.aborted) return;
                             // Le contenu reçu pendant l'initialisation sera poussé au prochain cycle
-                            currentRawAssContent = fullAssContent;
-                            if (dlgCount !== appliedDialogueCount) scheduleTrackUpdate();
+                            if (totalCount() !== appliedCount) scheduleTrackUpdate();
                         }
-                    } else if (dlgCount !== appliedDialogueCount) {
+                    } else if (totalCount() !== appliedCount) {
                         scheduleTrackUpdate();
                     }
-                }
+                });
 
                 clearTimeout(timeoutId);
+                if (streamSignal.aborted) return;
+
+                if (!jassubInitialized && fullAssContent.trim().length > 0) {
+                    jassubInitialized = true;
+                    appliedCount = totalCount();
+                    await initOrUpdateJassub(ensureEventsSection(buildMergedAss()));
+                }
+
+                // Attendre la fin de la piste panneaux, puis pousser la version finale complète
+                await signsPromise;
                 clearTimeout(trackUpdateTimer);
                 trackUpdateTimer = null;
                 if (streamSignal.aborted) return;
-
-                // Traiter le reliquat éventuel de la dernière ligne
-                const tail = lineBuffer + decoder.decode();
-                if (tail.trim().length > 0) {
-                    const remaining = tail + '\n';
-                    fullAssContent += remaining;
-                    dlgCount += (remaining.match(/^Dialogue\s*:/gim) || []).length;
-                    countDialogueStyles(remaining, styleUsage);
-                }
-                currentRawAssContent = fullAssContent;
-
-                if (!jassubInitialized && fullAssContent.trim().length > 0) {
-                    await initOrUpdateJassub(ensureEventsSection(fullAssContent));
-                } else if (jassubInstance && jassubInstance.renderer) {
-                    // Attendre une éventuelle mise à jour en cours, puis pousser la version finale complète
+                currentRawAssContent = buildMergedAss();
+                if (jassubInstance && jassubInstance.renderer) {
                     while (trackUpdateInFlight) await new Promise(r => setTimeout(r, 50));
-                    appliedDialogueCount = -1;
+                    appliedCount = -1;
                     await pushTrackUpdate();
                 }
                 return;
             } catch (err) {
+                clearTimeout(timeoutId);
                 if (err.name === 'AbortError') return;
                 console.warn("[JASSUB] Échec chargement sous-titres ASS, repli sur WebVTT :", err.message);
                 // Repli automatique sur WebVTT
@@ -1018,105 +1268,101 @@
         subStatus.style.color = "#ffa033";
         applySubtitleCuesToTrack(currentActualStartOffset);
 
-        try {
-            const subUrl = '/api/subtitles?magnet=' + encodeURIComponent(magnet) + '&fileIndex=' + fileIndex + '&subIndex=' + subIndex + '&format=vtt';
-            const response = await fetch(subUrl, { signal: currentSubAbort.signal });
-            if (!response.ok || !response.body) {
-                subStatus.innerText = "⚠️ Sous-titres indisponibles";
-                subStatus.style.color = "#ff4444";
-                return;
-            }
+        const seenCues = new Set();
+        let lastApplyTime = 0;
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
-            const seenCues = new Set();
-            let lastApplyTime = 0;
+        function processVttBlock(block) {
+            if (!block) return;
+            const lines = block.trim().split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                const match = lines[i].match(/((?:\d+:)?\d+:\d+\.\d+)\s*-->\s*((?:\d+:)?\d+:\d+\.\d+)(.*)/);
+                if (match) {
+                    const rawStart = parseVttTime(match[1]);
+                    const rawEnd = parseVttTime(match[2]);
+                    const settingsStr = (match[3] || '').trim();
+                    const rawTextLines = lines.slice(i + 1);
+                    const text = cleanSubtitleLines(rawTextLines);
 
-            function processVttBlock(block) {
-                if (!block) return;
-                const lines = block.trim().split('\n');
-                for (let i = 0; i < lines.length; i++) {
-                    const match = lines[i].match(/((?:\d+:)?\d+:\d+\.\d+)\s*-->\s*((?:\d+:)?\d+:\d+\.\d+)(.*)/);
-                    if (match) {
-                        const rawStart = parseVttTime(match[1]);
-                        const rawEnd = parseVttTime(match[2]);
-                        const settingsStr = (match[3] || '').trim();
-                        const rawTextLines = lines.slice(i + 1);
-                        const text = cleanSubtitleLines(rawTextLines);
+                    if (text && !isNaN(rawStart) && !isNaN(rawEnd) && rawEnd > rawStart) {
+                        let isTop = false;
+                        let explicitAlign = null;
 
-                        if (text && !isNaN(rawStart) && !isNaN(rawEnd) && rawEnd > rawStart) {
-                            let isTop = false;
-                            let explicitAlign = null;
-
-                            if (settingsStr) {
-                                const lineMatch = settingsStr.match(/line:(-?\d+(?:\.\d+)?%?)/);
-                                if (lineMatch) {
-                                    const rawLine = lineMatch[1];
-                                    const num = parseFloat(rawLine);
-                                    if (!isNaN(num) && num <= 30 && rawLine.includes('%')) {
-                                        isTop = true;
-                                    } else if (!isNaN(num) && num >= 0 && num <= 4 && !rawLine.includes('%')) {
-                                        isTop = true;
-                                    }
+                        if (settingsStr) {
+                            const lineMatch = settingsStr.match(/line:(-?\d+(?:\.\d+)?%?)/);
+                            if (lineMatch) {
+                                const rawLine = lineMatch[1];
+                                const num = parseFloat(rawLine);
+                                if (!isNaN(num) && num <= 30 && rawLine.includes('%')) {
+                                    isTop = true;
+                                } else if (!isNaN(num) && num >= 0 && num <= 4 && !rawLine.includes('%')) {
+                                    isTop = true;
                                 }
-                                const alignMatch = settingsStr.match(/align:(start|center|end|left|right)/);
-                                if (alignMatch) explicitAlign = alignMatch[1];
                             }
-
-                            const cleanPlain = text.replace(/<[^>]*>/g, '').trim();
-                            if (!isTop && /^(\[|\()(panneau|texte|titre|pancarte|enseigne|écrit|lettre|message|avis|sign|text|title|screen|traduction|trad)\b/i.test(cleanPlain)) {
-                                isTop = true;
-                            }
-
-                            const cueKey = (isTop ? 'T_' : 'B_') + rawStart.toFixed(3) + '_' + rawEnd.toFixed(3) + '_' + cleanPlain;
-
-                            if (!seenCues.has(cueKey)) {
-                                seenCues.add(cueKey);
-                                cachedEpisodeCues.push({
-                                    rawStart,
-                                    rawEnd,
-                                    text,
-                                    isTop,
-                                    explicitAlign
-                                });
-                            }
+                            const alignMatch = settingsStr.match(/align:(start|center|end|left|right)/);
+                            if (alignMatch) explicitAlign = alignMatch[1];
                         }
-                        break;
+
+                        const cleanPlain = text.replace(/<[^>]*>/g, '').trim();
+                        if (!isTop && /^(\[|\()(panneau|texte|titre|pancarte|enseigne|écrit|lettre|message|avis|sign|text|title|screen|traduction|trad)\b/i.test(cleanPlain)) {
+                            isTop = true;
+                        }
+
+                        const cueKey = (isTop ? 'T_' : 'B_') + rawStart.toFixed(3) + '_' + rawEnd.toFixed(3) + '_' + cleanPlain;
+
+                        if (!seenCues.has(cueKey)) {
+                            seenCues.add(cueKey);
+                            cachedEpisodeCues.push({
+                                rawStart,
+                                rawEnd,
+                                text,
+                                isTop,
+                                explicitAlign
+                            });
+                        }
                     }
+                    break;
                 }
             }
+        }
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-
+        // Lit un flux WebVTT bloc par bloc et rafraîchit le TextTrack (au plus toutes les 300 ms)
+        async function consumeVttStream(url, signal) {
+            let buffer = "";
+            await readTextLines(url, signal, (lines) => {
+                buffer += lines;
                 const blocks = buffer.split(/\n\s*\n/);
                 buffer = blocks.pop() || "";
-
-                for (const block of blocks) {
-                    processVttBlock(block);
-                }
+                for (const block of blocks) processVttBlock(block);
 
                 const now = Date.now();
                 if (now - lastApplyTime > 300) {
                     lastApplyTime = now;
                     applySubtitleCuesToTrack(currentActualStartOffset);
                 }
-            }
+            });
+            if (buffer.trim()) processVttBlock(buffer);
+        }
 
-            if (buffer.trim()) {
-                processVttBlock(buffer);
-                buffer = "";
-            }
+        const vttSignal = currentSubAbort.signal;
+        const vttSignsPromise = signsIndex === null ? Promise.resolve() : consumeVttStream(buildSubUrl(signsIndex, 'vtt'), vttSignal)
+            .catch(err => {
+                if (err.name !== 'AbortError') console.warn("[Sous-titres] Piste panneaux WebVTT indisponible :", err.message);
+            });
 
+        try {
+            await consumeVttStream(buildSubUrl(subIndex, 'vtt'), vttSignal);
+            await vttSignsPromise;
+            if (vttSignal.aborted) return;
             applySubtitleCuesToTrack(currentActualStartOffset);
         } catch (err) {
-            if (err.name !== 'AbortError') {
-                console.warn("Erreur streaming sous-titres:", err);
-                subStatus.innerText = "";
+            if (err.name === 'AbortError') return;
+            if (/^HTTP /.test(err.message || '')) {
+                subStatus.innerText = "⚠️ Sous-titres indisponibles";
+                subStatus.style.color = "#ff4444";
+                return;
             }
+            console.warn("Erreur streaming sous-titres:", err);
+            subStatus.innerText = "";
         }
     }
 

@@ -23,9 +23,10 @@ export const ROOT_DIR = process.cwd();
 export const SUB_CACHE_DIR = path.join(ROOT_DIR, 'cache', 'subtitles');
 export const THUMB_CACHE_DIR = path.join(ROOT_DIR, 'cache', 'thumbnails');
 export const HLS_CACHE_DIR = path.join(ROOT_DIR, 'cache', 'hls');
+export const FONT_CACHE_DIR = path.join(ROOT_DIR, 'cache', 'fonts');
 
 // Initialisation automatique des répertoires de cache nécessaires
-for (const dir of [SUB_CACHE_DIR, THUMB_CACHE_DIR, HLS_CACHE_DIR]) {
+for (const dir of [SUB_CACHE_DIR, THUMB_CACHE_DIR, HLS_CACHE_DIR, FONT_CACHE_DIR]) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }

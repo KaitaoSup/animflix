@@ -21,6 +21,7 @@ import {
   getDetectedHwAccel
 } from '../services/ffmpegService.js';
 import { streamSubtitlesLive } from '../services/subtitlesService.js';
+import { getEmbeddedFonts, resolveFontFile } from '../services/fontsService.js';
 import { getTorrentFiles } from '../services/torrserverService.js';
 
 const router = Router();
@@ -46,6 +47,29 @@ router.get('/api/subtitles', (req, res) => {
     if (!res.headersSent) res.status(500).send("Erreur extraction sous-titres");
     else res.end();
   });
+});
+
+// --- ROUTE API POLICES EMBARQUÉES (PIÈCES JOINTES MKV DES FANSUBS) ---
+router.get('/api/fonts', async (req, res) => {
+  const { magnet, fileIndex = 1 } = req.query;
+  if (!magnet) return res.status(400).json({ error: "Lien magnet manquant" });
+  try {
+    const fonts = await getEmbeddedFonts(magnet, fileIndex);
+    res.setHeader('Cache-Control', 'no-cache');
+    res.json({ fonts: fonts.map(f => ({ ...f, url: '/api/fonts/' + f.id })) });
+  } catch (err) {
+    console.warn("⚠️ Polices embarquées indisponibles :", err.message.split('\n')[0]);
+    res.status(503).json({ error: "Polices indisponibles", fonts: [] });
+  }
+});
+
+router.get('/api/fonts/:id', (req, res) => {
+  const font = resolveFontFile(req.params.id);
+  if (!font) return res.status(404).send("Police introuvable");
+  res.setHeader('Content-Type', font.contentType);
+  // Identifiant = empreinte du contenu : cache navigateur permanent
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.sendFile(font.filePath);
 });
 
 // --- ROUTE API SYNCHRONISATION PRÉCISE DU LECTEUR ET DES SOUS-TITRES ---
