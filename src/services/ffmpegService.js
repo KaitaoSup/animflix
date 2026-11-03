@@ -75,7 +75,7 @@ export async function checkHardwareAcceleration() {
 /**
  * Analyse rapide des flux (vidéo, audio, sous-titres, durée) avec ffprobe
  */
-export async function analyzeStreams(videoUrl) {
+export async function analyzeStreams(videoUrl, { timeoutMs = 15000 } = {}) {
   try {
     console.log("🔍 FFPROBE: Analyse rapide des flux et durée...");
     const ffprobeArgs = [
@@ -86,7 +86,7 @@ export async function analyzeStreams(videoUrl) {
       '-of', 'json',
       videoUrl
     ];
-    const { stdout } = await execFilePromise('ffprobe', ffprobeArgs, { timeout: 15000 });
+    const { stdout } = await execFilePromise('ffprobe', ffprobeArgs, { timeout: timeoutMs });
     const data = JSON.parse(stdout);
     const streams = data.streams || [];
 
@@ -182,9 +182,12 @@ export async function analyzeStreams(videoUrl) {
     return { subIndex, subTracks, frAudioIndex, audioTracks, duration, videoCodec, videoPixFmt, videoWidth, videoHeight };
   } catch (e) {
     console.log("⚠️ FFPROBE: Analyse rapide streams terminée avec fallback:", e.message);
+    // Analyse impossible (torrent encore lent…) : on ne connaît PAS les pistes.
+    // Ne surtout pas prétendre que la piste 0 est en français : c'est souvent l'anglais.
     return {
+      probeFailed: true,
       subIndex: 0,
-      subTracks: [{ index: 0, lang: 'fre', label: 'Français (VOSTFR)', isFrench: true }],
+      subTracks: [{ index: 0, lang: 'und', label: 'Piste 1 (analyse en cours…)', isFrench: false }],
       frAudioIndex: null,
       audioTracks: [],
       duration: 1440,
@@ -207,10 +210,39 @@ export async function getStreamInfo(magnet, fileIndex = 1) {
   if (cached && cached.duration) {
     return cached;
   }
+
+  // Une seule analyse ffprobe à la fois par fichier : /api/streams, /play et les sous-titres
+  // la demandent en même temps, et plusieurs ffprobe parallèles ralentissent le torrent.
+  if (pendingStreamProbes.has(cacheKey)) {
+    return pendingStreamProbes.get(cacheKey);
+  }
+
   const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
-  const data = await analyzeStreams(torrUrl);
-  streamsCache.set(cacheKey, data);
-  return data;
+  const probe = (async () => {
+    const data = await analyzeStreams(torrUrl);
+    // Un échec n'est gardé que 20s : le lecteur relance l'analyse pour obtenir la vraie liste des pistes
+    streamsCache.set(cacheKey, data, data.probeFailed ? 20000 : undefined);
+    return data;
+  })();
+
+  pendingStreamProbes.set(cacheKey, probe);
+  try {
+    return await probe;
+  } finally {
+    pendingStreamProbes.delete(cacheKey);
+  }
+}
+
+const pendingStreamProbes = new Map(); // cacheKey -> Promise (analyse ffprobe en cours)
+
+/**
+ * Métadonnées déjà connues (cache uniquement, sans lancer ffprobe) : null si inconnues ou analyse échouée
+ */
+export function getCachedStreamInfo(magnet, fileIndex = 1) {
+  const hash = getTorrentHash(magnet);
+  const parsedFileIndex = parseInt(fileIndex, 10) || 1;
+  const cached = streamsCache.get(`${hash}_f${parsedFileIndex}`);
+  return cached && !cached.probeFailed ? cached : null;
 }
 
 /**

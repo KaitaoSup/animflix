@@ -22,9 +22,12 @@
     function updatePlayerProgress(overrideTime = null) {
         const video = document.getElementById('videoPlayer');
         if (!video) return;
+        // Pendant le debounce d'un saut, afficher la cible demandée plutôt que la position de l'ancien flux
         const effectiveTime = (typeof overrideTime === 'number')
             ? overrideTime
-            : Math.max(0, currentStreamOffset + (video.currentTime || 0));
+            : (typeof pendingSeekTarget === 'number'
+                ? pendingSeekTarget
+                : Math.max(0, currentStreamOffset + (video.currentTime || 0)));
         const totalDur = currentTotalDuration > 0 ? currentTotalDuration : 1440;
 
         if (!isScrubbing) {
@@ -80,6 +83,8 @@
     }
 
     let seekDebounceTimeout = null;
+    // Cible d'un saut en attente (debounce) : permet d'additionner les appuis rapides (+10s x3 = +30s)
+    let pendingSeekTarget = null;
     function seekVideoTo(targetSeconds, immediate = false) {
         if (!currentActiveMagnet) return;
         if (typeof dismissResumeBanner === 'function') {
@@ -114,6 +119,7 @@
                         clearTimeout(seekDebounceTimeout);
                         seekDebounceTimeout = null;
                     }
+                    pendingSeekTarget = null;
                     try {
                         video.currentTime = relTarget;
                         updatePlayerProgress();
@@ -127,6 +133,7 @@
         }
         
         // Rafraîchissement visuel immédiat de la timeline vers la cible demandée
+        pendingSeekTarget = target;
         updatePlayerProgress(target);
         if (typeof updateMediaSessionPositionState === 'function') {
             updateMediaSessionPositionState(true);
@@ -138,6 +145,8 @@
         }
 
         const executeSeek = () => {
+            seekDebounceTimeout = null;
+            pendingSeekTarget = null;
             currentStreamOffset = target;
             const currentVlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(currentActiveMagnet) + "&index=" + currentActiveFileIndex + "&play";
             startStreamingInPlayer(currentActiveMagnet, currentAnimeItem?.titre || 'Anime', currentVlcUrl, currentActiveFileIndex, target);
@@ -153,7 +162,9 @@
     function jumpSeekRelative(deltaSeconds) {
         const video = document.getElementById('videoPlayer');
         if (!video || !currentActiveMagnet) return;
-        const currentPos = currentStreamOffset + (video.currentTime || 0);
+        const currentPos = (typeof pendingSeekTarget === 'number')
+            ? pendingSeekTarget
+            : currentStreamOffset + (video.currentTime || 0);
         const totalDur = currentTotalDuration > 0 ? currentTotalDuration : 1440;
         const targetPos = Math.max(0, Math.min(totalDur, Math.round(currentPos + deltaSeconds)));
         showToast((deltaSeconds > 0 ? `⏩ +${deltaSeconds}s` : `⏪ ${Math.abs(deltaSeconds)}s`) + ` (${formatTimestamp(targetPos)})`);
@@ -329,6 +340,19 @@
     let isAniSkipLoading = false;
     let hasSkippedCurrentOp = false;
     let hasSkippedCurrentEd = false;
+    // Identifie la requête AniSkip la plus récente et pour quoi les intervalles actuels ont été chargés
+    let aniSkipRequestSeq = 0;
+    let aniSkipLoadedFor = null; // { epKey, malId, ep }
+
+    // Vrai si les intervalles chargés ne correspondent pas (ou plus) à l'anime / épisode courant
+    function aniSkipNeedsRefresh() {
+        if (!aniSkipLoadedFor) return true;
+        const malId = currentAnilistMedia?.idMal;
+        return aniSkipLoadedFor.epKey !== window._currentPlayingEpisodeKey
+            || (malId && aniSkipLoadedFor.malId !== malId)
+            || aniSkipLoadedFor.ep !== (currentDetectedEpisode || 1);
+    }
+    window.aniSkipNeedsRefresh = aniSkipNeedsRefresh;
 
     function renderAniSkipTimelineMarkers() {
         const markersEl = document.getElementById('playerScrubberMarkers');
@@ -362,7 +386,14 @@
     window.renderAniSkipTimelineMarkers = renderAniSkipTimelineMarkers;
 
     async function checkAniSkipForCurrentEpisode() {
-        if (!currentAniSkipIntervals) {
+        const seq = ++aniSkipRequestSeq;
+        const epKeyAtStart = window._currentPlayingEpisodeKey;
+        // Une réponse n'est appliquée que si aucune requête plus récente n'a été lancée et que l'épisode n'a pas changé
+        const isStale = () => seq !== aniSkipRequestSeq || window._currentPlayingEpisodeKey !== epKeyAtStart;
+
+        if (aniSkipNeedsRefresh()) {
+            currentAniSkipIntervals = null;
+            window.currentAniSkipIntervals = null;
             hideAniSkipButton();
             renderAniSkipTimelineMarkers();
         }
@@ -390,7 +421,7 @@
             }
         }
 
-        if (!malId) return;
+        if (!malId || isStale()) return;
 
         try {
             isAniSkipLoading = true;
@@ -398,6 +429,8 @@
             const res = await fetch(url);
             if (!res.ok) return;
             const data = await res.json();
+            if (isStale()) return;
+            aniSkipLoadedFor = { epKey: epKeyAtStart, malId, ep };
             if (data && data.found && Array.isArray(data.results)) {
                 const intervals = {};
                 data.results.forEach(r => {
@@ -1160,6 +1193,11 @@
             currentActiveFileIndex = fileIndex;
         }
         currentStreamOffset = seekSeconds;
+        if (seekDebounceTimeout) {
+            clearTimeout(seekDebounceTimeout);
+            seekDebounceTimeout = null;
+        }
+        pendingSeekTarget = null;
         hasAutoTrackedCurrentEpisode = false;
         hasNextEpisodeTriggered = false;
         dismissNextEpisodeCountdown();
@@ -1178,11 +1216,12 @@
             hasSkippedCurrentEd = false;
             currentAniSkipIntervals = null;
             window.currentAniSkipIntervals = null;
+            aniSkipLoadedFor = null;
             checkAniSkipForCurrentEpisode();
         } else if (seekSeconds === 0) {
             hasSkippedCurrentOp = false;
             hasSkippedCurrentEd = false;
-        } else if (!currentAniSkipIntervals) {
+        } else if (aniSkipNeedsRefresh()) {
             checkAniSkipForCurrentEpisode();
         }
 

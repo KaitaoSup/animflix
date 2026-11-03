@@ -5,6 +5,50 @@
     // --- INSTANCE LIBASS WASM (JASSUB) & CONTENU ASS BRUT ---
     let jassubInstance = null;
     let currentRawAssContent = null;
+    // Repli WebVTT temporaire (pour l'épisode en cours) sans toucher à la préférence enregistrée
+    let libassFallbackActive = false;
+    // Visibilité choisie via le bouton CC (conservée lors des recréations du canvas JASSUB)
+    let subtitlesHidden = false;
+    // Sérialisation des (ré)initialisations JASSUB : une seule instance / un seul canvas à la fois
+    let jassubOpChain = Promise.resolve();
+    let jassubGeneration = 0;
+
+    function isLibassActive() {
+        return currentSubStyle.renderer === 'libass' && !libassFallbackActive;
+    }
+
+    function removeJassubCanvases() {
+        document.querySelectorAll('canvas.JASSUB').forEach(c => c.remove());
+    }
+
+    function applyJassubCanvasVisibility() {
+        document.querySelectorAll('canvas.JASSUB').forEach(c => {
+            c.style.display = subtitlesHidden ? 'none' : 'block';
+        });
+    }
+
+    function destroyJassub() {
+        jassubGeneration++; // invalide toute initialisation en cours
+        const inst = jassubInstance;
+        jassubInstance = null;
+        if (inst) {
+            try {
+                const p = inst.destroy();
+                if (p && typeof p.catch === 'function') p.catch(() => {});
+            } catch (e) {}
+        }
+        removeJassubCanvases();
+    }
+
+    // Bascule sur WebVTT pour la piste courante quand libass échoue (préférence utilisateur inchangée)
+    function activateLibassFallback(magnet, subIndex, fileIndex) {
+        libassFallbackActive = true;
+        destroyJassub();
+        currentLoadedSubKey = null;
+        if (magnet && subIndex !== -1) {
+            streamSubtitlesLive(magnet, subIndex, fileIndex, currentActualStartOffset);
+        }
+    }
 
     // --- GESTION DES SOUS-TITRES DIRECTS WEBVTT (MODE REPLI OU CLASSIQUE) ---
     let cachedEpisodeCues = []; // [{ rawStart, rawEnd, text }, ...]
@@ -55,7 +99,7 @@
         }
 
         // Si le moteur libass (JASSUB) est actif, synchroniser timeOffset et désactiver le TextTrack natif
-        if (currentSubStyle.renderer === 'libass' && jassubInstance) {
+        if (isLibassActive() && jassubInstance) {
             if (currentTextTrack) {
                 try { currentTextTrack.mode = 'disabled'; } catch (e) {}
             }
@@ -318,16 +362,41 @@
         return `&H${alphaHex}${b}${g}${r}&`.toUpperCase();
     }
 
-    // Applique les préférences de style (taille, couleur, police, position) à un fichier ASS
-    function applyStyleOverrideToAss(rawAss, style) {
+    // Compte le nombre de répliques par style (champ Style des lignes Dialogue)
+    function countDialogueStyles(assText, usage = new Map()) {
+        if (!assText) return usage;
+        const re = /^Dialogue\s*:\s*[^,]*,[^,]*,[^,]*,([^,]*),/gim;
+        let m;
+        while ((m = re.exec(assText)) !== null) {
+            const name = m[1].trim().replace(/^\*/, '').toLowerCase();
+            usage.set(name, (usage.get(name) || 0) + 1);
+        }
+        return usage;
+    }
+
+    const DEFAULT_ASS_STYLE_FORMAT = ['Name', 'Fontname', 'Fontsize', 'PrimaryColour', 'SecondaryColour', 'OutlineColour', 'BackColour',
+        'Bold', 'Italic', 'Underline', 'StrikeOut', 'ScaleX', 'ScaleY', 'Spacing', 'Angle', 'BorderStyle', 'Outline', 'Shadow',
+        'Alignment', 'MarginL', 'MarginR', 'MarginV', 'Encoding'];
+
+    // Applique les préférences de style (taille, couleur, police, position) à un fichier ASS.
+    // Seul l'en-tête (avant [Events]) est réécrit : coût constant même sur un gros fichier en streaming.
+    // styleUsage (optionnel) : Map nomDeStyle(minuscule) -> nombre de répliques, pour repérer les styles de dialogue.
+    function applyStyleOverrideToAss(rawAss, style, styleUsage = null) {
         if (!rawAss || typeof rawAss !== 'string') return rawAss;
+
+        const eventsIdx = rawAss.search(/^\[Events\]/im);
+        const header = eventsIdx === -1 ? rawAss : rawAss.slice(0, eventsIdx);
+        const events = eventsIdx === -1 ? '' : rawAss.slice(eventsIdx);
+        const usage = styleUsage || countDialogueStyles(events);
 
         // 1. Détection de PlayResY pour dimensionnement relatif exact
         let playResY = 1080;
-        const playResMatch = rawAss.match(/PlayResY\s*:\s*(\d+)/i);
+        const playResMatch = header.match(/PlayResY\s*:\s*(\d+)/i);
         if (playResMatch) {
             const parsed = parseInt(playResMatch[1], 10);
             if (!isNaN(parsed) && parsed > 0) playResY = parsed;
+        } else if (!/PlayResX/i.test(header)) {
+            playResY = 288; // valeur implicite de libass sans PlayRes
         }
 
         // 2. Calcul proportionnel de la taille de police
@@ -355,7 +424,6 @@
 
         // 5. Couleurs et fond
         const primaryColor = hexToAssBgrColor(style.color, '00');
-        const outlineColor = '&H00000000&';
         let backColor = '&H80000000&';
         let borderStyle = 1;
         if (style.bg === 'transparent') {
@@ -368,71 +436,110 @@
         // 6. Contour et ombrage
         let outline = 2.5;
         let shadow = 2.0;
-        if (style.shadow === 'outline') {
-            outline = 3.5;
-            shadow = 0;
-        } else if (style.shadow === 'shadow') {
-            outline = 2.2;
-            shadow = 2.8;
-        } else if (style.shadow === 'light') {
-            outline = 1.2;
-            shadow = 1.0;
-        } else if (style.shadow === 'none') {
-            outline = 0;
-            shadow = 0;
+        if (style.shadow === 'outline') { outline = 3.5; shadow = 0; }
+        else if (style.shadow === 'shadow') { outline = 2.2; shadow = 2.8; }
+        else if (style.shadow === 'light') { outline = 1.2; shadow = 1.0; }
+        else if (style.shadow === 'none') { outline = 0; shadow = 0; }
+
+        const overrides = {
+            fontname: fontName, fontsize: fontSize, primarycolour: primaryColor, secondarycolour: '&H000000FF&',
+            outlinecolour: '&H00000000&', tertiarycolour: '&H00000000&', backcolour: backColor,
+            bold: -1, underline: 0, strikeout: 0, scalex: 100, scaley: 100, spacing: 0, angle: 0,
+            borderstyle: borderStyle, outline, shadow, alignment: 2, marginl: 30, marginr: 30, marginv: marginV,
+            alphalevel: 0, encoding: 1
+        };
+
+        // Construit une ligne Style en respectant l'ordre des champs déclaré par la ligne Format du fichier
+        // (l'italique d'origine est conservé, ex: style "Italique" / pensées)
+        function buildCustomStyleLine(formatFields, originalValues) {
+            const values = formatFields.map((field, idx) => {
+                const key = field.toLowerCase();
+                if (key === 'name') return originalValues ? originalValues[idx] : 'Default';
+                if (key === 'italic') return originalValues ? originalValues[idx] : 0;
+                return key in overrides ? overrides[key] : (originalValues ? originalValues[idx] : 0);
+            });
+            return 'Style: ' + values.join(',');
         }
 
-        function buildCustomStyleLine(styleName) {
-            return `Style: ${styleName},${fontName},${fontSize},${primaryColor},&H000000FF&,${outlineColor},${backColor},1,0,0,0,100,100,0,0,${borderStyle},${outline},${shadow},2,30,30,${marginV},1`;
+        // Styles de dialogue : nom évocateur, ou style très utilisé (≥ 15 % des répliques, ou le plus utilisé)
+        const totalDialogues = [...usage.values()].reduce((a, b) => a + b, 0);
+        let topStyle = null;
+        let topCount = 0;
+        for (const [name, count] of usage) {
+            if (count > topCount) { topStyle = name; topCount = count; }
         }
+        const dialogueNameRegex = /(default|main|dialog|dial|texte|normal|vostfr|subtitle|french|italique|italic|flashback|narrat|pens[ée]e|thought)/i;
+        const signNameRegex = /(sign|panneau|titre|title|kara|song|lyric|romaji|logo|credit)|(^|[\s_\-])(ts|op|ed|note)([\s_\-\d]|$)/i;
+        const isDialogueStyle = (name) => {
+            const key = name.trim().replace(/^\*/, '').toLowerCase();
+            const count = usage.get(key) || 0;
+            if (key === topStyle) return true;
+            if (signNameRegex.test(key)) return false; // panneaux, karaokés, titres : jamais restylés
+            if (totalDialogues > 0 && count / totalDialogues >= 0.15) return true;
+            return dialogueNameRegex.test(key);
+        };
 
-        const lines = rawAss.split(/\r?\n/);
+        const lines = header.split(/\r?\n/);
         let inStyles = false;
+        let formatFields = DEFAULT_ASS_STYLE_FORMAT;
         let replacedAny = false;
-        const dialogueStyleRegex = /^(default|main|dialogue|dialog|texte|normal|vostfr|subtitles?|french)$/i;
+        let stylesEndIdx = -1;
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
             if (/^\[v4\+?\s*styles\]/i.test(line)) {
                 inStyles = true;
                 continue;
-            } else if (/^\[.*\]/.test(line) && inStyles) {
+            }
+            if (/^\[.*\]/.test(line)) {
+                if (inStyles) stylesEndIdx = i;
                 inStyles = false;
-                if (!replacedAny) {
-                    lines.splice(i, 0, buildCustomStyleLine('Default'));
-                    replacedAny = true;
-                    i++;
-                }
                 continue;
             }
+            if (!inStyles) continue;
 
-            if (inStyles && /^style\s*:/i.test(line)) {
-                const parts = line.substring(6).split(',').map(s => s.trim());
-                const currentName = parts[0];
-                if (dialogueStyleRegex.test(currentName)) {
-                    lines[i] = buildCustomStyleLine(currentName);
+            if (/^format\s*:/i.test(line)) {
+                formatFields = line.replace(/^format\s*:/i, '').split(',').map(f => f.trim()).filter(Boolean);
+            } else if (/^style\s*:/i.test(line)) {
+                const values = line.replace(/^style\s*:/i, '').split(',').map(v => v.trim());
+                const nameIdx = formatFields.findIndex(f => f.toLowerCase() === 'name');
+                const name = values[nameIdx >= 0 ? nameIdx : 0] || '';
+                if (values.length === formatFields.length && isDialogueStyle(name)) {
+                    lines[i] = buildCustomStyleLine(formatFields, values);
                     replacedAny = true;
                 }
             }
         }
 
-        return lines.join('\n');
+        // Aucun style de dialogue reconnu : ajouter/forcer un style "Default" en fin de section
+        if (!replacedAny) {
+            const insertAt = stylesEndIdx !== -1 ? stylesEndIdx : lines.length;
+            lines.splice(insertAt, 0, buildCustomStyleLine(formatFields, null));
+        }
+
+        let newHeader = lines.join('\n');
+        if (events && !newHeader.endsWith('\n')) newHeader += '\n';
+        return newHeader + events;
     }
 
-    // Initialisation ou mise à jour de l'instance JASSUB (libass Wasm)
-    async function initOrUpdateJassub(subContent = null) {
+    // Initialisation ou mise à jour de l'instance JASSUB (libass Wasm).
+    // Les appels sont sérialisés et seul le plus récent s'applique : jamais deux instances / canvas en même temps.
+    function initOrUpdateJassub(subContent = null) {
         if (subContent) currentRawAssContent = subContent;
+        const gen = ++jassubGeneration;
+        const run = jassubOpChain.then(() => doInitOrUpdateJassub(gen));
+        jassubOpChain = run.catch(() => {});
+        return run;
+    }
+
+    async function doInitOrUpdateJassub(gen) {
+        if (gen !== jassubGeneration) return; // remplacé par un appel plus récent
         const video = document.getElementById('videoPlayer');
         if (!video || !currentRawAssContent) return;
 
         const subSelect = document.getElementById('subSelect');
         if (subSelect && subSelect.value === "-1") {
-            if (jassubInstance) {
-                try { await jassubInstance.destroy(); } catch(e) {}
-                jassubInstance = null;
-            }
-            const oldCanvas = document.querySelector('canvas.JASSUB');
-            if (oldCanvas) oldCanvas.remove();
+            destroyJassub();
             return;
         }
 
@@ -442,18 +549,18 @@
             ? applyStyleOverrideToAss(currentRawAssContent, currentSubStyle)
             : currentRawAssContent;
 
-        if (jassubInstance) {
-            try {
-                await jassubInstance.destroy();
-            } catch(e) {}
-            jassubInstance = null;
+        // Détruire l'instance précédente (sans incrémenter la génération courante)
+        const previous = jassubInstance;
+        jassubInstance = null;
+        if (previous) {
+            try { await previous.destroy(); } catch (e) {}
         }
+        removeJassubCanvases();
+        if (gen !== jassubGeneration) return;
 
-        const oldCanvas = document.querySelector('canvas.JASSUB');
-        if (oldCanvas) oldCanvas.remove();
-
+        let instance = null;
         try {
-            jassubInstance = new window.JASSUB({
+            instance = new window.JASSUB({
                 video: video,
                 subContent: subContentToRender,
                 workerUrl: '/vendor/jassub/jassub-worker.bundle.js',
@@ -465,13 +572,23 @@
                 },
                 timeOffset: effOffset
             });
-            await jassubInstance.ready;
+            jassubInstance = instance;
+            await instance.ready;
+
+            // Un appel plus récent (changement de style, de piste, désactivation) a pris le relais entre-temps
+            if (gen !== jassubGeneration || jassubInstance !== instance) {
+                try { await instance.destroy(); } catch (e) {}
+                return;
+            }
+
             try {
-                if (typeof jassubInstance.resize === 'function') {
-                    await jassubInstance.resize(true);
+                if (typeof instance.resize === 'function') {
+                    await instance.resize(true);
                 }
                 safeJassubRender(true);
             } catch (e) {}
+
+            applyJassubCanvasVisibility();
 
             // Désactiver le TextTrack natif HTML5 pour éviter tout doublon visuel
             if (currentTextTrack) {
@@ -484,7 +601,7 @@
             }
 
             const subStatus = document.getElementById('sub-status');
-            if (subStatus) {
+            if (subStatus && !subtitlesHidden) {
                 const modeLabel = isCustomMode ? 'Style personnalisé' : 'Original Fansub';
                 const offsetLabel = currentManualSubOffset !== 0
                     ? ` [Sync: ${currentManualSubOffset > 0 ? '+' : ''}${currentManualSubOffset.toFixed(1)}s]`
@@ -493,16 +610,16 @@
                 subStatus.style.color = "#46d369";
             }
         } catch (err) {
+            if (gen !== jassubGeneration) return;
             console.warn("[JASSUB] Échec initialisation libass, repli sur WebVTT :", err);
-            if (jassubInstance) {
-                try { await jassubInstance.destroy(); } catch(e) {}
-                jassubInstance = null;
+            if (jassubInstance === instance) jassubInstance = null;
+            if (instance) {
+                try { await instance.destroy(); } catch(e) {}
             }
+            removeJassubCanvases();
             const chosenIndex = subSelect ? parseInt(subSelect.value, 10) : 0;
-            if (chosenIndex !== -1 && currentLoadedSubMagnet) {
-                currentLoadedSubKey = null;
-                currentSubStyle.renderer = 'vtt';
-                streamSubtitlesLive(currentLoadedSubMagnet, chosenIndex, currentLoadedSubFileIndex, currentActualStartOffset);
+            if (currentLoadedSubMagnet) {
+                activateLibassFallback(currentLoadedSubMagnet, chosenIndex, currentLoadedSubFileIndex);
             }
         }
     }
@@ -512,12 +629,8 @@
             currentSubAbort.abort();
             currentSubAbort = null;
         }
-        if (jassubInstance) {
-            try { jassubInstance.destroy(); } catch(e) {}
-            jassubInstance = null;
-        }
-        const oldCanvas = document.querySelector('canvas.JASSUB');
-        if (oldCanvas) oldCanvas.remove();
+        destroyJassub();
+        libassFallbackActive = false; // nouvel épisode : retenter libass
         currentRawAssContent = null;
         currentLoadedSubKey = null;
         currentLoadedSubMagnet = null;
@@ -534,7 +647,7 @@
     function updateSubtitleOffset(actualStart) {
         currentActualStartOffset = parseFloat(actualStart) || 0;
         const effOffset = currentActualStartOffset - currentManualSubOffset;
-        if (jassubInstance && currentSubStyle.renderer === 'libass') {
+        if (jassubInstance && isLibassActive()) {
             jassubInstance.timeOffset = effOffset;
             safeJassubRender(true);
         } else {
@@ -550,7 +663,7 @@
             display.textContent = (currentManualSubOffset >= 0 ? '+' : '') + currentManualSubOffset.toFixed(1) + 's';
         }
         const effOffset = currentActualStartOffset - currentManualSubOffset;
-        if (jassubInstance && currentSubStyle.renderer === 'libass') {
+        if (jassubInstance && isLibassActive()) {
             jassubInstance.timeOffset = effOffset;
             safeJassubRender(true);
             const subStatus = document.getElementById('sub-status');
@@ -574,7 +687,7 @@
             display.textContent = "0.0s";
         }
         const effOffset = currentActualStartOffset - currentManualSubOffset;
-        if (jassubInstance && currentSubStyle.renderer === 'libass') {
+        if (jassubInstance && isLibassActive()) {
             jassubInstance.timeOffset = effOffset;
             safeJassubRender(true);
             const subStatus = document.getElementById('sub-status');
@@ -588,7 +701,25 @@
         showToast("⏱️ Synchronisation réinitialisée (0.0s)");
     }
 
-    async function setupSubtitles(magnet, type, fileIndex = 1, seekOffset = 0) {
+    // Nouvel essai d'analyse des pistes quand le serveur n'a pas pu les lire (torrent encore lent)
+    let trackProbeRetryTimer = null;
+    let trackProbeRetryCount = 0;
+    let userPickedSubTrack = false;
+
+    function scheduleTrackProbeRetry(magnet, type, fileIndex) {
+        clearTimeout(trackProbeRetryTimer);
+        if (trackProbeRetryCount >= 5) return;
+        trackProbeRetryCount++;
+        trackProbeRetryTimer = setTimeout(() => {
+            trackProbeRetryTimer = null;
+            // Toujours sur le même fichier ?
+            if (magnet !== currentLoadedSubMagnet || fileIndex !== currentLoadedSubFileIndex) return;
+            currentLoadedSubMagnet = null; // forcer la reconstruction des listes
+            setupSubtitles(magnet, type, fileIndex, currentActualStartOffset, { isProbeRetry: true });
+        }, 8000);
+    }
+
+    async function setupSubtitles(magnet, type, fileIndex = 1, seekOffset = 0, { isProbeRetry = false } = {}) {
         const subSelect = document.getElementById('subSelect');
         const audioSelect = document.getElementById('audioSelect');
         const subStatus = document.getElementById('sub-status');
@@ -606,15 +737,29 @@
 
         currentLoadedSubMagnet = magnet;
         currentLoadedSubFileIndex = fileIndex;
-        subSelect.innerHTML = '<option value="-1">Analyse des pistes... ⏳</option>';
-        if (audioSelect) audioSelect.innerHTML = '<option value="">Analyse audio... ⏳</option>';
-        subStatus.innerText = "";
+        if (!isProbeRetry) {
+            clearTimeout(trackProbeRetryTimer);
+            trackProbeRetryTimer = null;
+            trackProbeRetryCount = 0;
+            userPickedSubTrack = false;
+            subSelect.innerHTML = '<option value="-1">Analyse des pistes... ⏳</option>';
+            if (audioSelect) audioSelect.innerHTML = '<option value="">Analyse audio... ⏳</option>';
+            subStatus.innerText = "";
+        }
 
         try {
             const res = await fetch('/api/streams?magnet=' + encodeURIComponent(magnet) + '&fileIndex=' + fileIndex);
             const info = await res.json();
             const subTracks = info.subTracks || [];
             const audioTracks = info.audioTracks || [];
+
+            if (info.probeFailed) {
+                // Pistes inconnues pour l'instant : réessayer, sans écraser la liste si c'est déjà un nouvel essai
+                scheduleTrackProbeRetry(magnet, type, fileIndex);
+                if (isProbeRetry) return;
+            } else if (isProbeRetry) {
+                console.log("[Sous-titres] Analyse des pistes réussie après un nouvel essai :", subTracks);
+            }
 
             // Récupération de la durée exacte de la vidéo analysée
             if (info && info.duration && info.duration > 0) {
@@ -647,6 +792,7 @@
             }
 
             // 2. Mise à jour du sélecteur Sous-titres
+            const subPickedBeforeRetry = isProbeRetry ? subSelect.value : null;
             subSelect.innerHTML = '';
             if (subTracks.length === 0) {
                 subSelect.innerHTML = '<option value="-1">Aucun sous-titre intégré</option>';
@@ -670,6 +816,11 @@
             if (type === 'vf' && info.frAudioIndex !== null && currentActiveAudioIndex === null) {
                 chosenIndex = -1;
             }
+            // Après un nouvel essai, respecter un choix fait à la main entre-temps
+            if (isProbeRetry && userPickedSubTrack && subPickedBeforeRetry !== null
+                && subTracks.some(t => String(t.index) === subPickedBeforeRetry || subPickedBeforeRetry === '-1')) {
+                chosenIndex = parseInt(subPickedBeforeRetry, 10);
+            }
 
             subSelect.value = chosenIndex;
             if (chosenIndex !== -1) {
@@ -692,7 +843,7 @@
         // Si cette piste est déjà active ou en cours de streaming pour ce fichier
         if (subKey === currentLoadedSubKey) {
             const effOffset = currentActualStartOffset - currentManualSubOffset;
-            if (currentSubStyle.renderer === 'libass' && jassubInstance) {
+            if (isLibassActive() && jassubInstance) {
                 jassubInstance.timeOffset = effOffset;
                 safeJassubRender(true);
             } else {
@@ -718,7 +869,7 @@
         }
 
         // --- MODE 1 : LIBASS WASM (JASSUB) HAUTE DÉFINITION (STREAMING TEMPS RÉEL) ---
-        if (currentSubStyle.renderer === 'libass' && typeof window.JASSUB !== 'undefined') {
+        if (isLibassActive() && typeof window.JASSUB !== 'undefined') {
             subStatus.innerText = "⏳ Chargement des sous-titres HD (libass)...";
             subStatus.style.color = "#ffa033";
 
@@ -731,20 +882,62 @@
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+                const streamSignal = currentSubAbort.signal;
                 let lineBuffer = "";
                 let fullAssContent = "";
                 let jassubInitialized = false;
                 let lastTrackUpdateTime = 0;
-                let lastDialogueCount = 0;
+                let dlgCount = 0;
+                let appliedDialogueCount = 0;
+                let trackUpdateTimer = null;
+                let trackUpdateInFlight = false;
+                const styleUsage = new Map();
 
-                // Timeout de sécurité : si aucun flux ASS n'arrive en 12s, repli transparent sur WebVTT
+                const ensureEventsSection = (txt) => txt.includes('[Events]')
+                    ? txt
+                    : txt + '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
+
+                const updateStatus = () => {
+                    if (!subStatus || subtitlesHidden) return;
+                    const modeLabel = currentSubStyle.mode === 'custom' ? 'Personnalisé' : 'Fansub';
+                    subStatus.innerText = `✨ Sous-titres HD actifs (${dlgCount} répliques • ${modeLabel})`;
+                    subStatus.style.color = "#46d369";
+                };
+
+                // Envoie le contenu accumulé au worker libass (au plus toutes les 300 ms au début, puis 1,5 s)
+                const pushTrackUpdate = async () => {
+                    trackUpdateTimer = null;
+                    if (streamSignal.aborted || trackUpdateInFlight) return;
+                    if (!jassubInstance || !jassubInstance.renderer) return;
+                    if (dlgCount === appliedDialogueCount) return;
+                    trackUpdateInFlight = true;
+                    lastTrackUpdateTime = Date.now();
+                    appliedDialogueCount = dlgCount;
+                    try {
+                        const subToRender = currentSubStyle.mode === 'custom'
+                            ? applyStyleOverrideToAss(fullAssContent, currentSubStyle, styleUsage)
+                            : fullAssContent;
+                        await jassubInstance.renderer.setTrack(subToRender);
+                        safeJassubRender(true);
+                    } catch (e) {}
+                    trackUpdateInFlight = false;
+                    updateStatus();
+                    if (dlgCount !== appliedDialogueCount) scheduleTrackUpdate();
+                };
+
+                const scheduleTrackUpdate = () => {
+                    if (trackUpdateTimer || streamSignal.aborted) return;
+                    const interval = dlgCount < 50 ? 300 : 1500;
+                    const wait = Math.max(0, interval - (Date.now() - lastTrackUpdateTime));
+                    trackUpdateTimer = setTimeout(pushTrackUpdate, wait);
+                };
+                streamSignal.addEventListener('abort', () => clearTimeout(trackUpdateTimer), { once: true });
+
+                // Délai de sécurité : si aucun en-tête ASS n'arrive en 12s, repli sur WebVTT pour cette piste
                 const timeoutId = setTimeout(() => {
-                    if (!jassubInitialized) {
+                    if (!jassubInitialized && !streamSignal.aborted) {
                         console.warn("[JASSUB] Délai dépassé (12s), repli automatique sur WebVTT");
-                        if (currentSubAbort) currentSubAbort.abort();
-                        currentLoadedSubKey = null;
-                        currentSubStyle.renderer = 'vtt';
-                        streamSubtitlesLive(magnet, subIndex, fileIndex, currentActualStartOffset);
+                        activateLibassFallback(magnet, subIndex, fileIndex);
                     }
                 }, 12000);
 
@@ -757,87 +950,60 @@
 
                     // Découpage strict aux sauts de ligne pour ne JAMAIS couper une réplique au milieu d'une balise {\pos(...)}
                     const lastNewlineIdx = lineBuffer.lastIndexOf('\n');
-                    if (lastNewlineIdx === -1) {
-                        // Ligne incomplète : conserver dans le buffer et attendre le chunk réseau suivant
-                        continue;
-                    }
+                    if (lastNewlineIdx === -1) continue;
 
                     const readyChunk = lineBuffer.substring(0, lastNewlineIdx + 1);
                     lineBuffer = lineBuffer.substring(lastNewlineIdx + 1);
                     fullAssContent += readyChunk;
                     currentRawAssContent = fullAssContent;
 
-                    const dialogueMatches = fullAssContent.match(/^Dialogue\s*:/gim);
-                    const dlgCount = dialogueMatches ? dialogueMatches.length : 0;
+                    // Comptage incrémental (uniquement sur le nouveau morceau)
+                    dlgCount += (readyChunk.match(/^Dialogue\s*:/gim) || []).length;
+                    countDialogueStyles(readyChunk, styleUsage);
 
-                    // Dès que l'en-tête ASS (styles ou events) est reçu, initialiser libass immédiatement (< 200ms)
+                    // Dès que l'en-tête ASS (styles ou events) est reçu, initialiser libass immédiatement
                     if (!jassubInitialized) {
-                        const hasStyles = fullAssContent.includes('[V4+ Styles]') && fullAssContent.includes('Style:');
+                        const hasStyles = /^\[V4\+? Styles\]/im.test(fullAssContent) && /^Style\s*:/im.test(fullAssContent);
                         const hasEvents = fullAssContent.includes('[Events]');
 
                         if (hasStyles || hasEvents) {
                             clearTimeout(timeoutId);
-                            let initAss = fullAssContent;
-                            if (!initAss.includes('[Events]')) {
-                                initAss += '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
-                            }
-                            await initOrUpdateJassub(initAss);
                             jassubInitialized = true;
+                            appliedDialogueCount = dlgCount;
+                            lastTrackUpdateTime = Date.now();
+                            await initOrUpdateJassub(ensureEventsSection(fullAssContent));
+                            if (streamSignal.aborted) return;
+                            // Le contenu reçu pendant l'initialisation sera poussé au prochain cycle
+                            currentRawAssContent = fullAssContent;
+                            if (dlgCount !== appliedDialogueCount) scheduleTrackUpdate();
                         }
-                    } else if (jassubInstance && jassubInstance.renderer) {
-                        // Mettre à jour les répliques dès qu'un lot de dialogues arrive
-                        if (dlgCount > lastDialogueCount) {
-                            lastDialogueCount = dlgCount;
-                            const now = Date.now();
-                            if (now - lastTrackUpdateTime > 250 || dlgCount < 30) {
-                                lastTrackUpdateTime = now;
-                                try {
-                                    const subToRender = currentSubStyle.mode === 'custom'
-                                        ? applyStyleOverrideToAss(fullAssContent, currentSubStyle)
-                                        : fullAssContent;
-                                    await jassubInstance.renderer.setTrack(subToRender);
-                                    safeJassubRender(true);
-                                } catch (e) {}
-                            }
-
-                            if (subStatus) {
-                                const modeLabel = currentSubStyle.mode === 'custom' ? 'Personnalisé' : 'Fansub';
-                                subStatus.innerText = `✨ Sous-titres HD actifs (${dlgCount} répliques • ${modeLabel})`;
-                                subStatus.style.color = "#46d369";
-                            }
-                        }
+                    } else if (dlgCount !== appliedDialogueCount) {
+                        scheduleTrackUpdate();
                     }
                 }
 
                 clearTimeout(timeoutId);
-                // Traiter le reliquat éventuel de la dernière ligne
-                if (lineBuffer.trim().length > 0) {
-                    const remaining = lineBuffer + '\n';
-                    fullAssContent += remaining;
-                    currentRawAssContent = fullAssContent;
-                }
+                clearTimeout(trackUpdateTimer);
+                trackUpdateTimer = null;
+                if (streamSignal.aborted) return;
 
+                // Traiter le reliquat éventuel de la dernière ligne
+                const tail = lineBuffer + decoder.decode();
+                if (tail.trim().length > 0) {
+                    const remaining = tail + '\n';
+                    fullAssContent += remaining;
+                    dlgCount += (remaining.match(/^Dialogue\s*:/gim) || []).length;
+                    countDialogueStyles(remaining, styleUsage);
+                }
                 currentRawAssContent = fullAssContent;
+
                 if (!jassubInitialized && fullAssContent.trim().length > 0) {
-                    let initAss = fullAssContent;
-                    if (!initAss.includes('[Events]')) {
-                        initAss += '\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
-                    }
-                    await initOrUpdateJassub(initAss);
+                    await initOrUpdateJassub(ensureEventsSection(fullAssContent));
                 } else if (jassubInstance && jassubInstance.renderer) {
-                    try {
-                        const subToRender = currentSubStyle.mode === 'custom'
-                            ? applyStyleOverrideToAss(fullAssContent, currentSubStyle)
-                            : fullAssContent;
-                        await jassubInstance.renderer.setTrack(subToRender);
-                        safeJassubRender(true);
-                        const finalCount = (fullAssContent.match(/^Dialogue\s*:/gim) || []).length;
-                        if (subStatus && finalCount > 0) {
-                            const modeLabel = currentSubStyle.mode === 'custom' ? 'Personnalisé' : 'Fansub';
-                            subStatus.innerText = `✨ Sous-titres HD actifs (${finalCount} répliques • ${modeLabel})`;
-                            subStatus.style.color = "#46d369";
-                        }
-                    } catch (e) {}
+                    // Attendre une éventuelle mise à jour en cours, puis pousser la version finale complète
+                    while (trackUpdateInFlight) await new Promise(r => setTimeout(r, 50));
+                    appliedDialogueCount = -1;
+                    await pushTrackUpdate();
                 }
                 return;
             } catch (err) {
@@ -961,22 +1127,24 @@
         const subCanvas = document.querySelector('canvas.JASSUB');
 
         let isCurrentlyVisible = false;
-        if (currentSubStyle.renderer === 'libass' && jassubInstance && subCanvas) {
-            isCurrentlyVisible = subCanvas.style.display !== 'none';
+        if (isLibassActive() && jassubInstance && subCanvas) {
+            isCurrentlyVisible = !subtitlesHidden;
         } else if (currentTextTrack) {
             isCurrentlyVisible = currentTextTrack.mode === 'showing';
         }
 
         if (isCurrentlyVisible) {
+            subtitlesHidden = true;
             if (currentTextTrack) currentTextTrack.mode = 'hidden';
-            if (subCanvas) subCanvas.style.display = 'none';
+            applyJassubCanvasVisibility();
             if (btn) { btn.innerText = "CC OFF"; btn.style.background = "#555"; }
             if (customCc) customCc.style.opacity = '0.4';
             if (subStatus) subStatus.innerText = "Sous-titres masqués";
             showToast("Sous-titres masqués");
         } else {
-            if (currentTextTrack) currentTextTrack.mode = 'showing';
-            if (subCanvas) subCanvas.style.display = 'block';
+            subtitlesHidden = false;
+            if (currentTextTrack && !isLibassActive()) currentTextTrack.mode = 'showing';
+            applyJassubCanvasVisibility();
             if (btn) { btn.innerText = "CC ON"; btn.style.background = "var(--primary)"; }
             if (customCc) customCc.style.opacity = '1';
             if (subStatus) subStatus.innerText = "Sous-titres affichés";
@@ -986,6 +1154,7 @@
 
     function onSubtitleChange(val) {
         const subIndex = parseInt(val, 10);
+        userPickedSubTrack = true;
         const btn = document.getElementById('toggleSubBtn');
         const subStatus = document.getElementById('sub-status');
         const subCanvas = document.querySelector('canvas.JASSUB');
@@ -993,11 +1162,8 @@
         if (subIndex === -1) {
             if (currentSubAbort) currentSubAbort.abort();
             if (currentTextTrack) currentTextTrack.mode = 'hidden';
-            if (jassubInstance) {
-                try { jassubInstance.destroy(); } catch(e) {}
-                jassubInstance = null;
-            }
-            if (subCanvas) subCanvas.remove();
+            destroyJassub();
+            currentLoadedSubKey = null;
             btn.innerText = "CC OFF";
             btn.style.background = "#555";
             subStatus.innerText = "Sous-titres désactivés";
@@ -1005,6 +1171,9 @@
         } else {
             btn.innerText = "CC ON";
             btn.style.background = "var(--primary)";
+            subtitlesHidden = false;
+            libassFallbackActive = false; // nouvelle piste : retenter libass
+            destroyJassub();
             currentLoadedSubKey = null; // Forcer le rechargement de la nouvelle piste
             if (currentActiveMagnet) {
                 streamSubtitlesLive(currentActiveMagnet, subIndex, currentActiveFileIndex, currentStreamOffset);
@@ -1128,6 +1297,8 @@
 
         // Si le moteur de rendu a changé (passage de libass à vtt ou vice-versa)
         if (prevRenderer !== currentSubStyle.renderer) {
+            libassFallbackActive = false;
+            destroyJassub();
             const subSelect = document.getElementById('subSelect');
             const chosenIndex = subSelect ? parseInt(subSelect.value, 10) : 0;
             if (chosenIndex !== -1 && currentLoadedSubMagnet) {
@@ -1138,7 +1309,7 @@
         }
 
         // Si le moteur libass est actif, réinitialiser le rendu avec le style choisi
-        if (currentSubStyle.renderer === 'libass' && currentRawAssContent) {
+        if (isLibassActive() && currentRawAssContent) {
             initOrUpdateJassub();
         } else {
             applySubtitleCuesToTrack();
@@ -1151,7 +1322,7 @@
             localStorage.removeItem('animflix_sub_style');
         } catch (e) {}
         loadSavedSubStyle();
-        if (currentSubStyle.renderer === 'libass' && currentRawAssContent) {
+        if (isLibassActive() && currentRawAssContent) {
             initOrUpdateJassub();
         } else {
             applySubtitleCuesToTrack();
@@ -1200,7 +1371,7 @@
 
         const preview = document.getElementById('sub-preview-box');
         if (preview) {
-            if (currentSubStyle.renderer === 'libass' && currentSubStyle.mode === 'original') {
+            if (isLibassActive() && currentSubStyle.mode === 'original') {
                 preview.style.backgroundColor = 'transparent';
                 preview.style.color = '#ffffff';
                 preview.style.fontFamily = 'inherit';

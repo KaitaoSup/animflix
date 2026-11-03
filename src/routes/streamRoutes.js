@@ -41,7 +41,11 @@ router.get('/api/streams', async (req, res) => {
 router.get('/api/subtitles', (req, res) => {
   const { magnet, fileIndex = 1, subIndex = 0, format = 'ass' } = req.query;
   if (!magnet) return res.status(400).send("Lien magnet manquant");
-  streamSubtitlesLive({ magnet, fileIndex, subIndex, format, req, res });
+  return streamSubtitlesLive({ magnet, fileIndex, subIndex, format, req, res }).catch((err) => {
+    console.error("Erreur sous-titres:", err.message);
+    if (!res.headersSent) res.status(500).send("Erreur extraction sous-titres");
+    else res.end();
+  });
 });
 
 // --- ROUTE API SYNCHRONISATION PRÉCISE DU LECTEUR ET DES SOUS-TITRES ---

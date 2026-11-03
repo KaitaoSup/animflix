@@ -2247,8 +2247,9 @@
             renderAnilistDetailCard();
             updatePlayerTrackButton();
 
-            // Déclencher la recherche AniSkip uniquement si les intervalles ne sont pas encore chargés
-            if (typeof checkAniSkipForCurrentEpisode === 'function' && !window.currentAniSkipIntervals) {
+            // Relancer AniSkip si rien n'est chargé ou si les intervalles concernent un autre anime / épisode
+            if (typeof checkAniSkipForCurrentEpisode === 'function'
+                && (typeof window.aniSkipNeedsRefresh !== 'function' || window.aniSkipNeedsRefresh())) {
                 checkAniSkipForCurrentEpisode();
             }
         } catch (err) {

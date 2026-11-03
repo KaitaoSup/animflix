@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { SUB_CACHE_DIR, TORRSERVER_LOCAL_URL } from '../config/constants.js';
 import { getTorrentHash } from '../utils/network.js';
-import { getStreamInfo } from './ffmpegService.js';
+import { getCachedStreamInfo } from './ffmpegService.js';
 
 /**
  * Transformateur de sous-titres ASS / SSA vers WebVTT positionné
@@ -214,19 +214,36 @@ export async function streamSubtitlesLive({ magnet, fileIndex = 1, subIndex = 0,
     return vttStream.pipe(res);
   }
 
-  // 4. Sinon, extraction en temps réel avec FFmpeg (sortie ASS native ultra-rapide)
+  // 4. Sinon, extraction en temps réel avec FFmpeg (partagée entre clients pour une même piste)
+  const contentType = isAss ? 'text/x-ssa; charset=utf-8' : 'text/vtt; charset=utf-8';
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-cache');
+
+  let extraction = activeSubExtractions.get(cacheKey);
+  if (!extraction) {
+    extraction = await startSubExtraction({ magnet, parsedFileIndex, parsedSubIndex, cacheKey, assFile });
+  }
+  attachClientToExtraction(extraction, { isAss, req, res });
+}
+
+// --- EXTRACTIONS FFMPEG EN COURS (une seule par piste, partagée entre clients) ---
+const activeSubExtractions = new Map(); // key: cacheKey -> extraction
+const SUB_EXTRACTION_IDLE_TIMEOUT_MS = 120000;
+
+async function startSubExtraction({ magnet, parsedFileIndex, parsedSubIndex, cacheKey, assFile }) {
+  // Réserver la clé immédiatement (une seule extraction FFmpeg par piste)
+  const extraction = { chunks: [], clients: new Set(), done: false };
+  activeSubExtractions.set(cacheKey, extraction);
+
   const uniqueId = Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
   const tmpAssFile = path.join(SUB_CACHE_DIR, `${cacheKey}.${uniqueId}.ass.tmp`);
   const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
 
-  const contentType = isAss ? 'text/x-ssa; charset=utf-8' : 'text/vtt; charset=utf-8';
-  res.setHeader('Content-Type', contentType);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Transfer-Encoding', 'chunked');
-  res.setHeader('Cache-Control', 'no-cache');
-
   const ffmpegArgs = [
     '-v', 'error',
+    '-nostats',
+    '-progress', 'pipe:2',
     '-probesize', '1000000',
     '-analyzeduration', '1000000',
     '-fflags', '+nobuffer',
@@ -236,73 +253,112 @@ export async function streamSubtitlesLive({ magnet, fileIndex = 1, subIndex = 0,
     '-flush_packets', '1'
   ];
 
-  // Si le codec de la piste sous-titres est déjà ASS/SSA natif, copier directement (0% CPU, flux instantané)
-  const streamInfo = await getStreamInfo(magnet, parsedFileIndex).catch(() => null);
-  const targetSub = (streamInfo?.subTracks || []).find(t => t.index === parsedSubIndex) || (streamInfo?.subTracks || [])[0];
-  if (isAss && targetSub?.codec && (targetSub.codec === 'ass' || targetSub.codec === 'ssa')) {
+  // Copie directe uniquement si la piste exacte est identifiée comme ASS/SSA
+  // (cache seulement : ne jamais retarder l'extraction en attendant une analyse ffprobe)
+  const streamInfo = getCachedStreamInfo(magnet, parsedFileIndex);
+  const targetSub = (streamInfo?.subTracks || []).find(t => t.index === parsedSubIndex);
+  if (targetSub?.codec === 'ass' || targetSub?.codec === 'ssa') {
     ffmpegArgs.push('-c:s', 'copy');
   }
-
   ffmpegArgs.push('-f', 'ass', 'pipe:1');
 
   const ffmpeg = spawn('ffmpeg', ffmpegArgs);
   const assFileOut = fs.createWriteStream(tmpAssFile);
-
-  if (isAss) {
-    ffmpeg.stdout.pipe(res);
-    ffmpeg.stdout.pipe(assFileOut);
-  } else {
-    const vttTransform = new AssToVttStream();
-    ffmpeg.stdout.pipe(vttTransform);
-    vttTransform.pipe(res);
-    ffmpeg.stdout.pipe(assFileOut);
-  }
+  assFileOut.on('error', () => {});
 
   let ffmpegClosed = false;
   let fileOutFinished = false;
   let successCode = false;
 
+  function finish() {
+    if (extraction.done) return;
+    extraction.done = true;
+    if (activeSubExtractions.get(cacheKey) === extraction) {
+      activeSubExtractions.delete(cacheKey);
+    }
+    for (const client of extraction.clients) client.end();
+    extraction.clients.clear();
+  }
+
   function tryPromoteCache() {
-    if (ffmpegClosed && fileOutFinished && successCode) {
-      if (fs.existsSync(tmpAssFile)) {
-        try {
-          if (!fs.existsSync(assFile)) {
-            fs.renameSync(tmpAssFile, assFile);
-          } else {
-            fs.unlinkSync(tmpAssFile);
-          }
-        } catch (e) {}
-      }
+    if (ffmpegClosed && fileOutFinished && successCode && fs.existsSync(tmpAssFile)) {
+      try {
+        if (!fs.existsSync(assFile)) fs.renameSync(tmpAssFile, assFile);
+        else fs.unlinkSync(tmpAssFile);
+      } catch (e) {}
     }
   }
+
+  // Délai d'inactivité : FFmpeg n'est tué que si la lecture du torrent n'avance plus (pas de durée totale fixe)
+  let idleTimer = null;
+  const resetIdle = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      console.warn(`⚠️ Extraction sous-titres bloquée (${cacheKey}), arrêt de FFmpeg`);
+      try { ffmpeg.kill('SIGKILL'); } catch (e) {}
+    }, SUB_EXTRACTION_IDLE_TIMEOUT_MS);
+  };
+  resetIdle();
+
+  ffmpeg.stderr.on('data', resetIdle);
+  ffmpeg.stdout.on('data', (chunk) => {
+    resetIdle();
+    extraction.chunks.push(chunk);
+    assFileOut.write(chunk);
+    for (const client of extraction.clients) client.write(chunk);
+  });
 
   assFileOut.on('finish', () => {
     fileOutFinished = true;
     tryPromoteCache();
   });
 
-  const safetyKillTimer = setTimeout(() => {
-    if (!ffmpegClosed) {
-      try { ffmpeg.kill('SIGKILL'); } catch (e) {}
-    }
-  }, 45000);
+  ffmpeg.on('error', (err) => {
+    console.error(`❌ FFmpeg sous-titres introuvable ou en erreur : ${err.message}`);
+  });
 
   ffmpeg.on('close', (code) => {
-    clearTimeout(safetyKillTimer);
+    clearTimeout(idleTimer);
     ffmpegClosed = true;
-    if (code === 0) {
-      successCode = true;
-      tryPromoteCache();
-    } else {
-      if (fs.existsSync(tmpAssFile)) {
-        try { fs.unlinkSync(tmpAssFile); } catch (e) {}
-      }
+    successCode = code === 0;
+    assFileOut.end();
+    if (!successCode) {
+      assFileOut.on('close', () => {
+        try { if (fs.existsSync(tmpAssFile)) fs.unlinkSync(tmpAssFile); } catch (e) {}
+      });
     }
+    finish();
   });
 
-  req.on('close', () => {
-    try {
-      ffmpeg.stdout.unpipe(res);
-    } catch (e) {}
-  });
+  return extraction;
 }
+
+function attachClientToExtraction(extraction, { isAss, req, res }) {
+  // Chaque client reçoit ce qui a déjà été extrait, puis le flux en direct.
+  // Les écritures ne dépendent jamais de la réponse HTTP : une déconnexion ne bloque pas l'extraction.
+  let sink;
+  if (isAss) {
+    sink = {
+      write: (chunk) => { if (!res.writableEnded && !res.destroyed) res.write(chunk); },
+      end: () => { if (!res.writableEnded && !res.destroyed) res.end(); }
+    };
+  } else {
+    const vttTransform = new AssToVttStream();
+    vttTransform.on('error', () => {});
+    vttTransform.on('data', (data) => { if (!res.writableEnded && !res.destroyed) res.write(data); });
+    vttTransform.on('end', () => { if (!res.writableEnded && !res.destroyed) res.end(); });
+    sink = {
+      write: (chunk) => vttTransform.write(chunk),
+      end: () => vttTransform.end()
+    };
+  }
+
+  for (const chunk of extraction.chunks) sink.write(chunk);
+  if (extraction.done) {
+    sink.end();
+    return;
+  }
+  extraction.clients.add(sink);
+  req.on('close', () => extraction.clients.delete(sink));
+}
+
