@@ -3,9 +3,18 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
-import { TORRSERVER_LOCAL_URL, HLS_CACHE_DIR, VAAPI_DEVICE } from '../config/constants.js';
+import { TORRSERVER_LOCAL_URL, HLS_CACHE_DIR, VAAPI_DEVICE, MAX_CONCURRENT_STREAMS } from '../config/constants.js';
 import { getTorrentHash } from '../utils/network.js';
 import {
+  parseFileIndex,
+  parseTrackIndex,
+  parseSeekSeconds,
+  parsePlaybackParams,
+  isValidPlayId
+} from '../utils/params.js';
+import { buildDirectArgs, buildTranscodeArgs, buildHlsArgs, isH264DirectCopy } from '../services/ffmpegArgs.js';
+import {
+  countActiveStreams,
   resolveClientId,
   activeClientFfmpegProcesses,
   activePlaySessions,
@@ -18,6 +27,7 @@ import {
 import {
   getStreamInfo,
   generateThumbnail,
+  probeKeyframeStart,
   getDetectedHwAccel
 } from '../services/ffmpegService.js';
 import { streamSubtitlesLive } from '../services/subtitlesService.js';
@@ -26,12 +36,25 @@ import { getTorrentFiles } from '../services/torrserverService.js';
 
 const router = Router();
 
+/**
+ * Marque une session play-sync comme résolue et réveille les requêtes /api/play-sync en attente
+ */
+function releasePlaySession(playSession, actualStart) {
+  if (!playSession) return;
+  playSession.actualStart = actualStart;
+  playSession.keyframeOffset = 0;
+  playSession.resolved = true;
+  while (playSession.waiters && playSession.waiters.length > 0) {
+    playSession.waiters.shift()();
+  }
+}
+
 // --- ROUTE API INFO FLUX (AUDIO & SOUS-TITRES) ---
 router.get('/api/streams', async (req, res) => {
-  const { magnet, fileIndex = 1 } = req.query;
+  const { magnet } = req.query;
   if (!magnet) return res.status(400).json({ error: "Lien magnet manquant" });
   try {
-    const info = await getStreamInfo(magnet, fileIndex);
+    const info = await getStreamInfo(magnet, parseFileIndex(req.query.fileIndex));
     res.json(info);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -40,8 +63,10 @@ router.get('/api/streams', async (req, res) => {
 
 // --- ROUTE API STREAMING SOUS-TITRES (ASS NATIF OU WEBVTT) ---
 router.get('/api/subtitles', (req, res) => {
-  const { magnet, fileIndex = 1, subIndex = 0, format = 'ass' } = req.query;
+  const { magnet, format = 'ass' } = req.query;
   if (!magnet) return res.status(400).send("Lien magnet manquant");
+  const fileIndex = parseFileIndex(req.query.fileIndex);
+  const subIndex = parseTrackIndex(req.query.subIndex);
   return streamSubtitlesLive({ magnet, fileIndex, subIndex, format, req, res }).catch((err) => {
     console.error("Erreur sous-titres:", err.message);
     if (!res.headersSent) res.status(500).send("Erreur extraction sous-titres");
@@ -51,10 +76,10 @@ router.get('/api/subtitles', (req, res) => {
 
 // --- ROUTE API POLICES EMBARQUÉES (PIÈCES JOINTES MKV DES FANSUBS) ---
 router.get('/api/fonts', async (req, res) => {
-  const { magnet, fileIndex = 1 } = req.query;
+  const { magnet } = req.query;
   if (!magnet) return res.status(400).json({ error: "Lien magnet manquant" });
   try {
-    const fonts = await getEmbeddedFonts(magnet, fileIndex);
+    const fonts = await getEmbeddedFonts(magnet, parseFileIndex(req.query.fileIndex));
     res.setHeader('Cache-Control', 'no-cache');
     res.json({ fonts: fonts.map(f => ({ ...f, url: '/api/fonts/' + f.id })) });
   } catch (err) {
@@ -74,10 +99,10 @@ router.get('/api/fonts/:id', (req, res) => {
 
 // --- ROUTE API SYNCHRONISATION PRÉCISE DU LECTEUR ET DES SOUS-TITRES ---
 router.get('/api/play-sync', async (req, res) => {
-  const { playId, expectedSeek } = req.query;
-  if (!playId) return res.status(400).json({ error: "playId manquant" });
+  const { playId } = req.query;
+  if (!isValidPlayId(playId)) return res.status(400).json({ error: "playId manquant ou invalide" });
 
-  const parsedExpectedSeek = parseFloat(expectedSeek) || 0;
+  const parsedExpectedSeek = parseSeekSeconds(req.query.expectedSeek);
 
   let session = activePlaySessions.get(playId);
   if (!session) {
@@ -119,13 +144,17 @@ router.get('/api/play-sync', async (req, res) => {
 
 // --- TRANSCODEUR FFMPEG OPTIMISÉ (ZÉRO LATENCE, SEEK & MULTITHREAD) ---
 router.get('/play', async (req, res) => {
-  const { magnet, mode, type, fileIndex = 1, audioIndex, ss, playId, audioOffset } = req.query;
+  const { magnet, mode, playId } = req.query;
   if (!magnet) return res.status(400).send("Lien magnet manquant");
+  if (playId !== undefined && !isValidPlayId(playId)) return res.status(400).send("playId invalide");
 
-  const parsedFileIndex = parseInt(fileIndex, 10) || 1;
+  const {
+    fileIndex: parsedFileIndex,
+    audioIndex,
+    seekSeconds,
+    audioOffset: parsedAudioOffset
+  } = parsePlaybackParams(req.query);
   const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
-  const seekSeconds = parseFloat(ss) || 0;
-  const parsedAudioOffset = parseFloat(audioOffset) || 0;
 
   // Création / liaison de la session de synchronisation
   let playSession = null;
@@ -160,54 +189,39 @@ router.get('/play', async (req, res) => {
   stopClientHlsSession(clientId);
   killClientFfmpegProcess(clientId);
 
+  // Analyse des pistes (mode direct) AVANT la vérification de limite : aucun `await` ne doit séparer
+  // le comptage des flux du lancement de FFmpeg, sinon deux requêtes simultanées dépassent la limite.
+  const streamInfo = mode === 'direct'
+    ? await getStreamInfo(magnet, parsedFileIndex).catch(() => null)
+    : null;
+
+  // Client parti pendant l'analyse : son événement 'close' est déjà passé, un FFmpeg lancé maintenant
+  // ne serait jamais arrêté (processus zombie lisant le torrent indéfiniment)
+  if (req.destroyed) {
+    releasePlaySession(playSession, seekSeconds);
+    return;
+  }
+
+  if (countActiveStreams() >= MAX_CONCURRENT_STREAMS) {
+    console.warn(`⛔ Limite de ${MAX_CONCURRENT_STREAMS} flux simultanés atteinte, lecture refusée (client ${clientId})`);
+    releasePlaySession(playSession, seekSeconds);
+    return res.status(503).send(`Trop de lectures en cours (max ${MAX_CONCURRENT_STREAMS}). Réessayez dans un instant.`);
+  }
+
   res.setHeader('Content-Type', 'video/mp4');
   res.setHeader('Accept-Ranges', 'none');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   // MODE 1 : LECTURE DIRECTE (0% CPU, STREAM ULTRA-RAPIDE SANS RÉENCODAGE VIDÉO)
   if (mode === 'direct') {
-    const streamInfo = await getStreamInfo(magnet, parsedFileIndex).catch(() => null);
     console.log(`⚡ Lancement FFmpeg en Mode Direct (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s, Audio: ${audioIndex ?? 'auto'}, Offset: ${parsedAudioOffset}s, playId: ${playId ?? 'none'})`);
-    const directArgs = ['-threads', '0'];
-
-    if (seekSeconds > 0) {
-      directArgs.push('-noaccurate_seek', '-ss', `${seekSeconds}`);
-    }
-
-    directArgs.push(
-      '-i', torrUrl,
-      '-map', '0:v:0',
-      '-c:v', 'copy',
-      '-bsf:v', 'showinfo'
-    );
-
-    let chosenAudioTrack = null;
-    if (audioIndex !== undefined && audioIndex !== null && audioIndex !== '') {
-      const idx = parseInt(audioIndex, 10);
-      directArgs.push('-map', `0:a:${idx}`);
-      chosenAudioTrack = (streamInfo?.audioTracks || []).find(a => a.index === idx);
-    } else {
-      directArgs.push('-map', '0:a:0?');
-      chosenAudioTrack = (streamInfo?.audioTracks || [])[0];
-    }
-
-    if (parsedAudioOffset !== 0) {
-      directArgs.push('-itsoffset', `${parsedAudioOffset}`);
-    }
-
-    const needsAacConversion = !chosenAudioTrack || (chosenAudioTrack.codec !== 'aac' && chosenAudioTrack.codec !== 'mp3');
-    if (needsAacConversion) {
-      directArgs.push('-c:a', 'aac', '-b:a', '192k', '-ac', '2');
-    } else {
-      directArgs.push('-c:a', 'copy');
-    }
-
-    directArgs.push(
-      '-sn',
-      '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-      '-f', 'mp4',
-      'pipe:1'
-    );
+    const directArgs = buildDirectArgs({
+      torrUrl,
+      seekSeconds,
+      audioIndex,
+      audioOffset: parsedAudioOffset,
+      streamInfo
+    });
 
     const ffmpeg = spawn('ffmpeg', directArgs);
     activeClientFfmpegProcesses.set(clientId, ffmpeg);
@@ -296,106 +310,14 @@ router.get('/play', async (req, res) => {
 
   const detectedHwAccel = getDetectedHwAccel();
   console.log(`🎬 Lancement FFmpeg en Mode Transcodage [${detectedHwAccel.toUpperCase()}] (Fichier index: ${parsedFileIndex}, Seek: ${seekSeconds}s)`);
-  const streamInfo = await getStreamInfo(magnet, parsedFileIndex).catch(() => null);
-  const transcodeArgs = [];
-
-  if (seekSeconds > 0) {
-    transcodeArgs.push('-noaccurate_seek', '-ss', `${seekSeconds}`);
-  }
-
-  if (detectedHwAccel === 'vaapi') {
-    transcodeArgs.push(
-      '-init_hw_device', `vaapi=va:${VAAPI_DEVICE}`,
-      '-filter_hw_device', 'va',
-      '-i', torrUrl,
-      '-map', '0:v:0'
-    );
-
-    if (audioIndex !== undefined && audioIndex !== null && audioIndex !== '') {
-      transcodeArgs.push('-map', `0:a:${audioIndex}`);
-    } else {
-      transcodeArgs.push('-map', '0:a:0?');
-    }
-
-    if (parsedAudioOffset !== 0) {
-      transcodeArgs.push('-itsoffset', `${parsedAudioOffset}`);
-    }
-
-    const is10BitOrHevc = (streamInfo?.videoPixFmt && streamInfo.videoPixFmt.includes('10')) ||
-                          (streamInfo?.videoCodec && (streamInfo.videoCodec.includes('hevc') || streamInfo.videoCodec.includes('h265')));
-
-    if (is10BitOrHevc) {
-      transcodeArgs.push('-vf', 'format=nv12,hwupload', '-c:v', 'h264_vaapi');
-    } else {
-      transcodeArgs.push('-vf', 'format=nv12,hwupload', '-c:v', 'h264_vaapi');
-    }
-
-    transcodeArgs.push(
-      '-qp', '24',
-      '-c:a', 'aac',
-      '-b:a', '192k',
-      '-ac', '2',
-      '-sn',
-      '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-      '-f', 'mp4',
-      'pipe:1'
-    );
-  } else if (detectedHwAccel === 'nvenc') {
-    transcodeArgs.push(
-      '-i', torrUrl,
-      '-map', '0:v:0'
-    );
-    if (audioIndex !== undefined && audioIndex !== null && audioIndex !== '') {
-      transcodeArgs.push('-map', `0:a:${audioIndex}`);
-    } else {
-      transcodeArgs.push('-map', '0:a:0?');
-    }
-    if (parsedAudioOffset !== 0) {
-      transcodeArgs.push('-itsoffset', `${parsedAudioOffset}`);
-    }
-    transcodeArgs.push(
-      '-c:v', 'h264_nvenc',
-      '-preset', 'p1',
-      '-tune', 'ull',
-      '-rc', 'constqp',
-      '-qp', '26',
-      '-c:a', 'aac',
-      '-b:a', '192k',
-      '-ac', '2',
-      '-sn',
-      '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-      '-f', 'mp4',
-      'pipe:1'
-    );
-  } else {
-    transcodeArgs.push(
-      '-threads', '0',
-      '-i', torrUrl,
-      '-map', '0:v:0'
-    );
-    if (audioIndex !== undefined && audioIndex !== null && audioIndex !== '') {
-      transcodeArgs.push('-map', `0:a:${audioIndex}`);
-    } else {
-      transcodeArgs.push('-map', '0:a:0?');
-    }
-    if (parsedAudioOffset !== 0) {
-      transcodeArgs.push('-itsoffset', `${parsedAudioOffset}`);
-    }
-    transcodeArgs.push(
-      '-c:v', 'libx264',
-      '-preset', 'ultrafast',
-      '-tune', 'zerolatency',
-      '-crf', '25',
-      '-pix_fmt', 'yuv420p',
-      '-c:a', 'aac',
-      '-b:a', '192k',
-      '-ac', '2',
-      '-sn',
-      '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-      '-f', 'mp4',
-      'pipe:1'
-    );
-  }
+  const transcodeArgs = buildTranscodeArgs({
+    torrUrl,
+    seekSeconds,
+    audioIndex,
+    audioOffset: parsedAudioOffset,
+    hwAccel: detectedHwAccel,
+    vaapiDevice: VAAPI_DEVICE
+  });
 
   const ffmpeg = spawn('ffmpeg', transcodeArgs);
   activeClientFfmpegProcesses.set(clientId, ffmpeg);
@@ -419,41 +341,24 @@ router.get('/play', async (req, res) => {
 // --- STREAMING HLS ADAPTATIF (.M3U8 / HLS.JS & SAFARI / IOS / TV) ---
 router.get('/api/hls/:playId/index.m3u8', async (req, res) => {
   const { playId } = req.params;
-  const { magnet, fileIndex = 1, audioIndex, ss, audioOffset } = req.query;
+  const { magnet } = req.query;
   const clientId = resolveClientId(req);
 
   if (!magnet) return res.status(400).send("Lien magnet manquant");
+  // playId sert de nom de dossier : refuser tout ce qui pourrait sortir du cache HLS ("..%2F..")
+  if (!isValidPlayId(playId)) return res.status(400).send("playId invalide");
 
-  const parsedFileIndex = parseInt(fileIndex, 10) || 1;
-  const seekSeconds = parseFloat(ss) || 0;
-  const parsedAudioOffset = parseFloat(audioOffset) || 0;
+  const {
+    fileIndex: parsedFileIndex,
+    audioIndex,
+    seekSeconds,
+    audioOffset: parsedAudioOffset
+  } = parsePlaybackParams(req.query);
   const sessionDir = path.join(HLS_CACHE_DIR, playId);
   const m3u8Path = path.join(sessionDir, 'index.m3u8');
 
-  // Synchronisation de la session pour /api/play-sync
-  let playSession = activePlaySessions.get(playId);
-  if (!playSession) {
-    playSession = {
-      seekSeconds,
-      actualStart: seekSeconds,
-      keyframeOffset: 0,
-      resolved: true,
-      createdAt: Date.now(),
-      waiters: []
-    };
-    activePlaySessions.set(playId, playSession);
-  } else {
-    playSession.seekSeconds = seekSeconds;
-    playSession.actualStart = seekSeconds;
-    playSession.keyframeOffset = 0;
-    playSession.resolved = true;
-    while (playSession.waiters && playSession.waiters.length > 0) {
-      const resolve = playSession.waiters.shift();
-      resolve();
-    }
-  }
-
   // Si la session HLS existe déjà, servir directement la playlist
+  // (hls.js recharge la playlist en boucle : la synchro déjà calculée ne doit pas être écrasée)
   if (activeHlsSessions.has(playId) && fs.existsSync(m3u8Path)) {
     activeHlsSessions.get(playId).lastAccess = Date.now();
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
@@ -466,102 +371,64 @@ router.get('/api/hls/:playId/index.m3u8', async (req, res) => {
   stopClientHlsSession(clientId);
   killClientFfmpegProcess(clientId);
 
+  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
+  const streamInfo = await getStreamInfo(magnet, parsedFileIndex).catch(() => null);
+
+  // Vérification juste avant le lancement (aucun `await` entre les deux)
+  if (countActiveStreams() >= MAX_CONCURRENT_STREAMS) {
+    console.warn(`⛔ Limite de ${MAX_CONCURRENT_STREAMS} flux simultanés atteinte, session HLS refusée (client ${clientId})`);
+    return res.status(503).send(`Trop de lectures en cours (max ${MAX_CONCURRENT_STREAMS}). Réessayez dans un instant.`);
+  }
+
   if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
   }
 
-  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
-  const streamInfo = await getStreamInfo(magnet, parsedFileIndex).catch(() => null);
-
-  const isH264DirectCopy = streamInfo &&
-    streamInfo.videoCodec === 'h264' &&
-    (!streamInfo.videoPixFmt || streamInfo.videoPixFmt === 'yuv420p');
-
-  let chosenAudioTrack = null;
-  if (audioIndex !== undefined && audioIndex !== null && audioIndex !== '') {
-    const idx = parseInt(audioIndex, 10);
-    chosenAudioTrack = (streamInfo?.audioTracks || []).find(a => a.index === idx);
-  } else {
-    chosenAudioTrack = (streamInfo?.audioTracks || [])[0];
+  // Synchronisation de la session pour /api/play-sync
+  let playSession = activePlaySessions.get(playId);
+  if (!playSession) {
+    playSession = { createdAt: Date.now(), waiters: [] };
+    activePlaySessions.set(playId, playSession);
   }
-  const needsAac = !chosenAudioTrack || (chosenAudioTrack.codec !== 'aac' && chosenAudioTrack.codec !== 'mp3');
+  playSession.seekSeconds = seekSeconds;
+  playSession.keyframeOffset = 0;
 
-  const hlsArgs = ['-threads', '0'];
-
-  if (seekSeconds > 0) {
-    hlsArgs.push('-noaccurate_seek', '-ss', `${seekSeconds}`);
+  const videoIsCopied = isH264DirectCopy(streamInfo);
+  if (videoIsCopied && seekSeconds > 0) {
+    // Vidéo copiée : le flux démarre sur l'image clé PRÉCÉDENT le seek, pas sur le seek lui-même.
+    // (En réencodage, FFmpeg coupe exactement au temps demandé : aucun décalage.)
+    playSession.resolved = false;
+    probeKeyframeStart(torrUrl, seekSeconds).then((actualStart) => {
+      const start = actualStart ?? seekSeconds;
+      if (actualStart !== null) {
+        console.log(`🎯 Keyframe HLS détecté (${playId}) : demandé = ${seekSeconds}s -> effectif = ${start}s`);
+      }
+      playSession.keyframeOffset = Math.round((start - seekSeconds) * 1000) / 1000;
+      playSession.actualStart = start;
+      playSession.resolved = true;
+      while (playSession.waiters.length > 0) playSession.waiters.shift()();
+    });
+  } else {
+    releasePlaySession(playSession, seekSeconds);
   }
 
   const detectedHwAccel = getDetectedHwAccel();
+  const hlsModeLabel = videoIsCopied
+    ? 'Direct Remuxing, 0% CPU'
+    : `Transcodage ${['vaapi', 'nvenc'].includes(detectedHwAccel) ? detectedHwAccel.toUpperCase() : 'CPU'}`;
+  console.log(`📡 Lancement HLS ${hlsModeLabel} (playId: ${playId}, seek: ${seekSeconds}s)`);
 
-  if (isH264DirectCopy) {
-    console.log(`📡 Lancement HLS Direct Remuxing (0% CPU, playId: ${playId}, seek: ${seekSeconds}s)`);
-    hlsArgs.push(
-      '-i', torrUrl,
-      '-map', '0:v:0',
-      '-c:v', 'copy',
-      '-bsf:v', 'h264_mp4toannexb'
-    );
-  } else if (detectedHwAccel === 'vaapi') {
-    console.log(`📡 Lancement HLS Transcodage VAAPI (playId: ${playId}, seek: ${seekSeconds}s)`);
-    hlsArgs.push(
-      '-init_hw_device', `vaapi=va:${VAAPI_DEVICE}`,
-      '-filter_hw_device', 'va',
-      '-i', torrUrl,
-      '-map', '0:v:0',
-      '-vf', 'format=nv12,hwupload',
-      '-c:v', 'h264_vaapi',
-      '-qp', '24'
-    );
-  } else if (detectedHwAccel === 'nvenc') {
-    console.log(`📡 Lancement HLS Transcodage NVENC (playId: ${playId}, seek: ${seekSeconds}s)`);
-    hlsArgs.push(
-      '-i', torrUrl,
-      '-map', '0:v:0',
-      '-c:v', 'h264_nvenc',
-      '-preset', 'p2',
-      '-tune', 'll',
-      '-cq', '26'
-    );
-  } else {
-    console.log(`📡 Lancement HLS Transcodage CPU (playId: ${playId}, seek: ${seekSeconds}s)`);
-    hlsArgs.push(
-      '-i', torrUrl,
-      '-map', '0:v:0',
-      '-c:v', 'libx264',
-      '-preset', 'ultrafast',
-      '-crf', '24',
-      '-pix_fmt', 'yuv420p'
-    );
-  }
-
-  if (audioIndex !== undefined && audioIndex !== null && audioIndex !== '') {
-    hlsArgs.push('-map', `0:a:${audioIndex}`);
-  } else {
-    hlsArgs.push('-map', '0:a:0?');
-  }
-
-  if (parsedAudioOffset !== 0) {
-    hlsArgs.push('-itsoffset', `${parsedAudioOffset}`);
-  }
-
-  if (needsAac) {
-    hlsArgs.push('-c:a', 'aac', '-b:a', '192k', '-ac', '2');
-  } else {
-    hlsArgs.push('-c:a', 'copy');
-  }
-
-  hlsArgs.push(
-    '-sn',
-    '-f', 'hls',
-    '-hls_time', '3',
-    '-hls_init_time', '2',
-    '-hls_list_size', '0',
-    '-hls_playlist_type', 'event',
-    '-hls_flags', 'independent_segments+temp_file',
-    '-hls_segment_filename', path.join(sessionDir, 'seg_%05d.ts'),
+  const hlsArgs = buildHlsArgs({
+    torrUrl,
+    seekSeconds,
+    audioIndex,
+    audioOffset: parsedAudioOffset,
+    streamInfo,
+    hwAccel: detectedHwAccel,
+    vaapiDevice: VAAPI_DEVICE,
+    segmentPattern: path.join(sessionDir, 'seg_%05d.ts'),
     m3u8Path
-  );
+  });
 
   const ffmpeg = spawn('ffmpeg', hlsArgs);
 
@@ -654,7 +521,7 @@ router.post('/api/hls/stop', (req, res) => {
 
 // --- ROUTE API MINIATURES POUR LA TIMELINE (VISUAL SCRUBBING) ---
 router.get('/api/thumbnail', async (req, res) => {
-  const { magnet, fileIndex = 1, t = 0 } = req.query;
+  const { magnet } = req.query;
   const clientId = resolveClientId(req);
 
   if (!magnet) return res.status(400).send("Lien magnet manquant");
@@ -662,8 +529,8 @@ router.get('/api/thumbnail', async (req, res) => {
   try {
     const thumbPath = await generateThumbnail({
       magnet,
-      fileIndex,
-      timestamp: t,
+      fileIndex: parseFileIndex(req.query.fileIndex),
+      timestamp: parseSeekSeconds(req.query.t),
       clientId: `thumb_${clientId}`
     });
 
@@ -678,10 +545,10 @@ router.get('/api/thumbnail', async (req, res) => {
 
 // --- ROUTE API TÉLÉCHARGEMENT LOCAL D'ÉPISODE (MODE HORS-LIGNE) ---
 router.get('/api/download', async (req, res) => {
-  const { magnet, fileIndex = 1, title } = req.query;
+  const { magnet, title } = req.query;
   if (!magnet) return res.status(400).send("Lien magnet manquant");
 
-  const parsedFileIndex = parseInt(fileIndex, 10) || 1;
+  const parsedFileIndex = parseFileIndex(req.query.fileIndex);
   const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
 
   let fileName = title || 'video';

@@ -1369,19 +1369,29 @@
         setupSubtitles(magnet, type, currentActiveFileIndex, seekSeconds);
 
         // Synchronisation directe avec le point clé exact (Keyframe) détecté par le serveur
-        fetch('/api/play-sync?playId=' + encodeURIComponent(playId) + '&expectedSeek=' + encodeURIComponent(seekSeconds))
-            .then(res => res.json())
-            .then(data => {
-                if (currentPlaySessionId === playId && data && data.resolved && typeof data.actualStart === 'number') {
-                    console.log(`🎯 Synchro appliquée pour ${playId}: Seek demandé=${seekSeconds}s -> Keyframe réel=${data.actualStart}s (Décalage=${data.keyframeOffset}s)`);
-                    currentStreamOffset = data.actualStart;
-                    updatePlayerProgress();
-                    if (typeof updateSubtitleOffset === 'function') {
-                        updateSubtitleOffset(data.actualStart);
+        // Le serveur répond au plus tard après 5 s : réessayer tant que la mesure n'est pas prête
+        // (en HLS, elle dépend d'une lecture du torrent qui peut être plus lente au démarrage)
+        const syncPlaySession = (attempt = 0) => {
+            fetch('/api/play-sync?playId=' + encodeURIComponent(playId) + '&expectedSeek=' + encodeURIComponent(seekSeconds))
+                .then(res => res.json())
+                .then(data => {
+                    if (currentPlaySessionId !== playId || !data) return;
+                    if (!data.resolved) {
+                        if (attempt < 5) syncPlaySession(attempt + 1);
+                        return;
                     }
-                }
-            })
-            .catch(() => {});
+                    if (typeof data.actualStart === 'number') {
+                        console.log(`🎯 Synchro appliquée pour ${playId}: Seek demandé=${seekSeconds}s -> Keyframe réel=${data.actualStart}s (Décalage=${data.keyframeOffset}s)`);
+                        currentStreamOffset = data.actualStart;
+                        updatePlayerProgress();
+                        if (typeof updateSubtitleOffset === 'function') {
+                            updateSubtitleOffset(data.actualStart);
+                        }
+                    }
+                })
+                .catch(() => {});
+        };
+        syncPlaySession();
 
         video.onplaying = () => {
             if (streamTimeout) clearTimeout(streamTimeout);

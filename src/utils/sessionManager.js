@@ -44,6 +44,24 @@ export function killClientFfmpegProcess(clientId) {
   }
 }
 
+function isProcessAlive(proc) {
+  return Boolean(proc) && proc.exitCode === null && proc.signalCode === null;
+}
+
+/**
+ * Nombre de flux vidéo FFmpeg actuellement en cours (lecture directe/transcodage + HLS)
+ */
+export function countActiveStreams() {
+  let count = 0;
+  for (const proc of activeClientFfmpegProcesses.values()) {
+    if (isProcessAlive(proc)) count++;
+  }
+  for (const session of activeHlsSessions.values()) {
+    if (isProcessAlive(session.ffmpegProcess)) count++;
+  }
+  return count;
+}
+
 /**
  * Interrompt un processus de génération de miniature pour un client donné
  */
@@ -81,7 +99,12 @@ export function cleanupHlsSession(playId) {
   }
 
   // Suppression du dossier temporaire de segments HLS
-  const sessionDir = path.join(HLS_CACHE_DIR, playId);
+  // Garde-fou : ne jamais supprimer récursivement autre chose qu'un sous-dossier direct du cache HLS
+  const sessionDir = path.resolve(HLS_CACHE_DIR, playId);
+  if (path.dirname(sessionDir) !== path.resolve(HLS_CACHE_DIR)) {
+    console.error(`⛔ Suppression HLS refusée hors du cache : ${sessionDir}`);
+    return;
+  }
   if (fs.existsSync(sessionDir)) {
     try {
       fs.rmSync(sessionDir, { recursive: true, force: true });

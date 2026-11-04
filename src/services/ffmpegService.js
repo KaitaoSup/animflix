@@ -74,6 +74,43 @@ export async function checkHardwareAcceleration() {
 }
 
 /**
+ * Position réelle (en secondes, relative au début du fichier) de l'image clé sur laquelle
+ * FFmpeg démarre quand on lui demande `-ss seekSeconds` en copie vidéo.
+ *
+ * En `-c:v copy`, FFmpeg ne peut commencer que sur une image clé : il recule jusqu'à la
+ * précédente (jusqu'à ~10 s plus tôt sur un encodage anime classique). La vidéo affichée
+ * commence donc AVANT le temps demandé, et les sous-titres doivent être décalés d'autant.
+ * ffprobe `-read_intervals` effectue exactement la même recherche que `-ss`.
+ *
+ * Retourne null si la position n'a pas pu être déterminée.
+ */
+export async function probeKeyframeStart(videoUrl, seekSeconds, { timeoutMs = 20000 } = {}) {
+  if (!(seekSeconds > 0)) return 0;
+  try {
+    const { stdout } = await execFilePromise('ffprobe', [
+      '-v', 'error',
+      '-read_intervals', `${seekSeconds}%+#1`,
+      '-select_streams', 'v:0',
+      '-show_entries', 'packet=pts_time:format=start_time',
+      '-of', 'json',
+      videoUrl
+    ], { timeout: timeoutMs });
+    const data = JSON.parse(stdout);
+    const pts = parseFloat(data.packets?.[0]?.pts_time);
+    if (isNaN(pts)) return null;
+    // -ss est relatif au début du fichier (start_time), les PTS sont absolus
+    const startTime = parseFloat(data.format?.start_time) || 0;
+    const actual = Math.round((pts - startTime) * 1000) / 1000;
+    // Garde-fou : le keyframe ne peut pas être après le seek ni à plus de 30 s avant
+    if (actual > seekSeconds + 0.5 || actual < seekSeconds - 30) return null;
+    return Math.max(0, actual);
+  } catch (err) {
+    console.warn("⚠️ Détection du keyframe de départ impossible :", err.message.split('\n')[0]);
+    return null;
+  }
+}
+
+/**
  * Analyse rapide des flux (vidéo, audio, sous-titres, durée) avec ffprobe
  */
 export async function analyzeStreams(videoUrl, { timeoutMs = 15000 } = {}) {

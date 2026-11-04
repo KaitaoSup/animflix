@@ -36,3 +36,55 @@ describe('Multi-Client Session Manager', () => {
     assert.strictEqual(/^[a-zA-Z0-9_\-]+$/.test(id), true);
   });
 });
+
+import fs from 'fs';
+import path from 'path';
+import { HLS_CACHE_DIR } from '../src/config/constants.js';
+import {
+  countActiveStreams,
+  cleanupHlsSession,
+  activeClientFfmpegProcesses,
+  activeHlsSessions
+} from '../src/utils/sessionManager.js';
+
+describe('Limite de flux et nettoyage HLS', () => {
+  const fakeProc = (alive) => ({ exitCode: alive ? null : 0, signalCode: null, kill() {} });
+
+  it('compte uniquement les processus FFmpeg encore vivants (direct + HLS)', () => {
+    activeClientFfmpegProcesses.set('t_a', fakeProc(true));
+    activeClientFfmpegProcesses.set('t_b', fakeProc(false));
+    activeHlsSessions.set('t_hls1', { ffmpegProcess: fakeProc(true) });
+    activeHlsSessions.set('t_hls2', { ffmpegProcess: fakeProc(false) });
+    try {
+      assert.strictEqual(countActiveStreams(), 2);
+    } finally {
+      ['t_a', 't_b'].forEach(k => activeClientFfmpegProcesses.delete(k));
+      ['t_hls1', 't_hls2'].forEach(k => activeHlsSessions.delete(k));
+    }
+  });
+
+  it('ne supprime jamais un dossier hors du cache HLS (traversée "..")', () => {
+    // Dossier témoin à côté du cache HLS : il NE doit PAS être supprimé
+    const victim = path.join(HLS_CACHE_DIR, '..', `victim_${process.pid}`);
+    fs.mkdirSync(victim, { recursive: true });
+    try {
+      const playId = `../victim_${process.pid}`;
+      activeHlsSessions.set(playId, { ffmpegProcess: fakeProc(false) });
+      cleanupHlsSession(playId);
+      assert.ok(fs.existsSync(victim), 'le dossier hors cache a été supprimé');
+      assert.ok(!activeHlsSessions.has(playId));
+    } finally {
+      fs.rmSync(victim, { recursive: true, force: true });
+    }
+  });
+
+  it('supprime bien le dossier d\'une session HLS légitime', () => {
+    const playId = `testplay${process.pid}`;
+    const dir = path.join(HLS_CACHE_DIR, playId);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'seg_00000.ts'), 'x');
+    activeHlsSessions.set(playId, { ffmpegProcess: fakeProc(true) });
+    cleanupHlsSession(playId);
+    assert.ok(!fs.existsSync(dir));
+  });
+});

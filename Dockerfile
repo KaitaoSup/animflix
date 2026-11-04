@@ -46,4 +46,8 @@ ENV PORT=3000
 ENV TORRSERVER_URL=http://127.0.0.1:8090
 ENV FFMPEG_HWACCEL=auto
 
+# Santé : le serveur web répond ET TorrServer est joignable (sinon aucune lecture n'est possible)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD curl -fsS "http://127.0.0.1:${PORT}/api/server/status" | grep -q '"torrserverOnline":true' || exit 1
+
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]

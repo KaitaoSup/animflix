@@ -18,6 +18,10 @@ export const NYAA_FALLBACK_URLS = [
 export const VAAPI_DEVICE = process.env.VAAPI_DEVICE || '/dev/dri/renderD128';
 export const FFMPEG_HWACCEL_PREF = (process.env.FFMPEG_HWACCEL || 'auto').toLowerCase();
 
+// --- LIMITE DE FLUX FFMPEG SIMULTANÉS (lecture directe, transcodage, HLS) ---
+// Chaque flux est un processus FFmpeg (transcodage = CPU/GPU intensif) : au-delà, réponse 503.
+export const MAX_CONCURRENT_STREAMS = Math.max(1, parseInt(process.env.MAX_CONCURRENT_STREAMS, 10) || 4);
+
 // --- REPERTOIRES DE CACHE DISQUE ---
 export const ROOT_DIR = process.cwd();
 export const SUB_CACHE_DIR = path.join(ROOT_DIR, 'cache', 'subtitles');

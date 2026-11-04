@@ -1,0 +1,33 @@
+# Dépendances : réinstallées dans l'image (better-sqlite3 est un module natif compilé pour l'hôte)
+node_modules/
+npm-debug.log*
+
+# Données et caches locaux (montés en volumes par docker-compose, jamais copiés dans l'image)
+cache/
+.cache/
+data/
+*.db
+*.db-shm
+*.db-wal
+settings.json
+
+# Binaire TorrServer local (l'image télécharge celui de la bonne architecture)
+TorrServer
+TorrServer-linux-*
+
+# Secrets
+.env
+.env.*
+*.env
+
+# Développement
+.git/
+.gitignore
+.vscode/
+.idea/
+.claude/
+archives/
+tests/
+*.log
+*.tmp
+*.swp
