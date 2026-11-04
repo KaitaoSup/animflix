@@ -219,6 +219,8 @@ ServeurAnimeTorr/
 │   │   ├── player/           # Contrôles, sync audio, AniSkip, épisode suivant, PiP/vitesse/boost,
 │   │   │                     # MediaSession, stats P2P, streaming/HLS, timeline, Cast/téléchargement
 │   │   ├── history.js        # Historique local, reprise de lecture, onglets, favoris
+│   │   ├── sync.js           # Synchro multi-appareils (historique, reprise, favoris, profils) si connecté
+│   │   ├── release-prefs.js  # Groupes de release / résolution préférés (tri « Mes préférences »)
 │   │   ├── search.js         # Recherche Nyaa, filtrage & tri, analyse des packs d'épisodes
 │   │   ├── anilist/          # Session & GraphQL, Découverte, Planning, Accueil, liste En cours, suivi
 │   │   └── tv.js             # Navigation manette / TV

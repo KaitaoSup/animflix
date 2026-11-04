@@ -132,6 +132,11 @@
             const audioTracks = info.audioTracks || [];
             currentSubTracks = subTracks;
 
+            // Opening / ending trouvés dans les chapitres du fichier (prioritaires sur AniSkip)
+            if (!info.probeFailed && typeof setChapterSkipIntervals === 'function') {
+                setChapterSkipIntervals(`${magnet}_${fileIndex}`, info.skipChapters || null);
+            }
+
             if (info.probeFailed) {
                 // Pistes inconnues pour l'instant : réessayer, sans écraser la liste si c'est déjà un nouvel essai
                 scheduleTrackProbeRetry(magnet, type, fileIndex);

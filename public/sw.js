@@ -32,6 +32,8 @@ const PRECACHE_ASSETS = [
   '/js/player/init-controls.js',
   '/js/player/cast.js',
   '/js/history.js',
+  '/js/sync.js',
+  '/js/release-prefs.js',
   '/js/search.js',
   '/js/anilist/core.js',
   '/js/anilist/discover.js',

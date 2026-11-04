@@ -6,6 +6,36 @@
     // Identifie la requête AniSkip la plus récente et pour quoi les intervalles actuels ont été chargés
     let aniSkipRequestSeq = 0;
     let aniSkipLoadedFor = null; // { epKey, malId, ep }
+    // Opening / ending lus dans les chapitres du fichier (réponse /api/streams) : { epKey, intervals }
+    let chapterSkipFor = null;
+
+    function skipSourceLabel(interval) {
+        return interval && interval.source === 'chapters' ? 'chapitres' : 'AniSkip';
+    }
+
+    // Les chapitres du fichier priment sur AniSkip : ils décrivent exactement cette release, alors
+    // qu'AniSkip donne des temps communautaires qui peuvent être décalés d'une release à l'autre.
+    function mergeChapterSkipIntervals() {
+        if (!chapterSkipFor || chapterSkipFor.epKey !== window._currentPlayingEpisodeKey) return;
+        const chapters = chapterSkipFor.intervals;
+        const merged = { ...(currentAniSkipIntervals || {}) };
+        if (chapters.op) merged.op = { ...chapters.op, source: 'chapters' };
+        if (chapters.ed) merged.ed = { ...chapters.ed, source: 'chapters' };
+        currentAniSkipIntervals = merged;
+        window.currentAniSkipIntervals = merged;
+        renderAniSkipTimelineMarkers();
+    }
+
+    // Appelée par subtitles/tracks.js dès que l'analyse du fichier est connue
+    function setChapterSkipIntervals(epKey, intervals) {
+        if (intervals && (intervals.op || intervals.ed)) {
+            chapterSkipFor = { epKey, intervals };
+            mergeChapterSkipIntervals();
+        } else if (chapterSkipFor && chapterSkipFor.epKey === epKey) {
+            chapterSkipFor = null;
+        }
+    }
+    window.setChapterSkipIntervals = setChapterSkipIntervals;
 
     // Vrai si les intervalles chargés ne correspondent pas (ou plus) à l'anime / épisode courant
     function aniSkipNeedsRefresh() {
@@ -40,10 +70,10 @@
         };
 
         if (currentAniSkipIntervals.op) {
-            addMarker(currentAniSkipIntervals.op, 'scrubber-marker-op', 'Opening (AniSkip)');
+            addMarker(currentAniSkipIntervals.op, 'scrubber-marker-op', `Opening (${skipSourceLabel(currentAniSkipIntervals.op)})`);
         }
         if (currentAniSkipIntervals.ed) {
-            addMarker(currentAniSkipIntervals.ed, 'scrubber-marker-ed', 'Ending (AniSkip)');
+            addMarker(currentAniSkipIntervals.ed, 'scrubber-marker-ed', `Ending (${skipSourceLabel(currentAniSkipIntervals.ed)})`);
         }
     }
     window.renderAniSkipTimelineMarkers = renderAniSkipTimelineMarkers;
@@ -60,6 +90,8 @@
             hideAniSkipButton();
             renderAniSkipTimelineMarkers();
         }
+        // Chapitres déjà connus pour cet épisode : utilisables tout de suite, sans attendre AniSkip
+        mergeChapterSkipIntervals();
 
         let malId = currentAnilistMedia?.idMal;
         const ep = currentDetectedEpisode || 1;
@@ -112,6 +144,7 @@
                 currentAniSkipIntervals = intervals;
                 window.currentAniSkipIntervals = intervals;
                 renderAniSkipTimelineMarkers();
+                mergeChapterSkipIntervals();
                 console.log(`[AniSkip] Intervalles trouvés pour MAL ${malId} Ép. ${ep} :`, intervals);
             }
         } catch(err) {
@@ -152,7 +185,7 @@
                 hasSkippedCurrentOp = true;
                 hideAniSkipButton();
                 seekVideoTo(op.endTime, true);
-                showToast("⏭️ Opening passé automatiquement (AniSkip)");
+                showToast(`⏭️ Opening passé automatiquement (${skipSourceLabel(op)})`);
                 return;
             }
 
@@ -182,7 +215,7 @@
                 hasSkippedCurrentEd = true;
                 hideAniSkipButton();
                 seekVideoTo(ed.endTime, true);
-                showToast("⏭️ Ending passé automatiquement (AniSkip)");
+                showToast(`⏭️ Ending passé automatiquement (${skipSourceLabel(ed)})`);
                 return;
             }
 

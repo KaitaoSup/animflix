@@ -39,6 +39,7 @@ function saveUserProfiles(profiles) {
     try {
         localStorage.setItem(STORAGE_KEY_PROFILES, JSON.stringify(profiles));
     } catch (e) {}
+    if (typeof scheduleCloudSync === 'function') scheduleCloudSync();
 }
 
 function switchUserProfile(profileId) {
@@ -77,6 +78,7 @@ function deleteUserProfile(profileId) {
         localStorage.removeItem(`animflix_playback_history_${profileId}`);
         localStorage.removeItem(`animflix_favorites_${profileId}`);
     } catch(e) {}
+    if (typeof scheduleCloudSync === 'function') scheduleCloudSync();
     switchUserProfile('default');
     return true;
 }
@@ -125,6 +127,7 @@ function savePlaybackHistoryList(list) {
     } catch (e) {
         console.warn("Erreur écriture historique:", e);
     }
+    if (typeof scheduleCloudSync === 'function') scheduleCloudSync();
 }
 
 // Vérifie si une reprise de lecture existe pour un stream donné
@@ -262,8 +265,9 @@ function deleteHistoryItem(key, event) {
 
 // Efface tout l'historique
 function clearAllPlaybackHistory() {
-    if (!confirm("Voulez-vous vraiment effacer tout votre historique de visionnage local ?")) return;
-    localStorage.removeItem(STORAGE_KEY_HISTORY);
+    if (!confirm("Voulez-vous vraiment effacer tout votre historique de visionnage ?")) return;
+    localStorage.removeItem(getHistoryStorageKey());
+    if (typeof scheduleCloudSync === 'function') scheduleCloudSync();
     showToast("🧹 Historique local entièrement effacé");
     renderHomeScreen();
 }
@@ -410,6 +414,7 @@ function saveFavoritesList(list) {
     } catch (e) {
         console.warn("Erreur écriture favoris:", e);
     }
+    if (typeof scheduleCloudSync === 'function') scheduleCloudSync();
 }
 
 function isAnimeFavorite(animeName) {

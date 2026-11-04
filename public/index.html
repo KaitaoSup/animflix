@@ -93,6 +93,7 @@
                       <label for="searchSortSelect" class="search-sort-label">Trier :</label>
                       <select id="searchSortSelect" class="search-sort-select" onchange="onSearchSortChange(this.value)">
                           <option value="seeders" selected>🌱 Seeders (Les plus rapides)</option>
+                          <option value="preferred">💜 Mes préférences (groupes, résolution)</option>
                           <option value="relevance">⚡ Pertinence</option>
                           <option value="size_desc">📦 Taille (Plus grand)</option>
                           <option value="size_asc">📦 Taille (Plus léger)</option>
@@ -790,6 +791,26 @@
                   </label>
               </div>
 
+              <!-- Préférences de release : tri « Mes préférences » des résultats Nyaa -->
+              <div class="settings-group">
+                  <label class="settings-label">
+                      <span>💜 Groupes de release préférés (par ordre de priorité) :</span>
+                      <input type="text" id="prefReleaseGroups" class="settings-select" placeholder="ex : Erai-raws, SubsPlease, Tsundere-Raws" autocomplete="off" spellcheck="false" onchange="saveUserSettings()">
+                  </label>
+              </div>
+
+              <div class="settings-group">
+                  <label class="settings-label">
+                      <span>📺 Résolution préférée :</span>
+                      <select id="prefResolution" class="settings-select" onchange="saveUserSettings()">
+                          <option value="any">Indifférent</option>
+                          <option value="1080p">1080p Full HD</option>
+                          <option value="720p">720p HD (plus léger)</option>
+                          <option value="2160p">2160p 4K</option>
+                      </select>
+                  </label>
+              </div>
+
               <!-- Mode de streaming par défaut -->
               <div class="settings-group">
                   <label class="settings-label">
@@ -990,6 +1011,8 @@
   <script src="/js/player/init-controls.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/player/cast.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/history.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/sync.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/release-prefs.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/search.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/anilist/core.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/anilist/discover.js?v={{ASSET_VERSION}}"></script>

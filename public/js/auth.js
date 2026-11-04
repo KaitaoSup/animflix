@@ -64,6 +64,7 @@ async function initAnimflixAuth() {
     }
 
     renderUserAccountNav();
+    if (typeof onAnimflixAuthChanged === 'function') onAnimflixAuthChanged();
 }
 
 // Lier automatiquement un token AniList déjà présent dans le navigateur au compte connecté
@@ -134,6 +135,7 @@ async function loginAnimflix(username, password) {
 
         closeAnimflixAuthModal();
         renderUserAccountNav();
+        if (typeof onAnimflixAuthChanged === 'function') onAnimflixAuthChanged();
 
         if (typeof showToast === 'function') {
             showToast(`🎉 Bienvenue ${currentAnimflixUser.username} !`);
@@ -202,6 +204,7 @@ async function registerAnimflix(username, password, linkLocalAnilist = true) {
 
         closeAnimflixAuthModal();
         renderUserAccountNav();
+        if (typeof onAnimflixAuthChanged === 'function') onAnimflixAuthChanged();
 
         if (typeof showToast === 'function') {
             showToast(`🎉 Compte créé ! Bienvenue ${currentAnimflixUser.username} 🍿`);
@@ -240,6 +243,7 @@ async function logoutAnimflix() {
     }
 
     renderUserAccountNav();
+    if (typeof onAnimflixAuthChanged === 'function') onAnimflixAuthChanged();
     if (typeof renderHomeScreen === 'function') renderHomeScreen();
 
     if (typeof showToast === 'function') {

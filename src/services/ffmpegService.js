@@ -6,6 +6,7 @@ import { VAAPI_DEVICE, FFMPEG_HWACCEL_PREF, TORRSERVER_LOCAL_URL, THUMB_CACHE_DI
 import { touchCacheFile } from '../utils/diskCacheCleaner.js';
 import { streamsCache } from '../utils/cache.js';
 import { getTorrentHash } from '../utils/network.js';
+import { detectSkipChapters } from './chapters.js';
 import {
   activeClientThumbProcesses,
   activeHlsSessions,
@@ -121,6 +122,8 @@ export async function analyzeStreams(videoUrl, { timeoutMs = 15000 } = {}) {
       '-probesize', '5000000',
       '-analyzeduration', '5000000',
       '-show_entries', 'stream=index,codec_type,codec_name,pix_fmt,width,height,duration:format=duration:stream_tags=language,title:stream_disposition=forced,default',
+      // Chapitres (en-tête du MKV, sans lecture supplémentaire) : repérer l'opening / l'ending
+      '-show_chapters',
       '-of', 'json',
       videoUrl
     ];
@@ -217,8 +220,10 @@ export async function analyzeStreams(videoUrl, { timeoutMs = 15000 } = {}) {
       subIndex = 0;
     }
 
-    console.log(`✅ FFPROBE: Analyse terminée. Vidéo = ${videoCodec} (${videoPixFmt}), Durée = ${duration}s, Sous-titres = ${subTracks.length}, Audio = ${audioTracks.length}`);
-    return { subIndex, subTracks, frAudioIndex, audioTracks, duration, videoCodec, videoPixFmt, videoWidth, videoHeight };
+    const skipChapters = detectSkipChapters(data.chapters, duration);
+
+    console.log(`✅ FFPROBE: Analyse terminée. Vidéo = ${videoCodec} (${videoPixFmt}), Durée = ${duration}s, Sous-titres = ${subTracks.length}, Audio = ${audioTracks.length}${skipChapters ? `, Chapitres OP/ED = ${JSON.stringify(skipChapters)}` : ''}`);
+    return { subIndex, subTracks, frAudioIndex, audioTracks, duration, videoCodec, videoPixFmt, videoWidth, videoHeight, skipChapters };
   } catch (e) {
     console.log("⚠️ FFPROBE: Analyse rapide streams terminée avec fallback:", e.message);
     // Analyse impossible (torrent encore lent…) : on ne connaît PAS les pistes.

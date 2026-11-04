@@ -319,6 +319,10 @@
             animation: fadeIn 0.2s ease-out;
             color: #fff;
             position: relative;
+            max-height: calc(100vh - 40px);
+            max-height: calc(100dvh - 40px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
         }
         .anilist-modal-header {
             display: flex;

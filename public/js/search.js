@@ -483,7 +483,15 @@
         });
 
         // 3. Tri
+        const releasePrefs = getReleasePrefs();
         mappedTorrents.sort((a, b) => {
+            if (activeSort === 'preferred') {
+                // L'épisode visé passe d'abord, puis l'ordre des préférences de release
+                if (nextEp && (a.matchType === 'exact') !== (b.matchType === 'exact')) {
+                    return a.matchType === 'exact' ? -1 : 1;
+                }
+                return compareByReleasePrefs(a.torrent, b.torrent, releasePrefs);
+            }
             if (activeSort === 'size_desc') {
                 return parseSizeToBytes(b.torrent.taille) - parseSizeToBytes(a.torrent.taille);
             }
@@ -536,6 +544,7 @@
 
             const isTargetMatch = matchType === 'exact';
             const isPackMatch = matchType === 'pack' || matchType === 'batch';
+            const isPreferredGroup = releaseGroupRank(t, releasePrefs) !== -1;
 
             const card = document.createElement('div');
             card.className = 'card' + (isTargetMatch ? ' card-target-highlight' : '');
@@ -559,6 +568,7 @@
                         <div style="display:flex; gap:4px; flex-wrap:wrap;">
                             <span class="badge-tag-mini">${escapeHtml(resolution)}</span>
                             <span class="badge-tag-mini badge-tag-audio">${audioLang.includes('MULTI') ? 'MULTI' : (audioLang.includes('VF') ? 'VF' : 'VOSTFR')}</span>
+                            ${isPreferredGroup ? `<span class="badge-tag-mini badge-tag-preferred" title="Groupe de release préféré">💜 ${escapeHtml(extractReleaseGroup(t.titre))}</span>` : ''}
                         </div>
                         ${highlightBadgeHtml}
                     </div>
@@ -696,13 +706,13 @@
             window._currentRawTorrents = torrents;
             window._currentSearchTargetInfo = targetInfo;
             window._currentSearchFilter = 'all';
-            window._currentSearchSort = 'seeders';
+            window._currentSearchSort = getDefaultSearchSort();
 
             // Affichage et réinitialisation de la barre de filtres
             if (filterBar) {
                 filterBar.style.display = 'flex';
                 const sortSelect = document.getElementById('searchSortSelect');
-                if (sortSelect) sortSelect.value = 'seeders';
+                if (sortSelect) sortSelect.value = window._currentSearchSort;
                 document.querySelectorAll('#searchFilterBar .filter-chip').forEach(btn => {
                     btn.classList.toggle('active', btn.dataset.filter === 'all');
                 });
@@ -710,7 +720,11 @@
 
             // Si autoPlayDirect demandé (Binge-watching) et qu'un torrent exact est disponible
             if (targetInfo && targetInfo.autoPlayDirect && nextEp) {
-                const exactTorrent = torrents.find(t => extractEpisodeNumber(t.episode, t.titre) === nextEp);
+                const exactCandidates = torrents.filter(t => extractEpisodeNumber(t.episode, t.titre) === nextEp);
+                // Avec des préférences de release, l'enchaînement choisit le groupe préféré plutôt que le 1er résultat Nyaa
+                const releasePrefs = getReleasePrefs();
+                if (hasReleasePrefs(releasePrefs)) exactCandidates.sort((a, b) => compareByReleasePrefs(a, b, releasePrefs));
+                const exactTorrent = exactCandidates[0];
                 if (exactTorrent) {
                     showToast(`🚀 Lancement automatique de l'Épisode ${nextEp} !`);
                     openAnimeDetail(exactTorrent);

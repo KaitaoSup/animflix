@@ -347,6 +347,8 @@ function loadUserSettings() {
     const prefTv = document.getElementById('prefTvMode');
     if (prefTv) prefTv.value = localStorage.getItem('animflix_tv_mode') || 'auto';
 
+    if (typeof loadReleasePrefsIntoSettings === 'function') loadReleasePrefsIntoSettings();
+
     renderSettingsProfiles();
 }
 
@@ -453,6 +455,8 @@ function saveUserSettings() {
     if (prefAuto) localStorage.setItem('animflix_autoplay_next', prefAuto);
     if (prefSpeed) localStorage.setItem('animflix_default_speed', prefSpeed);
     if (prefVoice) localStorage.setItem('animflix_default_voice_boost', prefVoice);
+    if (typeof saveReleasePrefsFromSettings === 'function') saveReleasePrefsFromSettings();
+    if (typeof scheduleCloudSync === 'function') scheduleCloudSync();
 
     showToast("💾 Préférences enregistrées !");
 }
