@@ -2,7 +2,9 @@
 // --- ANIMFLIX SERVICE WORKER (PWA SHELL, OFFLINE CACHE & STREAM BYPASS) ---
 // =========================================================================
 
-const CACHE_NAME = 'animflix-shell-v1.9.4';
+// {{ASSET_VERSION}} est remplacé par le serveur (empreinte du contenu de public/) :
+// toute modification du front change le service worker, qui purge alors l'ancien cache.
+const CACHE_NAME = 'animflix-shell-{{ASSET_VERSION}}';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -13,11 +15,31 @@ const PRECACHE_ASSETS = [
   '/css/tv.css',
   '/js/auth.js',
   '/js/app.js',
-  '/js/subtitles.js',
-  '/js/player.js',
+  '/js/subtitles/libass.js',
+  '/js/subtitles/vtt.js',
+  '/js/subtitles/signs.js',
+  '/js/subtitles/jassub.js',
+  '/js/subtitles/tracks.js',
+  '/js/subtitles/style.js',
+  '/js/player/controls.js',
+  '/js/player/audio-sync.js',
+  '/js/player/aniskip.js',
+  '/js/player/next-episode.js',
+  '/js/player/features.js',
+  '/js/player/media-session.js',
+  '/js/player/p2p-stats.js',
+  '/js/player/streaming.js',
+  '/js/player/init-controls.js',
+  '/js/player/cast.js',
   '/js/history.js',
   '/js/search.js',
-  '/js/anilist.js',
+  '/js/anilist/core.js',
+  '/js/anilist/discover.js',
+  '/js/anilist/schedule.js',
+  '/js/anilist/home.js',
+  '/js/anilist/watching.js',
+  '/js/anilist/session.js',
+  '/js/anilist/tracking.js',
   '/js/tv.js',
   '/manifest.json',
   '/icons/icon.svg',

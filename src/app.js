@@ -31,6 +31,10 @@ export function createApp() {
   // Validation des liens magnet / hash avant tout appel à TorrServer ou FFmpeg
   app.use(validateTorrentParams);
 
+  // Routes système AVANT les fichiers statiques : index.html et sw.js y reçoivent la version des
+  // ressources ({{ASSET_VERSION}}) ; servis bruts par express.static, le marqueur resterait tel quel
+  app.use(systemRoutes);
+
   // Servir les fichiers statiques (CSS, JS, Icônes, Vendor) mis en cache par le navigateur
   app.use(express.static(PUBLIC_DIR, { maxAge: '1h', index: false }));
 
@@ -39,7 +43,6 @@ export function createApp() {
   app.use(searchRoutes);
   app.use(streamRoutes);
   app.use(torrserverRoutes);
-  app.use(systemRoutes);
 
   return app;
 }

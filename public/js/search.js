@@ -557,7 +557,7 @@
                     </div>
                     <div class="card-badges-top">
                         <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                            <span class="badge-tag-mini">${resolution}</span>
+                            <span class="badge-tag-mini">${escapeHtml(resolution)}</span>
                             <span class="badge-tag-mini badge-tag-audio">${audioLang.includes('MULTI') ? 'MULTI' : (audioLang.includes('VF') ? 'VF' : 'VOSTFR')}</span>
                         </div>
                         ${highlightBadgeHtml}
@@ -572,9 +572,9 @@
                         </span>
                     </div>
                     <div class="stats">
-                        <span class="badge-rating">⭐ ${t.rating || 'N/A'}</span>
-                        <span>${t.taille}</span>
-                        <span class="seeders">🌱 ${t.seeders}</span>
+                        <span class="badge-rating">⭐ ${escapeHtml(t.rating || 'N/A')}</span>
+                        <span>${escapeHtml(t.taille)}</span>
+                        <span class="seeders">🌱 ${escapeHtml(t.seeders)}</span>
                     </div>
                 </div>
             `;

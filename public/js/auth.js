@@ -434,7 +434,7 @@ function renderUserAccountNav() {
         container.innerHTML = `
             <div id="anilistUserBadge" class="anilist-user-badge" onclick="toggleAnilistDropdown(event)" tabindex="0" title="Compte Animflix : ${escape(currentAnimflixUser.username)}">
                 ${hasAnilist 
-                    ? `<img class="anilist-avatar" src="${avatarUrl}" alt="${escape(anilistName)}" onerror="this.src='https://anilist.co/img/icons/icon.svg'">`
+                    ? `<img class="anilist-avatar" src="${escape(avatarUrl)}" alt="${escape(anilistName)}" onerror="this.src='https://anilist.co/img/icons/icon.svg'">`
                     : `<span class="profile-chip-avatar" style="font-size: 16px; margin-right: 2px;">🍿</span>`
                 }
                 <span class="anilist-username">${escape(currentAnimflixUser.username)}</span>
@@ -492,7 +492,7 @@ function renderUserAccountNav() {
         const avatarUrl = localAnilist.avatar?.medium || localAnilist.avatar?.large || 'https://anilist.co/img/icons/icon.svg';
         container.innerHTML = `
             <div id="anilistUserBadge" class="anilist-user-badge" onclick="toggleAnilistDropdown(event)" tabindex="0" title="AniList invité : ${escape(localAnilist.name)}">
-                <img class="anilist-avatar" src="${avatarUrl}" alt="${escape(localAnilist.name)}" onerror="this.src='https://anilist.co/img/icons/icon.svg'">
+                <img class="anilist-avatar" src="${escape(avatarUrl)}" alt="${escape(localAnilist.name)}" onerror="this.src='https://anilist.co/img/icons/icon.svg'">
                 <span class="anilist-username">${escape(localAnilist.name)}</span>
                 <span style="font-size: 10px; color: #888;">▼</span>
                 <div class="anilist-dropdown" onclick="event.stopPropagation()">
@@ -503,7 +503,7 @@ function renderUserAccountNav() {
                     <button onclick="openAnimflixAuthModal('register')" style="color: #4ade80; font-weight: bold;">
                         💾 Sauvegarder sur un compte
                     </button>
-                    <a href="${localAnilist.siteUrl || 'https://anilist.co'}" target="_blank" rel="noopener">
+                    <a href="${escape(localAnilist.siteUrl || 'https://anilist.co')}" target="_blank" rel="noopener">
                         🔗 Profil AniList
                     </a>
                     <button onclick="logoutAnilist(true)">

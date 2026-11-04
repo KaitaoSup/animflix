@@ -101,8 +101,8 @@ flowchart TB
     subgraph Client ["Client (Navigateur Web / PWA)"]
         UI["Interface Utilisateur (HTML5 / CSS3 / Vanilla JS)"]
         SW["Service Worker (sw.js - Cache Shell & Offline)"]
-        Player["Lecteur Vidéo Custom (player.js)"]
-        SubEngine["Moteur Sous-titres (subtitles.js)"]
+        Player["Lecteur Vidéo Custom (js/player/)"]
+        SubEngine["Moteur Sous-titres (js/subtitles/)"]
         MediaSession["MediaSession API & Touch Gestures"]
     end
 
@@ -211,13 +211,17 @@ ServeurAnimeTorr/
 │   │   ├── player.css        # Lecteur vidéo personnalisé, scrubber timeline, styles VTT
 │   │   └── anilist.css       # Widgets AniList, onglet Découverte, badges de statut
 │   │
-│   ├── js/
-│   │   ├── app.js            # Initialisation, routage simple, PWA install prompt, modales
-│   │   ├── search.js         # Recherche Nyaa, filtrage & tri, analyse des packs d'épisodes
-│   │   ├── player.js         # Lecteur vidéo, MediaSession, gestes tactiles, boost vocal
-│   │   ├── subtitles.js      # Décodage WebVTT, recalage au keyframe, moteur de styles
+│   ├── js/                   # Scripts classiques (portée globale partagée) — ORDRE de chargement
+│   │   │                     # fixé dans index.html et repris dans le pré-cache de sw.js
+│   │   ├── auth.js           # Comptes Animflix, session
+│   │   ├── app.js            # État global, utilitaires (escapeHtml, jsArg), PWA, réglages
+│   │   ├── subtitles/        # libass (JASSUB), WebVTT, piste panneaux, polices, pistes, styles
+│   │   ├── player/           # Contrôles, sync audio, AniSkip, épisode suivant, PiP/vitesse/boost,
+│   │   │                     # MediaSession, stats P2P, streaming/HLS, timeline, Cast/téléchargement
 │   │   ├── history.js        # Historique local, reprise de lecture, onglets, favoris
-│   │   └── anilist.js        # OAuth AniList, onglet Découverte (Tendances/Saison), GraphQL
+│   │   ├── search.js         # Recherche Nyaa, filtrage & tri, analyse des packs d'épisodes
+│   │   ├── anilist/          # Session & GraphQL, Découverte, Planning, Accueil, liste En cours, suivi
+│   │   └── tv.js             # Navigation manette / TV
 │   │
 │   └── icons/                # Icônes de l'application PWA (SVG, PNG standard & maskable)
 │

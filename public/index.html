@@ -17,10 +17,10 @@
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-    <link rel="stylesheet" href="/css/style.css?v=1.7.0">
-    <link rel="stylesheet" href="/css/player.css?v=1.7.0">
-    <link rel="stylesheet" href="/css/anilist.css?v=1.7.0">
-    <link rel="stylesheet" href="/css/tv.css?v=1.7.0">
+    <link rel="stylesheet" href="/css/style.css?v={{ASSET_VERSION}}">
+    <link rel="stylesheet" href="/css/player.css?v={{ASSET_VERSION}}">
+    <link rel="stylesheet" href="/css/anilist.css?v={{ASSET_VERSION}}">
+    <link rel="stylesheet" href="/css/tv.css?v={{ASSET_VERSION}}">
 </head>
 <body>
   <div class="navbar">
@@ -970,13 +970,34 @@
   <!-- SCRIPTS MODULAIRES ANIMFLIX -->
   <script src="/vendor/hls.min.js?v=1.5.17"></script>
   <script src="/vendor/jassub/jassub.bundle.js?v=2.5.23"></script>
-  <script src="/js/auth.js?v=1.7.0"></script>
-  <script src="/js/app.js?v=1.7.0"></script>
-  <script src="/js/subtitles.js?v=1.7.2"></script>
-  <script src="/js/player.js?v=1.7.0"></script>
-  <script src="/js/history.js?v=1.7.0"></script>
-  <script src="/js/search.js?v=1.7.0"></script>
-  <script src="/js/anilist.js?v=1.7.0"></script>
-  <script src="/js/tv.js?v=1.7.0"></script>
+  <!-- Scripts classiques (portée globale partagée) : l'ordre de chargement compte -->
+  <script src="/js/auth.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/app.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/subtitles/libass.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/subtitles/vtt.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/subtitles/signs.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/subtitles/jassub.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/subtitles/tracks.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/subtitles/style.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/player/controls.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/player/audio-sync.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/player/aniskip.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/player/next-episode.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/player/features.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/player/media-session.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/player/p2p-stats.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/player/streaming.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/player/init-controls.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/player/cast.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/history.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/search.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/anilist/core.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/anilist/discover.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/anilist/schedule.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/anilist/home.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/anilist/watching.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/anilist/session.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/anilist/tracking.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/tv.js?v={{ASSET_VERSION}}"></script>
 </body>
 </html>

@@ -161,13 +161,21 @@ function formatTimestamp(sec) {
 }
 
 function escapeHtml(str) {
-    if (!str) return '';
+    if (str === null || str === undefined) return '';
     return String(str)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+// Argument chaîne pour un gestionnaire inline (onclick="fn(${jsArg(titre)})").
+// escapeHtml seul ne suffit PAS : le navigateur redécode &#039; en ' avant d'exécuter l'attribut,
+// donc un titre comme « JoJo's » cassait le clic (et un titre piégé pouvait injecter du code).
+// JSON.stringify produit un littéral JS valide, escapeHtml le protège dans l'attribut HTML.
+function jsArg(value) {
+    return escapeHtml(JSON.stringify(value === null || value === undefined ? '' : String(value)));
 }
 
 function showToast(msg) {
@@ -355,11 +363,11 @@ function renderSettingsProfiles() {
         const isActive = p.id === active.id;
         const isDefault = p.id === 'default';
         return `
-            <div class="settings-profile-chip ${isActive ? 'active' : ''}" onclick="onSelectProfileClick('${p.id}')" title="${isActive ? 'Profil actif' : 'Basculer sur ce profil'}">
-                <span class="profile-chip-avatar">${p.avatar || '👤'}</span>
+            <div class="settings-profile-chip ${isActive ? 'active' : ''}" onclick="onSelectProfileClick(${jsArg(p.id)})" title="${isActive ? 'Profil actif' : 'Basculer sur ce profil'}">
+                <span class="profile-chip-avatar">${escapeHtml(p.avatar || '👤')}</span>
                 <span class="profile-chip-name">${escapeHtml(p.name)}</span>
                 ${p.isKid ? '<span class="profile-chip-kid">Enfant</span>' : ''}
-                ${!isDefault ? `<span class="profile-chip-del" onclick="event.stopPropagation(); onDeleteProfileClick('${p.id}', '${escapeHtml(p.name)}')" title="Supprimer ce profil">&times;</span>` : ''}
+                ${!isDefault ? `<span class="profile-chip-del" onclick="event.stopPropagation(); onDeleteProfileClick(${jsArg(p.id)}, ${jsArg(p.name)})" title="Supprimer ce profil">&times;</span>` : ''}
             </div>
         `;
     }).join('');
@@ -472,7 +480,7 @@ async function fetchServerStatus() {
         content.innerHTML = `
             <div><b>Transcodage vidéo :</b> ${hwBadge}</div>
             <div style="margin-top: 5px;"><b>TorrServer P2P :</b> ${torrBadge}</div>
-            <div style="margin-top: 5px;"><b>Source Nyaa :</b> <span style="color: #eee;">${data.nyaaUrl || 'https://nyaa.si'}</span></div>
+            <div style="margin-top: 5px;"><b>Source Nyaa :</b> <span style="color: #eee;">${escapeHtml(data.nyaaUrl || 'https://nyaa.si')}</span></div>
             <div style="margin-top: 5px; font-size: 11px; color: #888;">Version Animflix : v${data.version || '1.1.0'}</div>
         `;
     } catch (e) {

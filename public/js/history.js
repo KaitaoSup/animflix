@@ -546,11 +546,11 @@ function renderHistoryCards(historyList) {
         const isFinished = item.completed || item.progressPct >= 94;
 
         cardsHtml += `
-            <div class="card card-history" onclick="resumeAnimeFromHistory('${escapeHtml(item.key)}')" title="Reprendre la lecture de ${escapeHtml(displayTitle)}">
+            <div class="card card-history" onclick="resumeAnimeFromHistory(${jsArg(item.key)})" title="Reprendre la lecture de ${escapeHtml(displayTitle)}">
                 <div class="card-img-wrap">
                     <img src="${escapeHtml(poster)}" loading="lazy" alt="${escapeHtml(displayTitle)}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
                     
-                    <button class="card-btn-delete-history" onclick="deleteHistoryItem('${escapeHtml(item.key)}', event)" title="Supprimer de l'historique">
+                    <button class="card-btn-delete-history" onclick="deleteHistoryItem(${jsArg(item.key)}, event)" title="Supprimer de l'historique">
                         ✕
                     </button>
 
@@ -561,7 +561,7 @@ function renderHistoryCards(historyList) {
                     </div>
 
                     <div class="card-badges-top">
-                        ${item.rating ? `<span class="badge-tag-mini" style="background:rgba(255,193,7,0.2);color:#ffc107;border-color:rgba(255,193,7,0.4);">⭐ ${item.rating}</span>` : ''}
+                        ${item.rating ? `<span class="badge-tag-mini" style="background:rgba(255,193,7,0.2);color:#ffc107;border-color:rgba(255,193,7,0.4);">⭐ ${escapeHtml(item.rating)}</span>` : ''}
                         <span class="badge-tag-mini badge-tag-ep" style="background:rgba(2,169,255,0.25);border-color:rgba(2,169,255,0.4);color:#02a9ff;">
                             ${escapeHtml(item.episode)}
                         </span>
@@ -687,11 +687,11 @@ function renderFavoritesTabHtml(container) {
         const ago = formatTimeAgo(item.addedAt);
 
         cardsHtml += `
-            <div class="card card-favorite" onclick="searchFavoriteAnime('${escapeHtml(item.searchTitle || displayTitle)}')" title="Rechercher tous les épisodes de ${escapeHtml(displayTitle)}">
+            <div class="card card-favorite" onclick="searchFavoriteAnime(${jsArg(item.searchTitle || displayTitle)})" title="Rechercher tous les épisodes de ${escapeHtml(displayTitle)}">
                 <div class="card-img-wrap">
                     <img src="${escapeHtml(poster)}" loading="lazy" alt="${escapeHtml(displayTitle)}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
                     
-                    <button class="card-btn-delete-history" onclick="deleteFavoriteItem('${escapeHtml(item.id)}', event)" title="Retirer des favoris">
+                    <button class="card-btn-delete-history" onclick="deleteFavoriteItem(${jsArg(item.id)}, event)" title="Retirer des favoris">
                         ❤️
                     </button>
 
@@ -702,7 +702,7 @@ function renderFavoritesTabHtml(container) {
                     </div>
 
                     <div class="card-badges-top">
-                        ${item.rating ? `<span class="badge-tag-mini" style="background:rgba(255,193,7,0.2);color:#ffc107;border-color:rgba(255,193,7,0.4);">⭐ ${item.rating}</span>` : ''}
+                        ${item.rating ? `<span class="badge-tag-mini" style="background:rgba(255,193,7,0.2);color:#ffc107;border-color:rgba(255,193,7,0.4);">⭐ ${escapeHtml(item.rating)}</span>` : ''}
                         <span class="badge-tag-mini" style="background:rgba(229,9,20,0.25);border-color:rgba(229,9,20,0.4);color:#ff525d;">
                             ${escapeHtml(item.season || 'Anime')}
                         </span>
