@@ -286,3 +286,50 @@ export async function getTorrServerStats(torrentHash = null) {
     }))
   };
 }
+
+// --- PRÉCHARGEMENT DE L'ÉPISODE SUIVANT ---
+// TorrServer (`/stream?...&preload`) se connecte aux pairs et remplit son cache avec le début du fichier :
+// l'épisode suivant démarre alors presque instantanément. La requête ne rend la main qu'une fois le
+// préchargement fini : on ne l'attend pas.
+
+export const PRELOAD_LIMITS = {
+  MAX_PARALLEL: 2,
+  TIMEOUT_MS: 5 * 60 * 1000,
+  // Même fichier redemandé (rechargement de page, retour en arrière) : pas de second préchargement
+  REMEMBER_MS: 30 * 60 * 1000
+};
+
+const runningPreloads = new Map(); // clé -> début
+const finishedPreloads = new Map(); // clé -> fin
+
+/**
+ * Lance (sans l'attendre) le préchargement d'un fichier d'un torrent.
+ * Retourne { status: 'started' | 'running' | 'done' | 'busy' }.
+ */
+export function preloadTorrentFile(magnet, fileIndex = 1, { httpGet = axios.get, now = Date.now() } = {}) {
+  const key = `${getTorrentHash(magnet)}_f${fileIndex}`;
+  for (const [k, finishedAt] of finishedPreloads) {
+    if (now - finishedAt > PRELOAD_LIMITS.REMEMBER_MS) finishedPreloads.delete(k);
+  }
+  if (runningPreloads.has(key)) return { status: 'running' };
+  if (finishedPreloads.has(key)) return { status: 'done' };
+  if (runningPreloads.size >= PRELOAD_LIMITS.MAX_PARALLEL) return { status: 'busy' };
+
+  runningPreloads.set(key, now);
+  const url = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${fileIndex}&preload`;
+  console.log(`⏩ Préchargement de l'épisode suivant (${key})`);
+  Promise.resolve()
+    .then(() => httpGet(url, { timeout: PRELOAD_LIMITS.TIMEOUT_MS }))
+    .then(() => {
+      finishedPreloads.set(key, Date.now());
+      console.log(`✅ Préchargement terminé (${key})`);
+    })
+    .catch(err => console.warn(`⚠️ Préchargement interrompu (${key}) :`, err.message))
+    .finally(() => runningPreloads.delete(key));
+  return { status: 'started' };
+}
+
+export function resetPreloadsForTests() {
+  runningPreloads.clear();
+  finishedPreloads.clear();
+}

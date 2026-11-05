@@ -50,6 +50,16 @@ function releasePlaySession(playSession, actualStart) {
 }
 
 // --- ROUTE API INFO FLUX (AUDIO & SOUS-TITRES) ---
+/**
+ * Occupation du serveur : le lecteur la consulte quand une lecture échoue, pour distinguer
+ * « serveur saturé » (503) d'un format illisible (le navigateur ne donne pas le code HTTP d'une <video>)
+ */
+router.get('/api/streams/capacity', (req, res) => {
+  const active = countActiveStreams();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ active, max: MAX_CONCURRENT_STREAMS, full: active >= MAX_CONCURRENT_STREAMS });
+});
+
 router.get('/api/streams', async (req, res) => {
   const { magnet } = req.query;
   if (!magnet) return res.status(400).json({ error: "Lien magnet manquant" });

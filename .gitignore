@@ -11,6 +11,8 @@ config.db*
 animflix.db
 animflix.db*
 data/
+# Sauvegardes quotidiennes de animflix.db
+backups/
 
 # Variables d'environnement & Clés d'API (sécurité)
 .env

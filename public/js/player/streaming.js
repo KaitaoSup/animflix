@@ -22,6 +22,77 @@
     }
     window.destroyCurrentHlsInstance = destroyCurrentHlsInstance;
 
+    // --- SERVEUR SATURÉ (HTTP 503 : limite de lectures simultanées atteinte) ---
+    // Une <video> ne donne pas le code HTTP de son échec : on interroge /api/streams/capacity pour savoir
+    // si le refus vient de la saturation, plutôt que d'annoncer à tort un format illisible.
+    const STREAM_CAPACITY_RETRY_MS = 10000;
+    const STREAM_CAPACITY_MAX_RETRIES = 6; // 1 minute d'essais automatiques
+    let streamCapacityRetry = { key: null, count: 0, timer: null, retryFn: null };
+
+    async function fetchStreamCapacity() {
+        try {
+            const res = await fetch('/api/streams/capacity', { cache: 'no-store' });
+            return res.ok ? await res.json() : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function resetStreamCapacityRetry() {
+        clearTimeout(streamCapacityRetry.timer);
+        streamCapacityRetry = { key: null, count: 0, timer: null, retryFn: null };
+    }
+
+    function retryStreamNow() {
+        const fn = streamCapacityRetry.retryFn;
+        clearTimeout(streamCapacityRetry.timer);
+        streamCapacityRetry.timer = null;
+        if (typeof fn === 'function') fn();
+    }
+    window.retryStreamNow = retryStreamNow;
+
+    /**
+     * Si l'échec de lecture vient de la saturation du serveur : affiche le message et programme un nouvel
+     * essai. Retourne false si le serveur n'est pas saturé (autre cause d'erreur).
+     */
+    async function handleStreamCapacityError(playId, retryFn) {
+        const cap = await fetchStreamCapacity();
+        if (!cap || !cap.full || currentPlaySessionId !== playId) return false;
+
+        const playerStatus = document.getElementById('player-status');
+        const statusText = document.getElementById('status-text');
+        const key = `${currentActiveMagnet}_${currentActiveFileIndex}`;
+        if (streamCapacityRetry.key !== key) {
+            resetStreamCapacityRetry();
+            streamCapacityRetry.key = key;
+        }
+        clearTimeout(streamCapacityRetry.timer);
+        streamCapacityRetry.retryFn = retryFn;
+        if (playerStatus) playerStatus.style.display = 'block';
+
+        const retryButton = `<button class="btn-secondary" style="margin-top:10px;" onclick="retryStreamNow()">↻ Réessayer maintenant</button>`;
+        if (streamCapacityRetry.count >= STREAM_CAPACITY_MAX_RETRIES) {
+            if (statusText) {
+                statusText.innerHTML = `⛔ Le serveur est occupé : ${cap.active} lecture(s) en cours sur ${cap.max} possibles.` +
+                    `<br><span style='font-size:13px; color:#ffa033;'>Arrêtez une lecture sur un autre appareil, puis réessayez.</span><br>${retryButton}`;
+            }
+            return true;
+        }
+
+        streamCapacityRetry.count++;
+        if (statusText) {
+            statusText.innerHTML = `⛔ Le serveur est occupé : ${cap.active} lecture(s) en cours sur ${cap.max} possibles.` +
+                `<br><span style='font-size:13px; color:#ffa033;'>Nouvel essai automatique dans ${STREAM_CAPACITY_RETRY_MS / 1000} s ` +
+                `(${streamCapacityRetry.count}/${STREAM_CAPACITY_MAX_RETRIES})…</span><br>${retryButton}`;
+        }
+        streamCapacityRetry.timer = setTimeout(() => {
+            streamCapacityRetry.timer = null;
+            // L'utilisateur a lancé autre chose entre-temps : ne pas relancer l'ancien épisode
+            if (currentPlaySessionId === playId) retryFn();
+        }, STREAM_CAPACITY_RETRY_MS);
+        return true;
+    }
+
     // --- LECTEUR VIDÉO ET STREAMING ---
     async function startStreamingInPlayer(magnet, titre, vlcUrl, fileIndex = null, seekSeconds = 0) {
         currentActiveMagnet = magnet;
@@ -155,6 +226,18 @@
                     video.play().catch(() => {});
                 });
                 hls.on(Hls.Events.ERROR, (event, data) => {
+                    // 503 : serveur saturé. Inutile de laisser hls.js réessayer en boucle
+                    if (data && data.response && data.response.code === 503) {
+                        if (streamTimeout) clearTimeout(streamTimeout);
+                        destroyCurrentHlsInstance(false);
+                        handleStreamCapacityError(playId, () => startStreamingInPlayer(magnet, titre, vlcUrl, currentActiveFileIndex, currentStreamOffset))
+                            .then(handled => {
+                                if (!handled && currentPlaySessionId === playId) {
+                                    statusText.innerHTML = "⚠️ Le serveur a refusé le flux HLS. Réessayez dans un instant.";
+                                }
+                            });
+                        return;
+                    }
                     if (data && data.fatal) {
                         switch (data.type) {
                             case Hls.ErrorTypes.NETWORK_ERROR:
@@ -231,6 +314,7 @@
 
         video.onplaying = () => {
             if (streamTimeout) clearTimeout(streamTimeout);
+            resetStreamCapacityRetry();
             playerStatus.style.display = 'none';
             const playIcon = document.getElementById('customPlayIcon');
             if (playIcon) playIcon.textContent = '❚❚';
@@ -322,8 +406,12 @@
             }
         }, 8500);
 
-        video.onerror = () => {
+        video.onerror = async () => {
             if (streamTimeout) clearTimeout(streamTimeout);
+            // Serveur saturé (503) : message clair et nouvel essai, sans basculer de mode de lecture
+            const retry = () => startStreamingInPlayer(magnet, titre, vlcUrl, currentActiveFileIndex, currentStreamOffset);
+            if (await handleStreamCapacityError(playId, retry)) return;
+            if (currentPlaySessionId !== playId) return;
             // Bascule automatique intelligente (Direct -> HLS Adaptatif) si le codec HEVC 10-bit / AV1 n'est pas décodé nativement
             const fallbackKey = `${magnet}_${currentActiveFileIndex}`;
             if (streamMode === 'direct' && lastAutoFallbackKey !== fallbackKey) {

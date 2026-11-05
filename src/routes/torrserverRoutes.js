@@ -4,9 +4,11 @@ import {
   dropTorrent,
   cleanTorrServerCache,
   getTorrServerStats,
-  listTorrents
+  listTorrents,
+  preloadTorrentFile
 } from '../services/torrserverService.js';
 import { getTorrentHash } from '../utils/network.js';
+import { parseFileIndex } from '../utils/params.js';
 
 const router = Router();
 
@@ -37,6 +39,15 @@ router.post('/api/torrserver/drop', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * Préchargement de l'épisode suivant (appelé par le lecteur vers 80 % de l'épisode en cours)
+ */
+router.post('/api/torrserver/preload', (req, res) => {
+  const { magnet } = req.body || {};
+  if (!magnet) return res.status(400).json({ error: "Lien magnet manquant" });
+  res.status(202).json(preloadTorrentFile(magnet, parseFileIndex(req.body.fileIndex)));
 });
 
 router.post('/api/torrserver/clean', async (req, res) => {

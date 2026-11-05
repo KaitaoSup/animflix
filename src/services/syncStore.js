@@ -15,7 +15,8 @@ export const SYNC_LIMITS = {
   MAX_KEY_LENGTH: 256,
   MAX_DATA_BYTES: 16 * 1024,
   // Un appareil dont l'horloge avance ne doit pas gagner tous les arbitrages futurs
-  MAX_CLOCK_AHEAD_MS: 5 * 60 * 1000
+  MAX_CLOCK_AHEAD_MS: 5 * 60 * 1000,
+  TOMBSTONE_MAX_AGE_MS: 90 * 24 * 60 * 60 * 1000
 };
 
 // 'profiles', 'prefs', 'history:<idProfil>', 'favorites:<idProfil>'
@@ -125,5 +126,15 @@ export function createSyncStore(db) {
     return { rev, items, more };
   }
 
-  return { push, pull };
+  const deleteOldTombstones = db.prepare('DELETE FROM sync_items WHERE data IS NULL AND updated_at < ?');
+
+  /**
+   * Supprime les pierres tombales plus vieilles que `maxAgeMs`. Un appareil resté hors ligne plus longtemps
+   * garderait l'élément supprimé chez lui (sans le renvoyer tant qu'il n'y est pas modifié).
+   */
+  function pruneTombstones(maxAgeMs = SYNC_LIMITS.TOMBSTONE_MAX_AGE_MS, now = Date.now()) {
+    return deleteOldTombstones.run(now - maxAgeMs).changes;
+  }
+
+  return { push, pull, pruneTombstones };
 }

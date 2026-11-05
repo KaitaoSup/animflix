@@ -594,6 +594,25 @@
         });
     }
 
+    /**
+     * Torrent retenu pour l'épisode `nextEp` : celui du groupe préféré s'il y a des préférences de release,
+     * sinon le premier résultat Nyaa. Même choix pour le préchargement et pour l'enchaînement automatique.
+     */
+    function pickNextEpisodeTorrent(torrents, nextEp) {
+        const candidates = (torrents || []).filter(t => extractEpisodeNumber(t.episode, t.titre) === nextEp);
+        const releasePrefs = getReleasePrefs();
+        if (hasReleasePrefs(releasePrefs)) candidates.sort((a, b) => compareByReleasePrefs(a, b, releasePrefs));
+        return candidates[0] || null;
+    }
+
+    // Recherche Nyaa de l'épisode suivant sans toucher à l'affichage (préchargement pendant la lecture)
+    async function searchNextEpisodeTorrent(animeName, nextEp) {
+        const type = document.getElementById('searchType')?.value || 'vostfr';
+        const res = await fetch('/api/search?q=' + encodeURIComponent(animeName) + '&type=' + type);
+        if (!res.ok) return null;
+        return pickNextEpisodeTorrent(await res.json(), nextEp);
+    }
+
     async function executeSearchForAnime(searchTitle, targetInfo = null) {
         const homeView = document.getElementById('homeView');
         const searchView = document.getElementById('searchView');
@@ -686,6 +705,13 @@
                 }
             }
 
+            // Nyaa ne répond plus mais l'épisode a été préparé (et préchargé) pendant le précédent : on le lance quand même
+            if ((!torrents || torrents.length === 0) && targetInfo && targetInfo.autoPlayDirect && targetInfo.preparedTorrent) {
+                showToast(`🚀 Lancement automatique de l'Épisode ${nextEp} !`);
+                openAnimeDetail(targetInfo.preparedTorrent);
+                return;
+            }
+
             if (!torrents || torrents.length === 0) {
                 if (filterBar) filterBar.style.display = 'none';
                 resultsDiv.innerHTML = `
@@ -720,11 +746,10 @@
 
             // Si autoPlayDirect demandé (Binge-watching) et qu'un torrent exact est disponible
             if (targetInfo && targetInfo.autoPlayDirect && nextEp) {
-                const exactCandidates = torrents.filter(t => extractEpisodeNumber(t.episode, t.titre) === nextEp);
-                // Avec des préférences de release, l'enchaînement choisit le groupe préféré plutôt que le 1er résultat Nyaa
-                const releasePrefs = getReleasePrefs();
-                if (hasReleasePrefs(releasePrefs)) exactCandidates.sort((a, b) => compareByReleasePrefs(a, b, releasePrefs));
-                const exactTorrent = exactCandidates[0];
+                // Le torrent préchargé pendant l'épisode précédent est repris s'il figure toujours dans les résultats
+                const prepared = targetInfo.preparedTorrent;
+                const exactTorrent = (prepared && torrents.find(t => t.lienMagnet === prepared.lienMagnet))
+                    || pickNextEpisodeTorrent(torrents, nextEp);
                 if (exactTorrent) {
                     showToast(`🚀 Lancement automatique de l'Épisode ${nextEp} !`);
                     openAnimeDetail(exactTorrent);

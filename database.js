@@ -9,6 +9,8 @@ const __dirname = path.dirname(__filename);
 
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, 'animflix.db');
 const dbDir = path.dirname(dbPath);
+// Sauvegardes quotidiennes (src/services/dbMaintenance.js) : à côté de la base par défaut
+export const dbBackupDir = process.env.DATABASE_BACKUP_DIR || path.join(dbDir, 'backups');
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }

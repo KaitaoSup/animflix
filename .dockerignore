@@ -6,6 +6,7 @@ npm-debug.log*
 cache/
 .cache/
 data/
+backups/
 *.db
 *.db-shm
 *.db-wal
