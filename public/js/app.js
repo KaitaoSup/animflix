@@ -220,7 +220,7 @@ function fallbackCopyText(text) {
 
 // --- NAVIGATION PRINCIPALE ET ROUTING SIMPLE ---
 function handleLogoClick() {
-    closeDetailView();
+    closeDetailView({ navigate: false });
     const searchInput = document.getElementById('searchInput');
     if (searchInput) searchInput.value = '';
     if (typeof switchHomeTab === 'function') {
@@ -239,19 +239,32 @@ function focusSearchInput() {
 }
 window.focusSearchInput = focusSearchInput;
 
-function showHomeScreen() {
-    const searchView = document.getElementById('searchView');
-    if (searchView) searchView.style.display = 'none';
-    const filterBar = document.getElementById('searchFilterBar');
-    if (filterBar) filterBar.style.display = 'none';
-    const homeView = document.getElementById('homeView');
-    if (homeView) homeView.style.display = 'block';
+// Une seule sous-vue du catalogue visible à la fois : accueil, résultats de recherche ou fiche anime
+function showCatalogSubView(name) {
+    const views = { home: 'homeView', search: 'searchView', anime: 'animeView' };
+    Object.entries(views).forEach(([key, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = key === name ? 'block' : 'none';
+    });
+    if (name !== 'search') {
+        const filterBar = document.getElementById('searchFilterBar');
+        if (filterBar) filterBar.style.display = 'none';
+    }
     const detailView = document.getElementById('detailView');
     if (detailView) detailView.style.display = 'none';
     const catalogView = document.getElementById('catalogView');
     if (catalogView) catalogView.style.display = 'block';
+}
+window.showCatalogSubView = showCatalogSubView;
+
+function showHomeScreen(opts = {}) {
+    showCatalogSubView('home');
     if (typeof renderHomeScreen === 'function') {
         renderHomeScreen();
+    }
+    if (opts.syncUrl !== false && typeof AppRouter !== 'undefined') {
+        const tab = (typeof getActiveHomeTab === 'function') ? getActiveHomeTab() : 'home';
+        AppRouter.sync(AppRouter.homePath(tab));
     }
 }
 
@@ -422,8 +435,11 @@ function onSelectProfileClick(profileId) {
     }
 }
 
-function onDeleteProfileClick(profileId, name) {
-    if (confirm(`Supprimer définitivement le profil "${name}" et son historique ?`)) {
+async function onDeleteProfileClick(profileId, name) {
+    const ok = await uiConfirm(`Supprimer définitivement le profil « ${name} » et son historique ?`, {
+        title: 'Supprimer le profil', okLabel: 'Supprimer', danger: true
+    });
+    if (ok) {
         if (typeof deleteUserProfile === 'function') {
             deleteUserProfile(profileId);
             renderSettingsProfiles();

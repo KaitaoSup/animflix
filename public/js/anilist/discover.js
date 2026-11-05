@@ -74,6 +74,11 @@
     }
 
     function searchFromDiscover(animeTitle, coverImage, anilistId) {
+        // Fiche anime (épisodes + lecture en un clic) dès que l'ID AniList est connu
+        if (anilistId && typeof openAnimePage === 'function') {
+            openAnimePage(anilistId);
+            return;
+        }
         if (!animeTitle) return;
         const input = document.getElementById('searchInput');
         if (input) input.value = animeTitle;
@@ -199,10 +204,7 @@
 
         if (resultsArea) {
             resultsArea.innerHTML = `
-                <div class="empty-state" style="padding: 60px 20px;">
-                    <div class="spinner" style="margin: 0 auto 20px;"></div>
-                    Recherche des animes filtrés... ⏳
-                </div>
+                ${renderSkeletonGrid(12, 'Recherche des animes filtrés…')}
             `;
         }
 
@@ -273,9 +275,9 @@
             const safePoster = escapeHtml(poster);
 
             return `
-                <div class="card discover-card" onclick="searchFromDiscover(${jsArg(title)}, ${jsArg(poster)}, ${Number(m.id)})" title="Rechercher les torrents de ${safeTitle}">
+                <div class="card discover-card" onclick="searchFromDiscover(${jsArg(title)}, ${jsArg(poster)}, ${Number(m.id)})" title="Ouvrir la fiche de ${safeTitle}">
                     <div class="card-img-wrap">
-                        <img src="${safePoster}" loading="lazy" alt="${safeTitle}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                        <img src="${safePoster}" loading="lazy" alt="${safeTitle}" ${posterOnErrorAttr('Anime')}>
                         <div class="card-overlay-hover">
                             <span class="btn-play-hover" style="background: #02a9ff; box-shadow: 0 4px 12px rgba(2,169,255,0.5);">
                                 🔍 Voir les torrents & épisodes
@@ -415,10 +417,7 @@
                     </div>
                 </div>
                 ${renderDiscoverFilterBarHtml()}
-                <div class="empty-state" style="padding: 60px 20px;">
-                    <div class="spinner" style="margin: 0 auto 20px;"></div>
-                    Chargement des tendances et des séries de la saison actuelle... ⏳
-                </div>
+                ${renderSkeletonGrid(12, 'Chargement des tendances…')}
             </div>
         `;
 

@@ -92,7 +92,7 @@
                     status: "FINISHED",
                     averageScore: 78,
                     coverImage: {
-                        large: "https://via.placeholder.com/300x450/3a1020/ff4757?text=18%2B+Hentai+Demo"
+                        large: posterFallback("18+ Demo")
                     }
                 }
             }

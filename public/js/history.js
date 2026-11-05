@@ -264,8 +264,11 @@ function deleteHistoryItem(key, event) {
 }
 
 // Efface tout l'historique
-function clearAllPlaybackHistory() {
-    if (!confirm("Voulez-vous vraiment effacer tout votre historique de visionnage ?")) return;
+async function clearAllPlaybackHistory() {
+    const ok = await uiConfirm("Voulez-vous vraiment effacer tout votre historique de visionnage ?", {
+        title: "Effacer l'historique", okLabel: 'Tout effacer', danger: true
+    });
+    if (!ok) return;
     localStorage.removeItem(getHistoryStorageKey());
     if (typeof scheduleCloudSync === 'function') scheduleCloudSync();
     showToast("🧹 Historique local entièrement effacé");
@@ -452,6 +455,7 @@ function toggleCurrentAnimeFavorite() {
             rating: currentAnimeItem.rating || null,
             rawTitle: currentAnimeItem.titre || animeName,
             lienMagnet: currentAnimeItem.lienMagnet || null,
+            anilistId: (typeof currentAnilistMedia !== 'undefined' && currentAnilistMedia?.id) || null,
             searchTitle: animeName,
             addedAt: Date.now()
         };
@@ -517,9 +521,13 @@ function getActiveHomeTab() {
     return 'home';
 }
 
-function switchHomeTab(tabName) {
+function switchHomeTab(tabName, opts = {}) {
     localStorage.setItem(STORAGE_KEY_HOME_TAB, tabName);
-    renderHomeScreen();
+    if (typeof showHomeScreen === 'function') {
+        showHomeScreen(opts);
+    } else {
+        renderHomeScreen();
+    }
 }
 
 // Utilitaire de formatage temporel relatif ("Il y a 5 min", "Hier", etc.)
@@ -544,7 +552,7 @@ function renderHistoryCards(historyList) {
     let cardsHtml = '';
     historyList.forEach(item => {
         const displayTitle = item.animeName || 'Anime';
-        const poster = item.poster || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(displayTitle);
+        const poster = item.poster || posterFallback(displayTitle);
         const timeFormatted = formatTimestamp(item.currentTime);
         const durFormatted = formatTimestamp(item.duration);
         const ago = formatTimeAgo(item.updatedAt);
@@ -553,7 +561,7 @@ function renderHistoryCards(historyList) {
         cardsHtml += `
             <div class="card card-history" onclick="resumeAnimeFromHistory(${jsArg(item.key)})" title="Reprendre la lecture de ${escapeHtml(displayTitle)}">
                 <div class="card-img-wrap">
-                    <img src="${escapeHtml(poster)}" loading="lazy" alt="${escapeHtml(displayTitle)}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                    <img src="${escapeHtml(poster)}" loading="lazy" alt="${escapeHtml(displayTitle)}" ${posterOnErrorAttr('Anime')}>
                     
                     <button class="card-btn-delete-history" onclick="deleteHistoryItem(${jsArg(item.key)}, event)" title="Supprimer de l'historique">
                         ✕
@@ -688,13 +696,13 @@ function renderFavoritesTabHtml(container) {
     let cardsHtml = '';
     favorites.forEach(item => {
         const displayTitle = item.animeName || 'Anime';
-        const poster = item.poster || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(displayTitle);
+        const poster = item.poster || posterFallback(displayTitle);
         const ago = formatTimeAgo(item.addedAt);
 
         cardsHtml += `
-            <div class="card card-favorite" onclick="searchFavoriteAnime(${jsArg(item.searchTitle || displayTitle)})" title="Rechercher tous les épisodes de ${escapeHtml(displayTitle)}">
+            <div class="card card-favorite" onclick="${item.anilistId ? `openAnimePage(${Number(item.anilistId)})` : `searchFavoriteAnime(${jsArg(item.searchTitle || displayTitle)})`}" title="Rechercher tous les épisodes de ${escapeHtml(displayTitle)}">
                 <div class="card-img-wrap">
-                    <img src="${escapeHtml(poster)}" loading="lazy" alt="${escapeHtml(displayTitle)}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                    <img src="${escapeHtml(poster)}" loading="lazy" alt="${escapeHtml(displayTitle)}" ${posterOnErrorAttr('Anime')}>
                     
                     <button class="card-btn-delete-history" onclick="deleteFavoriteItem(${jsArg(item.id)}, event)" title="Retirer des favoris">
                         ❤️

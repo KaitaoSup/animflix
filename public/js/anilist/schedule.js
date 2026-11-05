@@ -99,6 +99,11 @@
 
     function watchScheduleEpisode(mediaId, title, epNumber, coverImage, airingAt) {
         const isReleased = (airingAt * 1000) <= Date.now();
+        // Fiche anime, épisode du planning mis en avant s'il est déjà sorti
+        if (mediaId && typeof openAnimePage === 'function') {
+            openAnimePage(mediaId, { ep: isReleased ? epNumber : null });
+            return;
+        }
         const diffMs = (airingAt * 1000) - Date.now();
         const targetInfo = {
             nextEp: epNumber,
@@ -159,7 +164,7 @@
             return `
                 <div class="card schedule-card ${isReleased ? 'schedule-card-released' : ''}" onclick="watchScheduleEpisode(${Number(m.id)}, ${jsArg(title)}, ${Number(item.episode)}, ${jsArg(poster)}, ${Number(item.airingAt)})" title="${safeTitle} - Épisode ${item.episode}">
                     <div class="card-img-wrap">
-                        <img src="${safePoster}" loading="lazy" alt="${safeTitle}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                        <img src="${safePoster}" loading="lazy" alt="${safeTitle}" ${posterOnErrorAttr('Anime')}>
                         <div class="card-overlay-hover">
                             <span class="btn-play-hover" style="background: ${isReleased ? '#02a9ff' : '#d97706'};">
                                 ${isReleased ? `▶ Voir Épisode ${item.episode}` : `⏳ Ép. ${item.episode} (Rechercher)`}
@@ -215,10 +220,7 @@
                         <span>Actualiser</span>
                     </button>
                 </div>
-                <div class="empty-state" style="padding: 60px 20px;">
-                    <div class="spinner" style="margin: 0 auto 20px;"></div>
-                    Chargement du calendrier des sorties de la semaine... ⏳
-                </div>
+                ${renderSkeletonGrid(8, 'Chargement du calendrier…')}
             </div>
         `;
 

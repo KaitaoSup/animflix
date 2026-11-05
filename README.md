@@ -37,17 +37,49 @@ Application web complète et moderne de streaming d'animes en direct à partir d
 - **Double Sélection AniList en Temps Réel** :
   - **🔥 Tendances du Moment** : Les 12 séries les plus populaires et discutées cette semaine.
   - **🌸 Saison en Cours** : Calculée dynamiquement selon la date (Automne, Hiver, Printemps, Été + Année) avec les sorties incontournables.
-- **Cartes Interactives & Détaillées** : Note moyenne, format (TV, Movie, OVA), genres, compte à rebours de diffusion en direct (`⏳ Ép. X dans 2j 5h`). Un clic lance instantanément la recherche de torrents.
+- **Cartes Interactives & Détaillées** : Note moyenne, format (TV, Movie, OVA), genres, compte à rebours de diffusion en direct (`⏳ Ép. X dans 2j 5h`). Un clic ouvre la fiche de l'anime (Découverte, Planning, « En cours » et favoris).
 - **Cache Local Haute Performance** : Données mises en cache 30 minutes dans `localStorage` pour un affichage instantané (0 ms de latence) lors des changements d'onglets.
+- **Squelettes de chargement** : Les grilles (recherche, Découverte, Planning, « En cours », fiche anime) affichent des cartes fantômes animées pendant le chargement au lieu d'un spinner.
 
-### 🔍 2. Recherche & Filtrage Multi-Critères
+### 📺 2. Fiche Anime & Lecture en 1 Clic
+- **Fiche AniList complète** (`#/anime/<id>`) : bannière, couverture, synopsis, note, genres, statut de diffusion, liens vers les autres saisons (préquelle, suite, spin-off).
+- **Grille des épisodes** avec titres et miniatures AniList :
+  - ✓ épisodes vus (progression AniList ou historique local), barre de progression pour un épisode entamé ;
+  - pastille verte = épisode disponible seul, jaune = disponible dans un pack ;
+  - tuile « à venir » avec compte à rebours du prochain épisode ;
+  - plages d'épisodes (1–100, 101–200…) pour les longues séries.
+- **Bouton principal contextuel** : `▶ Reprendre l'épisode N à 12:34`, `Regarder l'épisode N` ou `Commencer`.
+- **Choix automatique du torrent** :
+  - recherche Nyaa en parallèle sur tous les titres AniList (anglais, romaji…) ;
+  - torrents sans seeders et d'une autre saison écartés ;
+  - priorité à l'épisode seul, puis au pack d'épisodes, puis au pack de saison (le bon fichier est sélectionné dans le pack) ;
+  - classement selon les **préférences de release** (groupe, résolution), puis les seeders ;
+  - recherche ciblée (`Titre 05`, `Titre S01E05`) si rien ne correspond ; en dernier recours, ouverture de la liste brute.
+- **« 📋 Choisir la source »** : accès à la liste complète des torrents pour choisir manuellement.
+- **Recherche texte** : les fiches AniList correspondantes sont proposées au-dessus des résultats Nyaa.
+
+### 🔗 3. Navigation par URL
+- Chaque vue possède son adresse, partageable et compatible avec le rafraîchissement (F5) :
+
+  | URL | Vue |
+  | :--- | :--- |
+  | `#/` | Accueil |
+  | `#/discover`, `#/schedule`, `#/anilist`, `#/history`, `#/favorites` | Onglets de l'accueil |
+  | `#/search?q=Frieren&type=vf` | Résultats Nyaa (`type` omis pour VOSTFR) |
+  | `#/anime/154587` | Fiche anime AniList |
+  | `#/watch/<infohash>/<fichier>` | Lecteur |
+- **Boutons Précédent / Suivant du navigateur** (et geste retour sur mobile) fonctionnels ; revenir du lecteur vers des résultats ne relance pas la recherche Nyaa.
+- Un lien `#/watch/…` ouvert sur un autre appareil relance le torrent à partir de son infohash (connexion aux pairs via la DHT).
+- **Dialogues intégrés** : les confirmations (suppression de profil, purge du cache, historique…) utilisent une fenêtre accessible au clavier et à la télécommande (Échap annule, focus sur « Annuler » pour les actions destructives).
+
+### 🔍 4. Recherche & Filtrage Multi-Critères
 - **Scraping Nyaa.si ultra-rapide (< 400 ms)** avec extraction d'infoHash et génération directe de magnets P2P (contourne les protections Cloudflare).
 - **Barre d'outils dynamique** avec compteur de résultats.
 - **Filtres rapides (Chips)** : `Tous`, `1080p Full HD`, `720p HD`, `📦 Packs / Saisons`.
 - **Tri intelligent** : `🌱 Seeders (Les plus rapides)`, `⚡ Pertinence` (avec priorité à l'épisode ciblé), `📦 Taille (Plus grand)`, `📦 Taille (Plus léger)`.
 - **Inspection des Packs & Saisons (Batches)** : Détection automatique des fichiers vidéo au sein d'un pack torrent avec menu interactif de sélection d'épisodes.
 
-### 🎬 3. Lecteur Multimédia Sur-Mesure & Sous-Titres WebVTT
+### 🎬 5. Lecteur Multimédia Sur-Mesure & Sous-Titres WebVTT
 - **Deux Modes de Lecture** :
   - ⚡ **Lecture Directe (0% CPU, ultra-rapide)** : Copie brute du flux vidéo MP4 vers le navigateur avec extraction et streaming des pistes de sous-titres WebVTT.
   - 🔄 **Transcodage H.264 Universel** : Encodage multithread FFmpeg à la volée en cas de codec audio/vidéo non supporté nativement.
@@ -63,19 +95,19 @@ Application web complète et moderne de streaming d'animes en direct à partir d
   - Personnalisation intégrale : taille, couleurs (Blanc, Jaune VOSTFR, Cyan, Vert, Rose), fond, contours 360°, ombrages et polices.
   - Ajustement manuel à la volée de la synchronisation des sous-titres (<kbd>G</kbd>/<kbd>H</kbd>) et de l'audio (<kbd>J</kbd>/<kbd>K</kbd>).
 
-### 📱 4. Expérience Mobile & PWA (Progressive Web App)
+### 📱 6. Expérience Mobile & PWA (Progressive Web App)
 - **Installable en 1 clic** sur Android, iOS, Windows et macOS (manifeste complet, icônes maskable).
 - **Raccourcis d'Application (App Shortcuts)** : Accès direct depuis l'écran d'accueil à la Recherche, à l'Historique ou aux Favoris.
 - **Verrouillage d'Orientation Paysage** : En plein écran sur mobile, bascule et verrouille automatiquement la vidéo en mode paysage.
 - **Intégration Native MediaSession API** : Métadonnées, affiche HD et contrôles multimédias sur l'écran de verrouillage du smartphone et les casques/écouteurs Bluetooth.
 - **Gestes Tactiles Naturels** : Double-tap gauche (-10s), double-tap droite (+10s), double-tap centre (Pause / Play), tap simple pour afficher/masquer les commandes avec temporisation intelligente (4,5s).
 
-### ☁️ 5. Suivi AniList, Historique & Favoris
+### ☁️ 7. Suivi AniList, Historique & Favoris
 - **Synchronisation AniList Bi-directionnelle** : Connexion OAuth sécurisée, synchronisation automatique de l'épisode visionné à 85% ou à la fin, affichage des animés en cours.
 - **Historique Local & Reprise** : Mémorisation exacte de la position de lecture à la seconde près dans `localStorage`, avec bannière de reprise automatique.
 - **Favoris Locaux Hors Ligne** : Sauvegarde d'animes favoris accessible sans compte tiers.
 
-### ⚡ 6. Feedback P2P & TorrServer en Direct
+### ⚡ 8. Feedback P2P & TorrServer en Direct
 - **Télémétrie en temps réel (`/api/torrserver/stats`)** :
   - Débit descendant et montant instantané (Mo/s, Ko/s).
   - Nombre de pairs actifs connectés et swarm total détecté.
@@ -215,6 +247,7 @@ ServeurAnimeTorr/
 │   │   │                     # fixé dans index.html et repris dans le pré-cache de sw.js
 │   │   ├── auth.js           # Comptes Animflix, session
 │   │   ├── app.js            # État global, utilitaires (escapeHtml, jsArg), PWA, réglages
+│   │   ├── ui.js             # Dialogues (uiConfirm / uiAlert), squelettes de chargement, affiche de repli
 │   │   ├── subtitles/        # libass (JASSUB), WebVTT, piste panneaux, polices, pistes, styles
 │   │   ├── player/           # Contrôles, sync audio, AniSkip, épisode suivant, PiP/vitesse/boost,
 │   │   │                     # MediaSession, stats P2P, streaming/HLS, timeline, Cast/téléchargement
@@ -222,7 +255,9 @@ ServeurAnimeTorr/
 │   │   ├── sync.js           # Synchro multi-appareils (historique, reprise, favoris, profils) si connecté
 │   │   ├── release-prefs.js  # Groupes de release / résolution préférés (tri « Mes préférences »)
 │   │   ├── search.js         # Recherche Nyaa, filtrage & tri, analyse des packs d'épisodes
-│   │   ├── anilist/          # Session & GraphQL, Découverte, Planning, Accueil, liste En cours, suivi
+│   │   ├── anilist/          # Session & GraphQL, Découverte, Planning, Accueil, liste En cours, suivi,
+│   │   │                     # fiche anime (anime-page.js : épisodes, choix automatique du torrent)
+│   │   ├── router.js         # Routes dans le hash (#/anime/…, #/watch/…), précédent/suivant, F5
 │   │   └── tv.js             # Navigation manette / TV
 │   │
 │   └── icons/                # Icônes de l'application PWA (SVG, PNG standard & maskable)
@@ -343,13 +378,18 @@ npm start
 2. **Page d'Accueil & Découverte** :
    - Explorez les tendances et la saison en cours dès l'ouverture.
    - Si vous connectez votre compte AniList, l'onglet **🍿 AniList En cours** se synchronise instantanément.
-3. **Recherche & Filtres** :
-   - Saisissez le nom d'un anime.
+   - Cliquez sur une carte pour ouvrir la **fiche de l'anime**.
+3. **Fiche Anime** :
+   - Le gros bouton lance l'épisode à reprendre ou le suivant ; un clic sur une tuile lance cet épisode.
+   - Le meilleur torrent est choisi selon vos préférences de release ; **📋 Choisir la source** affiche la liste complète.
+   - Copiez l'URL pour partager la fiche, ou utilisez le bouton Précédent du navigateur pour revenir en arrière.
+4. **Recherche & Filtres** :
+   - Saisissez le nom d'un anime : les fiches AniList correspondantes apparaissent au-dessus des torrents.
    - Filtrez par langue (VOSTFR, VF, Multi-Sub, VOSTA) et affinez avec les chips de résolution (`1080p`, `720p`, `Packs`).
-4. **Lecture & Gestion d'Épisodes** :
+5. **Lecture & Gestion d'Épisodes** :
    - Choisissez le mode de lecture (Direct ou Transcodage).
    - Pour les packs complets, sélectionnez l'épisode souhaité dans la liste.
-5. **Personnalisation & Confort** :
+6. **Personnalisation & Confort** :
    - Personnalisez le rendu visuel des sous-titres via le bouton **`🎨 Style`**.
    - Activez le **Boost Vocal** si les voix sont masquées par les effets sonores.
    - Utilisez **`🧹 Nettoyer le cache`** pour libérer la mémoire vive du moteur P2P si besoin.
@@ -383,7 +423,7 @@ npm start
 | <kbd>G</kbd> / <kbd>H</kbd> | Ajuster la **synchronisation des sous-titres** (-0.1s / +0.1s) |
 | <kbd>J</kbd> / <kbd>K</kbd> | Ajuster la **synchronisation de la piste audio** (-0.1s / +0.1s) |
 | <kbd>F</kbd> | Basculer en mode Plein écran |
-| <kbd>Échap</kbd> | Quitter le plein écran, fermer les modales ou revenir au catalogue |
+| <kbd>Échap</kbd> | Quitter le plein écran, fermer les modales et dialogues, ou revenir à la vue précédente (fiche, résultats…) |
 
 ---
 

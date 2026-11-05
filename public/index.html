@@ -78,6 +78,9 @@
           <div id="searchView" style="display: none;">
               <div id="searchTargetBanner" style="display: none;"></div>
 
+              <!-- FICHES ANIME CORRESPONDANT À LA RECHERCHE TEXTE (ANILIST) -->
+              <div id="searchAnimeMatches" class="search-anime-matches" style="display: none;"></div>
+
               <!-- BARRE DE FILTRES ET TRI DES RÉSULTATS -->
               <div id="searchFilterBar" class="search-filter-bar" style="display: none;">
                   <div class="search-filter-left">
@@ -103,6 +106,9 @@
 
               <div id="results" class="grid"></div>
           </div>
+
+          <!-- VUE FICHE ANIME : ÉPISODES, PROGRESSION ET LECTURE EN UN CLIC -->
+          <div id="animeView" style="display: none;"></div>
       </div>
 
       <!-- VUE 2 : PAGE DE DÉTAIL DE LA VIDÉO -->
@@ -110,7 +116,7 @@
           <!-- Barre de navigation / Retour -->
           <div class="detail-nav">
               <button class="btn-back" onclick="closeDetailView()" title="Retour au catalogue (Échap)">
-                  <span style="font-size: 16px;">←</span> Retour aux résultats
+                  <span style="font-size: 16px;">←</span> Retour
               </button>
               <div id="detailBreadcrumb" class="detail-breadcrumb"></div>
           </div>
@@ -994,6 +1000,7 @@
   <!-- Scripts classiques (portée globale partagée) : l'ordre de chargement compte -->
   <script src="/js/auth.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/app.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/ui.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/subtitles/libass.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/subtitles/vtt.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/subtitles/signs.js?v={{ASSET_VERSION}}"></script>
@@ -1021,6 +1028,8 @@
   <script src="/js/anilist/watching.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/anilist/session.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/anilist/tracking.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/anilist/anime-page.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/router.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/tv.js?v={{ASSET_VERSION}}"></script>
 </body>
 </html>

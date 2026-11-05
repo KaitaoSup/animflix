@@ -146,11 +146,7 @@ async function loginAnimflix(username, password) {
             loadAnilistWatchingList(true);
         }
     } catch (err) {
-        if (typeof showToast === 'function') {
-            showToast("❌ " + err.message);
-        } else {
-            alert(err.message);
-        }
+        showToast("❌ " + err.message);
     }
 }
 
@@ -214,11 +210,7 @@ async function registerAnimflix(username, password, linkLocalAnilist = true) {
             loadAnilistWatchingList(true);
         }
     } catch (err) {
-        if (typeof showToast === 'function') {
-            showToast("❌ " + err.message);
-        } else {
-            alert(err.message);
-        }
+        showToast("❌ " + err.message);
     }
 }
 
@@ -310,9 +302,10 @@ async function linkAnilistToAnimflix(token, notify = true) {
 // Dissocier AniList du compte Animflix connecté
 async function unlinkAnilistFromAnimflix() {
     if (!currentAnimflixUser) return;
-    if (!confirm("Voulez-vous vraiment dissocier votre compte AniList de votre compte Animflix ?")) {
-        return;
-    }
+    const ok = await uiConfirm("Voulez-vous vraiment dissocier votre compte AniList de votre compte Animflix ?", {
+        title: 'Dissocier AniList', okLabel: 'Dissocier', danger: true
+    });
+    if (!ok) return;
 
     try {
         const res = await fetch('/api/auth/anilist/unlink', {

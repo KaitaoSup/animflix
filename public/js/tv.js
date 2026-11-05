@@ -186,7 +186,11 @@
      * Récupère la liste des éléments interactifs visibles
      */
     function getFocusableElements() {
-        // 1. Vérifier si une modale overlay est ouverte
+        // 1. Vérifier si une modale overlay est ouverte (le dialogue de confirmation passe devant tout)
+        const uiDialog = document.getElementById('uiDialogOverlay');
+        if (uiDialog) {
+            return Array.from(uiDialog.querySelectorAll('button')).filter(el => isElementVisible(el));
+        }
         const activeModal = document.querySelector('.anilist-modal-overlay[style*="display: flex"], .anilist-modal-overlay[style*="display: block"]');
         if (activeModal) {
             return Array.from(activeModal.querySelectorAll('button, input, select, textarea, a, [tabindex="0"]'))
@@ -237,7 +241,10 @@
             '#searchSortSelect',
             '.card',
             '.calendar-card',
-            '.resume-banner button'
+            '.resume-banner button',
+            '#searchAnimeMatches button',
+            '#animeView button',
+            '#animeView select'
         ];
 
         return Array.from(document.querySelectorAll(generalSelectors.join(',')))
@@ -415,6 +422,12 @@
      * Gestion de la touche Retour (Télécommande TV / Touche Échap / Bouton B)
      */
     function handleTvBackAction() {
+        // 0. Dialogue de confirmation : Retour = Annuler
+        if (typeof isUiDialogOpen === 'function' && isUiDialogOpen()) {
+            cancelUiDialog();
+            return true;
+        }
+
         // 1. Fermer les modales ouvertes
         const modals = [
             '#settingsModal',
@@ -449,8 +462,18 @@
         }
 
         // 4. Recherche active -> retour à l'accueil
+        // 4. Fiche anime ou recherche -> page précédente (ou accueil)
+        const animeView = document.getElementById('animeView');
+        if (animeView && animeView.style.display !== 'none' && typeof AppRouter !== 'undefined') {
+            AppRouter.back('/');
+            return true;
+        }
         const searchView = document.getElementById('searchView');
         if (searchView && searchView.style.display !== 'none') {
+            if (typeof AppRouter !== 'undefined' && AppRouter.previousPath()) {
+                AppRouter.back('/');
+                return true;
+            }
             if (typeof window.handleLogoClick === 'function') {
                 window.handleLogoClick();
                 return true;

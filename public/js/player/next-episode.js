@@ -171,6 +171,9 @@
         });
 
         startStreamingInPlayer(currentAnimeItem.lienMagnet, currentAnimeItem.titre, newVlcUrl, nextFile.id, 0);
+        if (typeof AppRouter !== 'undefined') {
+            AppRouter.sync(AppRouter.watchPath(currentAnimeItem.lienMagnet, nextFile.id), { replace: true });
+        }
     }
 
     function playNextEpisodeSearch(nextEpNum) {
@@ -180,7 +183,8 @@
         const animeName = currentAnimeItem.animeName || parsed.animeName || currentAnimeItem.cleanTitle;
 
         showToast(`🔍 Recherche automatique de l'Épisode ${nextEpNum}... ⏳`);
-        closeDetailView();
+        // L'URL reste sur le lecteur : l'épisode suivant la remplacera (le retour ramène à la page d'origine)
+        closeDetailView({ navigate: false });
         const searchInput = document.getElementById('searchInput');
         if (searchInput) searchInput.value = animeName;
 

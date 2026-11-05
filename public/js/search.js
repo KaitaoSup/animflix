@@ -52,7 +52,12 @@
                 // Trouver l'épisode correspondant le mieux à la cible actuelle
                 const parsed = getAnimeDetails(anime);
                 const targetEp = currentDetectedEpisode || extractEpisodeNumber(anime.episode || parsed.episode, anime.titre);
-                let selectedFile = files.find(f => f.episode === targetEp) || files[0];
+                // Priorité : fichier explicitement ouvert (fiche anime, reprise, lien), puis épisode demandé, puis détection
+                const initialIndex = currentActiveFileIndex;
+                let selectedFile = (initialIndex !== 1 && files.find(f => f.id === initialIndex))
+                    || (anime.targetEpisode && files.find(f => f.episode === anime.targetEpisode))
+                    || files.find(f => f.episode === targetEp)
+                    || files[0];
                 currentActiveFileIndex = selectedFile.id;
 
                 files.forEach(f => {
@@ -86,12 +91,14 @@
                             checkAndShowResumeBanner(anime.lienMagnet, f.id, anime);
                         }
                         startStreamingInPlayer(anime.lienMagnet, anime.titre, newVlcUrl, f.id, 0);
+                        if (typeof AppRouter !== 'undefined') AppRouter.sync(AppRouter.watchPath(anime.lienMagnet, f.id), { replace: true });
                     };
                     packList.appendChild(btn);
                 });
 
-                // Si le fichier cible trouvé n'était pas l'index 1, basculer immédiatement le lecteur dessus
-                if (selectedFile.id !== 1) {
+                // Si le fichier retenu n'est pas celui déjà lancé, basculer immédiatement le lecteur dessus
+                if (selectedFile.id !== initialIndex) {
+                    if (typeof AppRouter !== 'undefined') AppRouter.sync(AppRouter.watchPath(anime.lienMagnet, selectedFile.id), { replace: true });
                     const matchedVlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(anime.lienMagnet) + "&index=" + selectedFile.id + "&play";
                     updateVlcLinks(matchedVlcUrl);
                     if (selectedFile.episode) {
@@ -126,8 +133,12 @@
         detailView.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        // Mise à jour de l'historique d'URL
-        window.location.hash = 'detail';
+        // Mise à jour de l'URL (#/watch/<hash>/<fichier>) : remplace l'entrée si on enchaîne depuis un autre épisode
+        if (typeof AppRouter !== 'undefined') {
+            AppRouter.rememberTorrent(anime);
+            const watchPath = AppRouter.watchPath(anime.lienMagnet, currentActiveFileIndex);
+            if (watchPath) AppRouter.sync(watchPath, { replace: AppRouter.currentPath().startsWith('/watch/') });
+        }
 
         // Extraction et assignation des métadonnées
         const parsed = getAnimeDetails(anime);
@@ -136,7 +147,7 @@
         const episode = anime.episode || parsed.episode || 'Épisode 1';
         const resolution = anime.resolution || parsed.resolution || '1080p Full HD';
         const audioLang = anime.audioLang || parsed.audioLang || 'VOSTFR';
-        const posterSrc = anime.poster || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(animeName);
+        const posterSrc = anime.poster || posterFallback(animeName);
 
         // Mise à jour du fil d'Ariane
         document.getElementById('detailBreadcrumb').innerText = `Animflix > ${animeName} > ${season} > ${episode}`;
@@ -155,7 +166,8 @@
         const posterImg = document.getElementById('detailPosterImg');
         posterImg.src = posterSrc;
         posterImg.onerror = function() {
-            this.src = 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(animeName);
+            this.onerror = null;
+            this.src = posterFallback(animeName);
         };
 
         // Configuration initiale des liens VLC et Magnet
@@ -208,7 +220,17 @@
         loadPackEpisodes(anime);
     }
 
-    function closeDetailView() {
+    /**
+     * Ferme le lecteur. navigate=false quand l'appelant fixe lui-même l'URL suivante
+     * (recherche, logo, enchaînement d'épisode, routeur) ; sinon on revient à la page précédente.
+     */
+    function closeDetailView(opts = {}) {
+        const navigate = opts.navigate !== false;
+        const detailViewEl = document.getElementById('detailView');
+        if (!detailViewEl || detailViewEl.style.display === 'none') {
+            if (navigate && typeof AppRouter !== 'undefined') AppRouter.leaveWatch();
+            return;
+        }
         if (typeof savePlaybackProgress === 'function') {
             savePlaybackProgress(true);
         }
@@ -285,14 +307,16 @@
         document.getElementById('detailView').style.display = 'none';
         document.getElementById('catalogView').style.display = 'block';
 
-        if (window.location.hash === '#detail') {
-            history.replaceState(null, '', window.location.pathname + window.location.search);
+        // Rafraîchit la vue d'origine (progression d'historique, épisodes vus)
+        const subView = (typeof AppRouter !== 'undefined') ? AppRouter.catalogSubView() : 'search';
+        const query = document.getElementById('searchInput')?.value.trim();
+        if (subView === 'anime' && window._currentAnimePageId && typeof openAnimePage === 'function') {
+            openAnimePage(window._currentAnimePageId, { syncUrl: false });
+        } else if (subView === 'home' || !query) {
+            showHomeScreen({ syncUrl: false });
         }
 
-        const query = document.getElementById('searchInput')?.value.trim();
-        if (!query) {
-            showHomeScreen();
-        }
+        if (navigate && typeof AppRouter !== 'undefined') AppRouter.leaveWatch();
     }
 
     function scrollToPlayer() {
@@ -319,10 +343,16 @@
         // Si l'utilisateur est sur la page de détail, revenir au catalogue pour afficher les nouveaux résultats
         const detailView = document.getElementById('detailView');
         if (detailView && detailView.style.display === 'block') {
-            closeDetailView();
+            closeDetailView({ navigate: false });
         }
         const query = document.getElementById('searchInput').value.trim();
         if (!query) {
+            // Changement de langue depuis la barre du haut sur une fiche anime : on recharge ses sources
+            const animeView = document.getElementById('animeView');
+            if (animeView && animeView.style.display !== 'none' && typeof refreshAnimePageSources === 'function') {
+                refreshAnimePageSources();
+                return;
+            }
             showHomeScreen();
             return;
         }
@@ -340,15 +370,7 @@
         }
     }
 
-    // Gestion du bouton précédent du navigateur
-    window.addEventListener('popstate', () => {
-        if (window.location.hash !== '#detail') {
-            const detailView = document.getElementById('detailView');
-            if (detailView && detailView.style.display === 'block') {
-                closeDetailView();
-            }
-        }
-    });
+    // Le bouton précédent du navigateur est géré par le routeur (router.js)
 
     // --- RECHERCHE SUR NYAA & CIBLAGE D'ÉPISODE ---
     async function searchNyaa() {
@@ -540,7 +562,7 @@
             const episode = t.episode || parsed.episode || 'Épisode 1';
             const resolution = (t.resolution || parsed.resolution || '1080p').split(' ')[0];
             const audioLang = t.audioLang || parsed.audioLang || 'VOSTFR';
-            const posterSrc = t.poster || (targetInfo?.coverImage) || ('https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(animeName));
+            const posterSrc = t.poster || (targetInfo?.coverImage) || posterFallback(animeName);
 
             const isTargetMatch = matchType === 'exact';
             const isPackMatch = matchType === 'pack' || matchType === 'batch';
@@ -558,7 +580,7 @@
 
             card.innerHTML = `
                 <div class="card-img-wrap">
-                    <img src="${escapeHtml(posterSrc)}" loading="lazy" alt="${escapeHtml(animeName)}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                    <img src="${escapeHtml(posterSrc)}" loading="lazy" alt="${escapeHtml(animeName)}" ${posterOnErrorAttr(animeName)}>
                     <div class="card-overlay-hover">
                         <span class="btn-play-hover" style="${isTargetMatch ? 'background:var(--accent-green);color:#000;font-weight:800;' : ''}">
                             ▶ ${isTargetMatch ? `Regarder l'Épisode ${nextEp}` : 'Voir la fiche & Regarder'}
@@ -590,6 +612,15 @@
             `;
 
             card.onclick = () => openAnimeDetail(t);
+            card.tabIndex = 0;
+            card.setAttribute('role', 'button');
+            card.setAttribute('aria-label', `${animeName}, ${episode}, ${resolution}, ${t.seeders || 0} seeders`);
+            card.onkeydown = (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openAnimeDetail(t);
+                }
+            };
             resultsDiv.appendChild(card);
         });
     }
@@ -620,13 +651,39 @@
         const filterBar = document.getElementById('searchFilterBar');
         const resultsDiv = document.getElementById('results');
 
-        if (homeView) homeView.style.display = 'none';
-        if (searchView) searchView.style.display = 'block';
+        const isAutoPlay = !!(targetInfo && targetInfo.autoPlayDirect);
+        const detailOpen = typeof AppRouter !== 'undefined' && AppRouter.isDetailOpen();
+        if (typeof showCatalogSubView === 'function' && !detailOpen) {
+            showCatalogSubView('search');
+        } else {
+            if (homeView) homeView.style.display = 'none';
+            if (searchView) searchView.style.display = 'block';
+            const animeView = document.getElementById('animeView');
+            if (animeView) animeView.style.display = 'none';
+        }
         if (filterBar) filterBar.style.display = 'none';
 
         const type = document.getElementById('searchType')?.value || 'vostfr';
         const nextEp = targetInfo ? targetInfo.nextEp : null;
         const animeDisplayName = targetInfo ? targetInfo.animeName : searchTitle;
+
+        // URL de la recherche (pas pendant un enchaînement automatique : l'URL suivante sera celle du lecteur)
+        const routeKey = (typeof AppRouter !== 'undefined') ? AppRouter.searchPath(searchTitle, type) : null;
+        window._lastSearchRoute = routeKey;
+        window._renderedSearchRoute = null;
+        const syncSearchUrl = () => {
+            if (routeKey && typeof AppRouter !== 'undefined' && !AppRouter.isDetailOpen()) AppRouter.sync(routeKey);
+        };
+        if (!isAutoPlay) syncSearchUrl();
+
+        // Recherche libre : propose aussi les fiches AniList correspondantes
+        const matchesBox = document.getElementById('searchAnimeMatches');
+        if (!targetInfo && typeof renderSearchAnimeMatches === 'function') {
+            renderSearchAnimeMatches(searchTitle);
+        } else if (matchesBox) {
+            matchesBox.style.display = 'none';
+            matchesBox.innerHTML = '';
+        }
 
         // Mise à jour de la bannière de ciblage
         if (targetInfo && targetBanner) {
@@ -678,10 +735,10 @@
         }
 
         resultsDiv.innerHTML = `
-            <div class="empty-state" style="grid-column: 1 / -1;">
-                <div class="spinner" style="margin: 0 auto 20px;"></div>
-                Recherche des vidéos pour "<b>${escapeHtml(animeDisplayName)}</b>"${nextEp ? ` (Épisode ${nextEp})` : ''}... ⏳
+            <div class="search-loading-label" style="grid-column: 1 / -1;" role="status">
+                Recherche des vidéos pour « <b>${escapeHtml(animeDisplayName)}</b> »${nextEp ? ` (Épisode ${nextEp})` : ''}…
             </div>
+            ${renderSkeletonCards(12)}
         `;
 
         try {
@@ -711,6 +768,8 @@
                 openAnimeDetail(targetInfo.preparedTorrent);
                 return;
             }
+
+            if (isAutoPlay) syncSearchUrl();
 
             if (!torrents || torrents.length === 0) {
                 if (filterBar) filterBar.style.display = 'none';
@@ -757,8 +816,11 @@
                 }
             }
 
+            if (isAutoPlay) syncSearchUrl();
             renderFilteredSortedResults();
+            window._renderedSearchRoute = routeKey;
         } catch (err) { 
+            if (isAutoPlay) syncSearchUrl();
             const filterBar = document.getElementById('searchFilterBar');
             if (filterBar) filterBar.style.display = 'none';
             resultsDiv.innerHTML = `
@@ -774,7 +836,10 @@
 
 
     async function cleanTorrServerCache() {
-        if (!confirm("Voulez-vous purger tous les torrents et données en mémoire de TorrServer ?\n(Libère immédiatement la RAM, le cache de streaming, les sous-titres et miniatures en cache)")) return;
+        const ok = await uiConfirm("Voulez-vous purger tous les torrents et données en mémoire de TorrServer ?\n(Libère immédiatement la RAM, le cache de streaming, les sous-titres et miniatures en cache)", {
+            title: 'Purger TorrServer', okLabel: 'Purger', danger: true
+        });
+        if (!ok) return;
         showToast("Purge du cache TorrServer en cours... ⏳");
         try {
             const res = await fetch('/api/torrserver/clean', { method: 'POST' });

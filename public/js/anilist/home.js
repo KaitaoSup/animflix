@@ -109,10 +109,7 @@
                             Accéder au catalogue →
                         </button>
                     </div>
-                    <div style="text-align: center; padding: 40px 20px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.08);">
-                        <div class="spinner" style="margin: 0 auto 14px;"></div>
-                        <div style="color: #aaa; font-size: 13.5px;">Chargement des tendances mondiales AniList...</div>
-                    </div>
+                    ${renderSkeletonGrid(6, 'Chargement des tendances AniList…')}
                 </div>
             `;
         }
@@ -352,7 +349,7 @@
             const nextEp = progress + 1;
             const isCompleted = total && progress >= total;
             const progressPct = total ? Math.min(100, Math.round((progress / total) * 100)) : (progress > 0 ? 50 : 0);
-            const poster = media.coverImage?.large || media.coverImage?.extraLarge || media.coverImage?.medium || 'https://via.placeholder.com/300x450/191919/666666?text=' + encodeURIComponent(displayTitle);
+            const poster = media.coverImage?.large || media.coverImage?.extraLarge || media.coverImage?.medium || posterFallback(displayTitle);
             const score = media.averageScore ? (media.averageScore / 10).toFixed(1) : null;
             const format = media.format || 'TV';
 
@@ -412,9 +409,9 @@
             }
 
             cardsHtml += `
-                <div class="card card-watching" onclick="watchAnimeNextEpisode(${media.id})" title="${isNextEpUnreleased ? `Épisode ${nextAiring.episode} pas encore sorti. Cliquer pour chercher les vidéos disponibles.` : `Cliquer pour chercher les vidéos de l'épisode ${nextEp}`}">
+                <div class="card card-watching" onclick="openAnimePage(${Number(media.id)})" title="${isNextEpUnreleased ? `Épisode ${nextAiring.episode} pas encore sorti` : `Ouvrir la fiche : épisode ${nextEp} à regarder`}">
                     <div class="card-img-wrap">
-                        <img src="${escapeHtml(poster)}" loading="lazy" alt="${escapeHtml(displayTitle)}" onerror="this.src='https://via.placeholder.com/300x450/191919/666666?text=Anime'">
+                        <img src="${escapeHtml(poster)}" loading="lazy" alt="${escapeHtml(displayTitle)}" ${posterOnErrorAttr('Anime')}>
                         <div class="card-overlay-hover">
                             ${overlayBtnHtml}
                         </div>
@@ -579,10 +576,7 @@
                         </h2>
                     </div>
                 </div>
-                <div class="empty-state" style="padding: 60px 20px;">
-                    <div class="spinner" style="margin: 0 auto 20px;"></div>
-                    Chargement de vos animes en cours depuis AniList... ⏳
-                </div>
+                ${renderSkeletonGrid(8, 'Chargement de vos animes en cours…')}
             </div>
         `;
     }
