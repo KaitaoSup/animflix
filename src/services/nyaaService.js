@@ -3,11 +3,62 @@ import axios from 'axios';
 import { NYAA_PRIMARY_URL, NYAA_FALLBACK_URLS, TMDB_API_KEY } from '../config/constants.js';
 import { metadataCache, searchCache } from '../utils/cache.js';
 import { cleanAnimeTitle, parseAnimeDetails } from '../utils/animeParser.js';
+import { searchAllTorrents } from './torrentAggregator.js';
 
 let currentWorkingNyaaUrl = NYAA_PRIMARY_URL;
 
 export function getCurrentNyaaUrl() {
   return currentWorkingNyaaUrl;
+}
+
+export function setWorkingNyaaUrl(url) {
+  if (url) {
+    currentWorkingNyaaUrl = url.replace(/\/+$/, '');
+  }
+}
+
+/**
+ * Teste la latence et l'accessibilité de chaque miroir Nyaa
+ */
+export async function testNyaaMirrors() {
+  const results = [];
+  for (const mirror of NYAA_FALLBACK_URLS) {
+    const start = Date.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    try {
+      const res = await fetch(`${mirror}/?page=rss`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        },
+        signal: controller.signal
+      });
+      // Un miroir qui redirige vers une page HTML (ou un challenge Cloudflare) n'est pas exploitable
+      const body = res.ok ? await res.text() : '';
+      clearTimeout(timeoutId);
+      const latencyMs = Date.now() - start;
+      const isRss = body.includes('<rss');
+      results.push({
+        url: mirror,
+        ok: res.ok && isRss,
+        ...(res.ok && !isRss ? { error: 'Pas de flux RSS' } : {}),
+        status: res.status,
+        latencyMs,
+        isCurrent: mirror === currentWorkingNyaaUrl
+      });
+    } catch (e) {
+      clearTimeout(timeoutId);
+      results.push({
+        url: mirror,
+        ok: false,
+        status: 0,
+        latencyMs: Date.now() - start,
+        error: e.message,
+        isCurrent: mirror === currentWorkingNyaaUrl
+      });
+    }
+  }
+  return results;
 }
 
 const parser = new Parser({
@@ -133,81 +184,8 @@ export async function getAnimeMetadata(cleanTitle) {
 }
 
 /**
- * Recherche complète d'animes sur Nyaa avec enrichissement des métadonnées
+ * Recherche complète d'animes multi-sources (Nyaa + Tokyo Toshokan + Torznab)
  */
-export async function searchAnime(query, type = 'vostfr') {
-  if (!query) return [];
-
-  const cacheKey = `${query.toLowerCase()}_${type}`;
-  const cached = searchCache.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  let searchQuery = query;
-  let category = '1_0';
-  if (type === 'vostfr') { searchQuery += ' vostfr'; category = '1_3'; } 
-  else if (type === 'vf') { searchQuery += ' vf'; category = '1_3'; } 
-  else if (type === 'multisub') { searchQuery += ' multi'; category = '1_2'; } 
-  else if (type === 'sub') { category = '1_2'; }
-
-  const items = await fetchNyaaRss(searchQuery, category);
-
-  if (items.length === 0) {
-    searchCache.set(cacheKey, []);
-    return [];
-  }
-
-  // 1. Récupération prioritaire et ultra-rapide de l'affiche de la franchise
-  const queryClean = cleanAnimeTitle(query) || query;
-  const defaultMeta = await getAnimeMetadata(queryClean);
-
-  // 2. Déduplication des titres nettoyés
-  const titleCleanMap = new Map();
-  items.forEach(t => {
-    const clean = cleanAnimeTitle(t.title);
-    titleCleanMap.set(t.title, clean);
-  });
-
-  const uniqueCleanTitles = [...new Set(Array.from(titleCleanMap.values()))];
-  const metaLookup = new Map();
-
-  if (defaultMeta && defaultMeta.poster) {
-    uniqueCleanTitles.forEach(c => metaLookup.set(c, defaultMeta));
-  } else {
-    const titlesToFetch = uniqueCleanTitles.slice(0, 4);
-    await Promise.all(titlesToFetch.map(async (clean) => {
-      const meta = await getAnimeMetadata(clean);
-      metaLookup.set(clean, meta);
-    }));
-  }
-
-  // 3. Construction des résultats avec métadonnées enrichies et lien magnet direct
-  const videos = items.map(t => {
-    const details = parseAnimeDetails(t.title);
-    const clean = titleCleanMap.get(t.title) || details.animeName;
-    const meta = metaLookup.get(clean) || metaLookup.get(details.animeName) || defaultMeta || { poster: null, rating: "N/A" };
-    const infoHash = t.infoHash || '';
-    const magnetLink = infoHash 
-      ? `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(t.title)}&tr=http%3A%2F%2Fnyaa.tracker.wf%3A7777%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce`
-      : t.link;
-
-    return {
-      titre: t.title,
-      cleanTitle: clean,
-      animeName: details.animeName,
-      season: details.season,
-      episode: details.episode,
-      resolution: details.resolution,
-      audioLang: details.audioLang,
-      lienMagnet: magnetLink,
-      taille: t.size,
-      seeders: parseInt(t.seeders, 10) || 0,
-      poster: meta.poster,
-      rating: meta.rating
-    };
-  });
-
-  searchCache.set(cacheKey, videos);
-  return videos;
+export async function searchAnime(query, type = 'vostfr', options = {}) {
+  return searchAllTorrents(query, type, options);
 }

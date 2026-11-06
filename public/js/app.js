@@ -497,14 +497,129 @@ async function fetchServerStatus() {
             ? `<span style="color: #46d369;">● En ligne</span>`
             : `<span style="color: #ff4757;">● Déconnecté</span>`;
 
+        const sources = data.torrentSources?.sources || {};
+        const sourcesText = [
+            `Nyaa (<span style="color:#46d369;">${escapeHtml(data.nyaaUrl || 'https://nyaa.si')}</span>)`,
+            sources.tokyoTosho?.enabled ? `<span style="color:#38bdf8;">TokyoTosho</span>` : null,
+            sources.torznab?.configured ? `<span style="color:#c084fc;">Torznab/Prowlarr</span>` : null
+        ].filter(Boolean).join(' • ');
+
         content.innerHTML = `
             <div><b>Transcodage vidéo :</b> ${hwBadge}</div>
             <div style="margin-top: 5px;"><b>TorrServer P2P :</b> ${torrBadge}</div>
-            <div style="margin-top: 5px;"><b>Source Nyaa :</b> <span style="color: #eee;">${escapeHtml(data.nyaaUrl || 'https://nyaa.si')}</span></div>
+            <div style="margin-top: 5px;"><b>Sources actives :</b> ${sourcesText}</div>
             <div style="margin-top: 5px; font-size: 11px; color: #888;">Version Animflix : v${data.version || '1.1.0'}</div>
         `;
+
+        const activeMirrorLabel = document.getElementById('activeNyaaMirrorLabel');
+        if (activeMirrorLabel && data.nyaaUrl) {
+            activeMirrorLabel.textContent = data.nyaaUrl;
+        }
     } catch (e) {
         content.innerHTML = `<span style="color: #ff4757;">⚠️ Erreur récupération état serveur</span>`;
+    }
+}
+
+// --- GESTION DES SOURCES TORRENT (RÉSILIENCE & TORZNAB) ---
+async function loadTorrentSettings() {
+    try {
+        const res = await fetch('/api/torrent/settings');
+        const data = await res.json();
+        const modeEl = document.getElementById('prefTorrentSourceMode');
+        const urlEl = document.getElementById('prefTorznabUrl');
+        const keyEl = document.getElementById('prefTorznabApiKey');
+
+        if (modeEl && data.mode) modeEl.value = data.mode;
+        if (urlEl) urlEl.value = data.torznabUrl || '';
+        if (keyEl) {
+            keyEl.value = data.hasTorznabApiKey ? '********' : '';
+        }
+    } catch (e) {
+        console.warn('Impossible de charger les paramètres torrents:', e);
+    }
+}
+
+async function saveTorrentSourceSettings() {
+    const mode = document.getElementById('prefTorrentSourceMode')?.value;
+    const torznabUrl = document.getElementById('prefTorznabUrl')?.value;
+    const torznabApiKey = document.getElementById('prefTorznabApiKey')?.value;
+
+    try {
+        await fetch('/api/torrent/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode, torznabUrl, torznabApiKey })
+        });
+        showToast("💾 Paramètres torrents enregistrés !");
+        fetchServerStatus();
+    } catch (e) {
+        showToast("⚠️ Échec enregistrement torrents", { isError: true });
+    }
+}
+
+async function testTorznabUI() {
+    const statusEl = document.getElementById('torznabTestStatus');
+    const url = document.getElementById('prefTorznabUrl')?.value?.trim();
+    const apiKey = document.getElementById('prefTorznabApiKey')?.value?.trim();
+
+    if (!url) {
+        if (statusEl) {
+            statusEl.innerHTML = `<span style="color: #ff4757;">⚠️ Renseignez d'abord l'URL Torznab.</span>`;
+        }
+        return;
+    }
+
+    if (statusEl) {
+        statusEl.innerHTML = `<span style="color: #ffa033;">⏳ Test de connexion en cours...</span>`;
+    }
+
+    try {
+        const res = await fetch('/api/torrent/test-torznab', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, apiKey })
+        });
+        const data = await res.json();
+        if (data.success) {
+            statusEl.innerHTML = `<span style="color: #46d369; font-weight: bold;">✅ ${escapeHtml(data.message)}</span>`;
+        } else {
+            statusEl.innerHTML = `<span style="color: #ff4757;">❌ ${escapeHtml(data.message)}</span>`;
+        }
+    } catch (e) {
+        if (statusEl) {
+            statusEl.innerHTML = `<span style="color: #ff4757;">❌ Erreur réseau : ${escapeHtml(e.message)}</span>`;
+        }
+    }
+}
+
+async function testNyaaMirrorsUI() {
+    const listEl = document.getElementById('nyaaMirrorsList');
+    if (!listEl) return;
+    listEl.innerHTML = `⏳ Test des miroirs en cours (latence & disponibilité)...`;
+
+    try {
+        const res = await fetch('/api/torrent/mirrors');
+        const mirrors = await res.json();
+        if (!Array.isArray(mirrors) || mirrors.length === 0) {
+            listEl.innerHTML = `<span style="color: #ff4757;">Aucun miroir joignable.</span>`;
+            return;
+        }
+
+        let html = '<div style="display: flex; flex-direction: column; gap: 4px;">';
+        mirrors.forEach(m => {
+            const badge = m.ok 
+                ? `<span style="color: #46d369; font-weight: bold;">● En ligne (${m.latencyMs}ms)</span>`
+                : `<span style="color: #ff4757;">● Hors ligne (${m.error || 'Erreur'})</span>`;
+            const currentBadge = m.isCurrent ? ` <span style="background: rgba(70,211,105,0.2); color:#46d369; padding:1px 5px; border-radius:3px; font-size:10px;">Actif</span>` : '';
+            html += `<div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>${escapeHtml(m.url)}${currentBadge}</span>
+                <span>${badge}</span>
+            </div>`;
+        });
+        html += '</div>';
+        listEl.innerHTML = html;
+    } catch (e) {
+        listEl.innerHTML = `<span style="color: #ff4757;">⚠️ Erreur test miroirs : ${escapeHtml(e.message)}</span>`;
     }
 }
 
@@ -515,6 +630,7 @@ function toggleSettingsModal() {
         closeSettingsModal();
     } else {
         loadUserSettings();
+        loadTorrentSettings();
         fetchServerStatus();
         modal.style.display = 'flex';
     }
@@ -529,6 +645,10 @@ window.toggleSettingsModal = toggleSettingsModal;
 window.closeSettingsModal = closeSettingsModal;
 window.saveUserSettings = saveUserSettings;
 window.loadUserSettings = loadUserSettings;
+window.loadTorrentSettings = loadTorrentSettings;
+window.saveTorrentSourceSettings = saveTorrentSourceSettings;
+window.testTorznabUI = testTorznabUI;
+window.testNyaaMirrorsUI = testNyaaMirrorsUI;
 window.renderSettingsProfiles = renderSettingsProfiles;
 window.selectProfileAvatar = selectProfileAvatar;
 window.openAddProfileModal = openAddProfileModal;

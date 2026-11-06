@@ -5,6 +5,7 @@ import { getServerNetworkIps } from '../utils/network.js';
 import { isTorrserverOnline } from '../services/torrserverService.js';
 import { getCurrentNyaaUrl } from '../services/nyaaService.js';
 import { getDetectedHwAccel, getVaapiDevice } from '../services/ffmpegService.js';
+import { getTorrentSourcesStatus } from '../services/torrentAggregator.js';
 import { APP_VERSION, renderVersioned } from '../utils/assetVersion.js';
 
 const router = Router();
@@ -42,6 +43,7 @@ router.get('/api/server/status', async (req, res) => {
     vaapiDevice: getVaapiDevice(),
     torrserverOnline,
     nyaaUrl: getCurrentNyaaUrl(),
+    torrentSources: getTorrentSourcesStatus(),
     lanIp,
     tailscaleIp,
     port: PORT

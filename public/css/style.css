@@ -200,6 +200,10 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        .badge-tag-source {
+            color: #38bdf8;
+            border-color: rgba(56, 189, 248, 0.45);
+        }
 
         .card-info { 
             padding: 14px 14px 12px; 

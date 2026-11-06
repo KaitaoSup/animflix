@@ -888,6 +888,61 @@
                   </label>
               </div>
 
+              <!-- Sources Torrent & Résilience (Multi-sources) -->
+              <div class="settings-group" style="border-top: 1px solid #333; padding-top: 14px; margin-top: 14px;">
+                  <div style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                      <span>🌐 Sources Torrent & Résilience</span>
+                  </div>
+                  <label class="settings-label">
+                      <span>Stratégie de recherche multi-sources :</span>
+                      <select id="prefTorrentSourceMode" class="settings-select" onchange="saveTorrentSourceSettings()">
+                          <option value="resilient">🌐 Cascade résiliente (Nyaa + Repli Auto TokyoTosho / Torznab - Recommandé)</option>
+                          <option value="aggregate">⚡ Agrégation multi-sources (Recherche simultanée combinée)</option>
+                          <option value="nyaa_only">Nyaa.si uniquement</option>
+                      </select>
+                  </label>
+                  <div style="font-size: 11px; color: #888; margin-top: 4px; line-height: 1.4;">
+                      Bascule automatiquement sur Tokyo Toshokan si Nyaa est bloqué ou ne renvoie aucun résultat.
+                  </div>
+              </div>
+
+              <!-- Miroirs Nyaa -->
+              <div class="settings-group">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                      <span style="font-size: 12px; font-weight: 600; color: #ccc;">Miroirs Nyaa.si disponibles :</span>
+                      <button type="button" class="btn-sub-style" style="padding: 3px 8px; font-size: 11px;" onclick="testNyaaMirrorsUI()">
+                          🔄 Tester les miroirs
+                      </button>
+                  </div>
+                  <div id="nyaaMirrorsList" style="font-size: 11px; color: #aaa; background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; border: 1px solid #282828;">
+                      Miroir actif : <span id="activeNyaaMirrorLabel" style="color: #46d369; font-weight: bold;">Chargement...</span>
+                  </div>
+              </div>
+
+              <!-- Torznab (Jackett / Prowlarr) -->
+              <div class="settings-group">
+                  <div style="font-size: 13px; font-weight: 600; color: #ddd; margin-bottom: 4px;">
+                      🔌 Indexeur Torznab (Jackett / Prowlarr) — <i>Optionnel</i>
+                  </div>
+                  <div style="font-size: 11px; color: #888; margin-bottom: 8px;">
+                      Idéal pour les releases VF et trackers privés francophones (Sharewood, YggTorrent, etc.).
+                  </div>
+                  <label class="settings-label" style="margin-bottom: 8px;">
+                      <span>URL API Torznab :</span>
+                      <input type="text" id="prefTorznabUrl" class="settings-select" placeholder="ex: http://192.168.1.50:9696/1/api ou http://localhost:9117/api/v2.0/indexers/all/results/torznab" autocomplete="off" spellcheck="false" onchange="saveTorrentSourceSettings()">
+                  </label>
+                  <label class="settings-label" style="margin-bottom: 8px;">
+                      <span>Clé API Torznab :</span>
+                      <input type="password" id="prefTorznabApiKey" class="settings-select" placeholder="Clé API Jackett ou Prowlarr" autocomplete="new-password" onchange="saveTorrentSourceSettings()">
+                  </label>
+                  <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px;">
+                      <button type="button" class="btn-sub-style" style="padding: 5px 12px; font-size: 12px;" onclick="testTorznabUI()">
+                          🔌 Tester la connexion
+                      </button>
+                      <span id="torznabTestStatus" style="font-size: 12px;"></span>
+                  </div>
+              </div>
+
               <!-- Informations Système & Serveur -->
               <div class="settings-server-info" id="settingsServerInfo">
                   <div class="settings-server-title">🖥️ Statut Serveur & Décodeur</div>

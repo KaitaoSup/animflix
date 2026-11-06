@@ -591,6 +591,7 @@
                             <span class="badge-tag-mini">${escapeHtml(resolution)}</span>
                             <span class="badge-tag-mini badge-tag-audio">${audioLang.includes('MULTI') ? 'MULTI' : (audioLang.includes('VF') ? 'VF' : 'VOSTFR')}</span>
                             ${isPreferredGroup ? `<span class="badge-tag-mini badge-tag-preferred" title="Groupe de release préféré">💜 ${escapeHtml(extractReleaseGroup(t.titre))}</span>` : ''}
+                            ${t.source && t.source !== 'nyaa' ? `<span class="badge-tag-mini badge-tag-source" title="Source: ${escapeHtml(t.source)}">🌐 ${escapeHtml(t.source === 'tokyotosho' ? 'TokyoTosho' : 'Torznab')}</span>` : ''}
                         </div>
                         ${highlightBadgeHtml}
                     </div>

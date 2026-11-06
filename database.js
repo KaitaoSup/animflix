@@ -44,6 +44,12 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS server_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
   CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
   CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 `);
@@ -252,6 +258,52 @@ export function cleanupExpiredSessions() {
   db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now);
 }
 
+/**
+ * Récupère un paramètre serveur persistant
+ */
+export function getServerSetting(key, defaultValue = null) {
+  try {
+    const row = db.prepare('SELECT value FROM server_settings WHERE key = ?').get(key);
+    return row && row.value !== undefined ? row.value : defaultValue;
+  } catch (e) {
+    return defaultValue;
+  }
+}
+
+/**
+ * Enregistre ou met à jour un paramètre serveur persistant
+ */
+export function setServerSetting(key, value) {
+  try {
+    const stmt = db.prepare(`
+      INSERT INTO server_settings (key, value, updated_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        updated_at = CURRENT_TIMESTAMP
+    `);
+    stmt.run(key, String(value));
+    return true;
+  } catch (e) {
+    console.error('Erreur enregistrement paramètre serveur:', e.message);
+    return false;
+  }
+}
+
+/**
+ * Récupère tous les paramètres serveur
+ */
+export function getAllServerSettings() {
+  try {
+    const rows = db.prepare('SELECT key, value FROM server_settings').all();
+    const map = {};
+    for (const r of rows) map[r.key] = r.value;
+    return map;
+  } catch (e) {
+    return {};
+  }
+}
+
 export default {
   db,
   hashPassword,
@@ -265,5 +317,8 @@ export default {
   createSession,
   getSessionUser,
   deleteSession,
-  cleanupExpiredSessions
+  cleanupExpiredSessions,
+  getServerSetting,
+  setServerSetting,
+  getAllServerSettings
 };

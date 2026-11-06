@@ -14,6 +14,12 @@ export const NYAA_FALLBACK_URLS = [
   'https://nyaa.land'
 ].filter((v, i, a) => a.indexOf(v) === i);
 
+// --- SOURCES TORRENT ALTERNATIVES & TORZNAB (JACKETT / PROWLARR) ---
+export const TOKYO_TOSHO_URL = (process.env.TOKYO_TOSHO_URL || 'https://www.tokyotosho.info').replace(/\/+$/, '');
+export const TORZNAB_DEFAULT_URL = (process.env.TORZNAB_URL || '').replace(/\/+$/, '');
+export const TORZNAB_DEFAULT_API_KEY = process.env.TORZNAB_API_KEY || '';
+export const TORRENT_SOURCE_DEFAULT_MODE = process.env.TORRENT_SOURCE_MODE || 'resilient'; // 'resilient' | 'aggregate' | 'nyaa_only'
+
 // --- ACCELERATION MATERIELLE VAAPI ---
 export const VAAPI_DEVICE = process.env.VAAPI_DEVICE || '/dev/dri/renderD128';
 export const FFMPEG_HWACCEL_PREF = (process.env.FFMPEG_HWACCEL || 'auto').toLowerCase();
