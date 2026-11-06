@@ -92,7 +92,7 @@
                 localStorage.setItem('anilist_token', token);
                 history.replaceState(null, '', window.location.pathname + window.location.search);
                 if (typeof linkAnilistToAnimflix === 'function' && window.currentAnimflixUser) {
-                    linkAnilistToAnimflix(token, true);
+                    linkAnilistToAnimflix(token, true).catch(() => {});
                 } else {
                     showToast("🎉 Connecté avec succès à AniList !");
                 }

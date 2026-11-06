@@ -508,13 +508,10 @@ function searchFavoriteAnime(searchTitle) {
 
 function getActiveHomeTab() {
     const saved = localStorage.getItem(STORAGE_KEY_HOME_TAB);
-    const token = localStorage.getItem('anilist_token');
-    const hasAnilist = !!(token && typeof currentAnilistUser !== 'undefined' && currentAnilistUser);
 
+    // L'onglet 'anilist' reste valide hors connexion : il affiche alors l'écran
+    // « Connexion AniList » (renderLoggedOutHomeHtml) au lieu de renvoyer à l'accueil.
     if (saved && (saved === 'home' || saved === 'anilist' || saved === 'history' || saved === 'favorites' || saved === 'discover' || saved === 'schedule')) {
-        if (saved === 'anilist' && !hasAnilist) {
-            return 'home';
-        }
         return saved;
     }
 

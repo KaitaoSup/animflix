@@ -11,6 +11,12 @@
         const savedUser = localStorage.getItem('anilist_user');
         if (savedUser) currentAnilistUser = JSON.parse(savedUser);
     } catch(e) {}
+    // Exposé pour auth.js (les `let` globaux ne sont pas des propriétés de window)
+    Object.defineProperty(window, 'currentAnilistUser', {
+        configurable: true,
+        get: () => currentAnilistUser,
+        set: (v) => { currentAnilistUser = v; }
+    });
     let anilistWatchingList = [];
     try {
         const savedWatching = localStorage.getItem('anilist_watching_cache');

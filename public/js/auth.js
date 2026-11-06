@@ -527,7 +527,13 @@ function renderUserAccountNav() {
 }
 
 // Exposer globalement pour l'interopérabilité
-window.currentAnimflixUser = currentAnimflixUser;
+// Accesseur vivant : une simple copie figerait la valeur initiale (null) et
+// session.js ne verrait jamais l'utilisateur connecté (liaison AniList ignorée).
+Object.defineProperty(window, 'currentAnimflixUser', {
+    configurable: true,
+    get: () => currentAnimflixUser,
+    set: (v) => { currentAnimflixUser = v; }
+});
 window.initAnimflixAuth = initAnimflixAuth;
 window.loginAnimflix = loginAnimflix;
 window.registerAnimflix = registerAnimflix;
