@@ -182,8 +182,11 @@ router.post('/api/auth/login', (req, res) => {
   }
 
   const user = getUserByUsername(username);
-  if (!user || !verifyPassword(password, user.password_hash, user.salt)) {
-    return res.status(401).json({ error: "Identifiant ou mot de passe incorrect." });
+  if (!user) {
+    return res.status(401).json({ error: "Utilisateur introuvable.", field: 'username' });
+  }
+  if (!verifyPassword(password, user.password_hash, user.salt)) {
+    return res.status(401).json({ error: "Mot de passe erroné.", field: 'password' });
   }
 
   const session = createSession(user.id);

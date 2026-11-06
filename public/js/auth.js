@@ -90,10 +90,43 @@ async function tryAutoLinkExistingAnilist(localToken) {
     }
 }
 
+// Message d'erreur affiché directement dans la modale de connexion
+// (le toast est masqué derrière la modale)
+function showAuthError(message, field) {
+    const box = document.getElementById('authErrorMessage');
+    if (box) {
+        box.innerText = "❌ " + message;
+        box.style.display = 'block';
+    } else if (typeof showToast === 'function') {
+        showToast("❌ " + message);
+    }
+    const input = field === 'username'
+        ? document.getElementById('authUsernameInput')
+        : field === 'password' ? document.getElementById('authPasswordInput') : null;
+    if (input) {
+        input.style.borderColor = '#e50914';
+        input.focus();
+        if (field === 'password') input.select();
+    }
+}
+
+function clearAuthError() {
+    const box = document.getElementById('authErrorMessage');
+    if (box) {
+        box.innerText = '';
+        box.style.display = 'none';
+    }
+    ['authUsernameInput', 'authPasswordInput'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.borderColor = '';
+    });
+}
+
 // Connexion à un compte Animflix
 async function loginAnimflix(username, password) {
+    clearAuthError();
     if (!username || !password) {
-        if (typeof showToast === 'function') showToast("⚠️ Veuillez renseigner votre identifiant et mot de passe.");
+        showAuthError("Veuillez renseigner votre identifiant et mot de passe.");
         return;
     }
 
@@ -107,7 +140,8 @@ async function loginAnimflix(username, password) {
         const data = await res.json();
 
         if (!res.ok || !data.success) {
-            throw new Error(data.error || "Identifiant ou mot de passe incorrect.");
+            showAuthError(data.error || "Identifiant ou mot de passe incorrect.", data.field);
+            return;
         }
 
         if (data.sessionToken) {
@@ -146,14 +180,15 @@ async function loginAnimflix(username, password) {
             loadAnilistWatchingList(true);
         }
     } catch (err) {
-        showToast("❌ " + err.message);
+        showAuthError(err.message);
     }
 }
 
 // Inscription d'un nouveau compte Animflix
 async function registerAnimflix(username, password, linkLocalAnilist = true) {
+    clearAuthError();
     if (!username || !password) {
-        if (typeof showToast === 'function') showToast("⚠️ Remplissez tous les champs obligatoires.");
+        showAuthError("Remplissez tous les champs obligatoires.");
         return;
     }
 
@@ -210,7 +245,7 @@ async function registerAnimflix(username, password, linkLocalAnilist = true) {
             loadAnilistWatchingList(true);
         }
     } catch (err) {
-        showToast("❌ " + err.message);
+        showAuthError(err.message);
     }
 }
 
@@ -362,6 +397,7 @@ function closeAnimflixAuthModal() {
 
 function switchAnimflixAuthTab(tab) {
     currentAuthTab = tab;
+    clearAuthError();
     const tabLogin = document.getElementById('tabAuthLogin');
     const tabRegister = document.getElementById('tabAuthRegister');
     const title = document.getElementById('animflixAuthModalTitle');
