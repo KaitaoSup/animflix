@@ -285,6 +285,9 @@
                     <span>❤️ Favoris</span>
                     ${favCount > 0 ? `<span class="home-tab-badge">${favCount}</span>` : ''}
                 </button>
+                <button class="home-tab-btn ${activeTab === 'stats' ? 'active' : ''}" onclick="switchHomeTab('stats')">
+                    <span>📊 Stats</span>
+                </button>
                 ${!hasAnilist ? `
                     <button class="home-tab-btn ${activeTab === 'anilist' ? 'active' : ''}" onclick="switchHomeTab('anilist')" style="margin-left: auto;">
                         <span>☁️ Connexion AniList</span>
@@ -308,6 +311,8 @@
             renderHistoryTabHtml(tabContent);
         } else if (activeTab === 'favorites' && typeof renderFavoritesTabHtml === 'function') {
             renderFavoritesTabHtml(tabContent);
+        } else if (activeTab === 'stats' && typeof renderStatsTabHtml === 'function') {
+            renderStatsTabHtml(tabContent);
         } else {
             // Tab anilist
             if (hasAnilist) {

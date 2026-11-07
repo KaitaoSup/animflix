@@ -71,6 +71,11 @@
             updateAniSkipButton(effectiveTime);
         }
 
+        // Statistiques personnelles : temps réellement regardé et épisodes terminés
+        if (!isScrubbing && typeof recordWatchTick === 'function') {
+            recordWatchTick(effectiveTime, totalDur);
+        }
+
         // Vérification de fin d'épisode pour l'enchaînement automatique (Binge-Watching)
         if (!isScrubbing && typeof checkAutoPlayNextEpisode === 'function') {
             checkAutoPlayNextEpisode(effectiveTime, totalDur);

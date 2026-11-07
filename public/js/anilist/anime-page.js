@@ -60,6 +60,17 @@
                             node { id type format status title { userPreferred english romaji } coverImage { medium large } }
                         }
                     }
+                    recommendations(sort: [RATING_DESC], perPage: 16) {
+                        nodes {
+                            rating
+                            mediaRecommendation {
+                                id type format status isAdult genres averageScore
+                                title { userPreferred english romaji }
+                                coverImage { medium large }
+                                ${token ? 'mediaListEntry { status }' : ''}
+                            }
+                        }
+                    }
                     ${token ? 'mediaListEntry { id status progress }' : ''}
                 }
             }
@@ -391,6 +402,8 @@
     const STATUS_LABELS = { FINISHED: 'Terminé', RELEASING: 'En cours de diffusion', NOT_YET_RELEASED: 'À venir', CANCELLED: 'Annulé', HIATUS: 'En pause' };
     const SEASON_LABELS = { WINTER: 'Hiver', SPRING: 'Printemps', SUMMER: 'Été', FALL: 'Automne' };
     const RELATION_LABELS = { PREQUEL: 'Préquelle', SEQUEL: 'Suite', PARENT: 'Série principale', SIDE_STORY: 'Histoire parallèle' };
+    const LIST_STATUS_LABELS = { COMPLETED: '✓ Vu', CURRENT: '▶ En cours', REPEATING: '▶ En cours', PAUSED: '⏸ En pause', PLANNING: '🔖 Prévu', DROPPED: 'Abandonné' };
+    const RECOMMENDATIONS_SHOWN = 10;
 
     function renderAnimePageSkeleton(container) {
         container.innerHTML = `
@@ -526,6 +539,57 @@
             </section>`;
     }
 
+    /**
+     * Recommandations AniList (« Si vous avez aimé… ») : les mieux notées par la communauté.
+     * Exclues : l'anime lui-même, ses saisons (déjà dans « Dans la même série »), le 18+ sauf
+     * préférence contraire, les animes pas encore sortis et les recommandations sans vote positif.
+     */
+    function pickRecommendations(media, showAdult) {
+        const related = new Set([media.id, ...(media.relations?.edges || []).map(e => e.node?.id)]);
+        const seen = new Set();
+        return (media.recommendations?.nodes || [])
+            .filter(n => {
+                const m = n?.mediaRecommendation;
+                if (!m || m.type !== 'ANIME' || !(n.rating > 0)) return false;
+                if (related.has(m.id) || seen.has(m.id)) return false;
+                if (m.status === 'NOT_YET_RELEASED') return false;
+                const adult = m.isAdult === true || (Array.isArray(m.genres) && m.genres.includes('Hentai'));
+                if (adult && !showAdult) return false;
+                seen.add(m.id);
+                return true;
+            })
+            .slice(0, RECOMMENDATIONS_SHOWN)
+            .map(n => n.mediaRecommendation);
+    }
+
+    function renderRecommendations(media) {
+        const showAdult = typeof getShowNsfwPreference === 'function' && getShowNsfwPreference();
+        const recs = pickRecommendations(media, showAdult);
+        if (!recs.length) return '';
+        return `
+            <section class="anime-section">
+                <h2 class="anime-section-title">Si vous avez aimé ${escapeHtml(animeDisplayTitle(media))}…</h2>
+                <div class="anime-relations">
+                    ${recs.map(m => {
+                        const t = m.title?.english || m.title?.userPreferred || m.title?.romaji || 'Anime';
+                        const cover = m.coverImage?.large || m.coverImage?.medium || posterFallback(t);
+                        const listStatus = LIST_STATUS_LABELS[m.mediaListEntry?.status];
+                        const meta = [m.averageScore ? `⭐ ${(m.averageScore / 10).toFixed(1)}` : '', m.format ? (FORMAT_LABELS[m.format] || m.format) : '']
+                            .filter(Boolean).join(' · ');
+                        return `
+                            <button type="button" class="anime-relation-card" onclick="openAnimePage(${Number(m.id)})">
+                                <span class="anime-relation-cover">
+                                    <img src="${escapeHtml(cover)}" alt="" loading="lazy" ${posterOnErrorAttr(t)}>
+                                    ${listStatus ? `<span class="anime-rec-list-status">${escapeHtml(listStatus)}</span>` : ''}
+                                </span>
+                                ${meta ? `<span class="anime-relation-type anime-rec-meta">${escapeHtml(meta)}</span>` : ''}
+                                <span class="anime-relation-title">${escapeHtml(t)}</span>
+                            </button>`;
+                    }).join('')}
+                </div>
+            </section>`;
+    }
+
     function renderAnimeSourceStatus(forceState) {
         const el = document.getElementById('animeSourceStatus');
         if (!el) return;
@@ -633,6 +697,8 @@
                 </section>
 
                 ${renderRelations(media)}
+
+                ${renderRecommendations(media)}
             </div>`;
 
         renderAnimeSourceStatus();
@@ -993,3 +1059,4 @@
     window.toggleAnimePageFavorite = toggleAnimePageFavorite;
     window.renderSearchAnimeMatches = renderSearchAnimeMatches;
     window.pickTorrentForEpisode = pickTorrentForEpisode;
+    window.pickRecommendations = pickRecommendations;

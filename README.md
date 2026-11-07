@@ -55,6 +55,7 @@ Application web complète et moderne de streaming d'animes en direct à partir d
   - priorité à l'épisode seul, puis au pack d'épisodes, puis au pack de saison (le bon fichier est sélectionné dans le pack) ;
   - classement selon les **préférences de release** (groupe, résolution), puis les seeders ;
   - recherche ciblée (`Titre 05`, `Titre S01E05`) si rien ne correspond ; en dernier recours, ouverture de la liste brute.
+- **« Si vous avez aimé… »** : jusqu'à 10 recommandations AniList les mieux notées par la communauté (hors saisons de la même série, animes à venir et 18+ sauf préférence contraire), avec l'état dans votre liste AniList (✓ Vu, ▶ En cours, 🔖 Prévu).
 - **« 📋 Choisir la source »** : accès à la liste complète des torrents pour choisir manuellement.
 - **Recherche texte** : les fiches AniList correspondantes sont proposées au-dessus des résultats Nyaa.
 
@@ -107,6 +108,7 @@ Application web complète et moderne de streaming d'animes en direct à partir d
 - **Synchronisation AniList Bi-directionnelle** : Connexion OAuth sécurisée, synchronisation automatique de l'épisode visionné à 85% ou à la fin, affichage des animés en cours.
 - **Historique Local & Reprise** : Mémorisation exacte de la position de lecture à la seconde près dans `localStorage`, avec bannière de reprise automatique.
 - **Favoris Locaux Hors Ligne** : Sauvegarde d'animes favoris accessible sans compte tiers.
+- **📊 Statistiques personnelles** (`#/stats`, par profil) : temps réellement regardé (total, 7 et 30 jours), épisodes terminés (à 85 %), série de jours consécutifs (en cours et record), activité des 30 derniers jours, animes et genres les plus regardés. Comptées à partir de leur installation et synchronisées entre appareils pour un compte connecté ; avec AniList lié, les statistiques de tout l'historique AniList s'y ajoutent (animes, épisodes, jours de visionnage, note moyenne, genres).
 - **🔒 Protection anti brute-force de la connexion** : 5 essais par compte (20 par adresse IP), puis blocage temporaire qui double à chaque nouvel échec (1, 2, 4, 8 puis 15 min max). Pendant le blocage, même le bon mot de passe est refusé ; le compteur s'efface après une connexion réussie ou 15 min sans échec. Derrière un proxy local (Tailscale Funnel, nginx), l'IP réelle est lue dans `X-Forwarded-For`.
 - **🔔 Notifications de nouveaux épisodes (Web Push)** : *Paramètres ⚙️ → Notifications*, avec un compte Animflix lié à AniList. Toutes les 15 min, le serveur regarde les épisodes diffusés de votre liste « En cours » et cherche une source torrent dans la langue de recherche par défaut :
   - source trouvée → « Épisode N disponible » ; toujours rien 6 h après la diffusion → « Épisode N sorti » ;

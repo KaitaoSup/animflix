@@ -126,8 +126,13 @@ function getSyncCollection(ns) {
             }
         };
     }
-    const m = /^(history|favorites):([A-Za-z0-9_-]{1,64})$/.exec(ns);
+    const m = /^(history|favorites|stats):([A-Za-z0-9_-]{1,64})$/.exec(ns);
     if (!m) return null;
+    if (m[1] === 'stats') {
+        // Journal du temps regardé (stats.js) : une entrée par jour × appareil × anime
+        if (typeof statsStorageKeyFor !== 'function') return null;
+        return arrayCollection(ns, statsStorageKeyFor(m[2]), e => e.key, list => trimWatchStats(list));
+    }
     if (m[1] === 'history') {
         return arrayCollection(ns, historyStorageKeyFor(m[2]), h => h.key,
             list => list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 50));
@@ -143,6 +148,7 @@ function listSyncNamespaces(state) {
         if (/^[A-Za-z0-9_-]{1,64}$/.test(p.id)) {
             set.add(`history:${p.id}`);
             set.add(`favorites:${p.id}`);
+            set.add(`stats:${p.id}`);
         }
     });
     Object.keys(state.shadow).forEach(ns => set.add(ns));
@@ -286,6 +292,10 @@ function refreshUiAfterSync(touched) {
     if (affectsActive && typeof renderHomeScreen === 'function') {
         const tab = typeof getActiveHomeTab === 'function' ? getActiveHomeTab() : 'home';
         if (tab === 'home' || tab === 'history' || tab === 'favorites') renderHomeScreen();
+    }
+    if (touched.has(`stats:${active}`) && typeof getActiveHomeTab === 'function' && getActiveHomeTab() === 'stats'
+        && typeof renderHomeScreen === 'function') {
+        renderHomeScreen();
     }
 }
 

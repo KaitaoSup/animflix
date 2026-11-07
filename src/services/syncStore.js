@@ -19,8 +19,8 @@ export const SYNC_LIMITS = {
   TOMBSTONE_MAX_AGE_MS: 90 * 24 * 60 * 60 * 1000
 };
 
-// 'profiles', 'prefs', 'history:<idProfil>', 'favorites:<idProfil>'
-const NAMESPACE_RE = /^(?:profiles|prefs|(?:history|favorites):[A-Za-z0-9_-]{1,64})$/;
+// 'profiles', 'prefs', 'history:<idProfil>', 'favorites:<idProfil>', 'stats:<idProfil>'
+const NAMESPACE_RE = /^(?:profiles|prefs|(?:history|favorites|stats):[A-Za-z0-9_-]{1,64})$/;
 
 export function isValidNamespace(ns) {
   return typeof ns === 'string' && NAMESPACE_RE.test(ns);

@@ -152,3 +152,45 @@ describe('Routeur', () => {
     assert.deepEqual(replaced, ['/']);
   });
 });
+
+describe('Fiche anime — recommandations « Si vous avez aimé… »', () => {
+  const rec = (id, rating, extra = {}) => ({ rating, mediaRecommendation: { id, type: 'ANIME', status: 'FINISHED', isAdult: false, genres: ['Drama'], ...extra } });
+  const media = {
+    id: 1,
+    relations: { edges: [{ relationType: 'SEQUEL', node: { id: 2 } }] },
+    recommendations: {
+      nodes: [
+        rec(10, 120),
+        rec(1, 90),                                   // l'anime lui-même
+        rec(2, 80),                                   // sa suite : déjà dans « Dans la même série »
+        rec(11, 0),                                   // aucun vote positif
+        rec(12, 50, { isAdult: true }),
+        rec(13, 40, { genres: ['Hentai'] }),
+        rec(14, 30, { status: 'NOT_YET_RELEASED' }),
+        rec(15, 20, { type: 'MANGA' }),
+        rec(10, 10),                                  // doublon
+        rec(16, 5),
+        { rating: 3, mediaRecommendation: null }      // recommandation supprimée sur AniList
+      ]
+    }
+  };
+
+  test('écarte l\'anime, sa série, le 18+, les doublons et les animes à venir', () => {
+    const ctx = loadAnimePage();
+    const ids = ctx.window.pickRecommendations(media, false).map(m => m.id);
+    assert.deepEqual([...ids], [10, 16]);
+  });
+
+  test('18+ affiché si la préférence l\'autorise', () => {
+    const ctx = loadAnimePage();
+    const ids = ctx.window.pickRecommendations(media, true).map(m => m.id);
+    assert.deepEqual([...ids], [10, 12, 13, 16]);
+  });
+
+  test('au plus 10 recommandations, sans données : aucune', () => {
+    const ctx = loadAnimePage();
+    const many = { id: 1, recommendations: { nodes: Array.from({ length: 16 }, (_, i) => rec(100 + i, 50)) } };
+    assert.equal(ctx.window.pickRecommendations(many, false).length, 10);
+    assert.equal(ctx.window.pickRecommendations({ id: 1 }, false).length, 0);
+  });
+});

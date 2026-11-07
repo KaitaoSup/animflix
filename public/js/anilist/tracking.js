@@ -27,6 +27,7 @@
                             episodes
                             status
                             format
+                            genres
                             siteUrl
                             coverImage { large medium }
                             ${token ? 'mediaListEntry { id status progress score }' : ''}
@@ -44,6 +45,7 @@
                             episodes
                             status
                             format
+                            genres
                             siteUrl
                             coverImage { large medium }
                             ${token ? 'mediaListEntry { id status progress score }' : ''}
