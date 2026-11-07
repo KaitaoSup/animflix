@@ -11,8 +11,20 @@ import {
   unlinkUserAnilist,
   sanitizeUser
 } from '../../database.js';
+import { createLoginLimiter, getClientIp, formatLockDelay } from '../utils/loginLimiter.js';
 
 const router = Router();
+
+// Anti brute-force sur /api/auth/login (par compte visé et par adresse IP)
+export const loginLimiter = createLoginLimiter();
+
+function sendTooManyAttempts(res, retryAfterMs) {
+  res.setHeader('Retry-After', String(Math.ceil(retryAfterMs / 1000)));
+  return res.status(429).json({
+    error: `Trop de tentatives de connexion. Réessayez dans ${formatLockDelay(retryAfterMs)}.`,
+    retryAfter: Math.ceil(retryAfterMs / 1000)
+  });
+}
 
 /**
  * Extraction des cookies depuis les en-têtes HTTP
@@ -176,19 +188,38 @@ router.post('/api/auth/register', async (req, res) => {
  * Connexion d'un utilisateur existant
  */
 router.post('/api/auth/login', (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
+  const { username, password } = req.body || {};
+  if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
     return res.status(400).json({ error: "Nom d'utilisateur et mot de passe requis." });
   }
 
-  const user = getUserByUsername(username);
-  if (!user) {
-    return res.status(401).json({ error: "Utilisateur introuvable.", field: 'username' });
-  }
-  if (!verifyPassword(password, user.password_hash, user.salt)) {
-    return res.status(401).json({ error: "Mot de passe erroné.", field: 'password' });
+  // Les noms d'utilisateur ne tiennent pas compte de la casse (COLLATE NOCASE) : le compteur non plus
+  const userKey = 'user:' + username.trim().toLowerCase();
+  const limiterKeys = [userKey, 'ip:' + getClientIp(req)];
+  const gate = loginLimiter.check(limiterKeys);
+  if (!gate.allowed) {
+    return sendTooManyAttempts(res, gate.retryAfterMs);
   }
 
+  const user = getUserByUsername(username);
+  const failure = !user ? { error: "Utilisateur introuvable.", field: 'username' }
+    : !verifyPassword(password, user.password_hash, user.salt) ? { error: "Mot de passe erroné.", field: 'password' }
+    : null;
+
+  if (failure) {
+    const result = loginLimiter.recordFailure(limiterKeys);
+    if (result.lockedMs) {
+      console.warn(`🔒 Connexion bloquée ${formatLockDelay(result.lockedMs)} (compte « ${username.trim().slice(0, 64)} », IP ${getClientIp(req)})`);
+      return sendTooManyAttempts(res, result.lockedMs);
+    }
+    if (result.remaining <= 2) {
+      const s = result.remaining > 1 ? 's' : '';
+      failure.error += ` Encore ${result.remaining} essai${s} avant un blocage temporaire.`;
+    }
+    return res.status(401).json(failure);
+  }
+
+  loginLimiter.recordSuccess(userKey);
   const session = createSession(user.id);
   setSessionCookie(res, session.token);
 
