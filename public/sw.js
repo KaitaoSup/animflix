@@ -6,8 +6,12 @@
 // toute modification du front change le service worker, qui purge alors l'ancien cache.
 const CACHE_NAME = 'animflix-shell-{{ASSET_VERSION}}';
 
+// Page affichée quand le serveur est injoignable (PC éteint, Node arrêté → 502 de Tailscale Funnel)
+const OFFLINE_URL = '/offline.html';
+
 const PRECACHE_ASSETS = [
   '/',
+  '/offline.html',
   '/vendor/hls.min.js',
   '/css/style.css',
   '/css/player.css',
@@ -77,6 +81,28 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+const GATEWAY_ERROR_STATUSES = new Set([502, 503, 504]);
+
+// Page hors ligne depuis le cache (statut 503 pour que le navigateur ne la prenne pas pour la vraie page)
+async function offlineResponse() {
+  const cached = await caches.match(OFFLINE_URL);
+  if (cached) {
+    return new Response(cached.body, {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }
+    });
+  }
+  return new Response(
+    '<!DOCTYPE html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>Animflix – Serveur hors ligne</title>' +
+    '<body style="background:#141414;color:#fff;font-family:sans-serif;text-align:center;padding:60px 16px">' +
+    '<h1 style="color:#e50914">ANIMFLIX</h1><p>Le serveur Animflix est hors ligne.</p>' +
+    '<button onclick="location.reload()">Réessayer</button></body>',
+    { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+  );
+}
+
 // Interception des requêtes : Protection absolue des flux multimédias P2P & Streaming
 self.addEventListener('fetch', (event) => {
   const req = event.request;
@@ -105,18 +131,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Requêtes de navigation (HTML principal) : Réseau en priorité, repli sur le cache
+  // Sonde de disponibilité utilisée par offline.html : toujours réseau, jamais de cache
+  if (url.pathname === '/api/ping') return;
+
+  // 2. Requêtes de navigation (HTML principal) : Réseau en priorité, page hors ligne en secours
+  //    - échec réseau (PC éteint, Tailscale coupé) → offline.html
+  //    - 502/503/504 (Tailscale Funnel ne joint plus le serveur Node) → offline.html
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
         .then((networkRes) => {
-          if (networkRes && networkRes.status === 200) {
+          if (GATEWAY_ERROR_STATUSES.has(networkRes.status)) {
+            return offlineResponse();
+          }
+          if (networkRes.status === 200) {
             const resClone = networkRes.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
           }
           return networkRes;
         })
-        .catch(() => caches.match('/', { ignoreSearch: true }) || caches.match(req, { ignoreSearch: true }))
+        .catch(() => offlineResponse())
     );
     return;
   }

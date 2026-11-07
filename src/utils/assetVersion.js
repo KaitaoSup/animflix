@@ -7,7 +7,7 @@ const PACKAGE_JSON = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'packag
 export const APP_VERSION = PACKAGE_JSON.version;
 
 const VERSIONED_DIRS = ['js', 'css'];
-const VERSIONED_FILES = ['index.html', 'sw.js', 'manifest.json'];
+const VERSIONED_FILES = ['index.html', 'sw.js', 'manifest.json', 'offline.html'];
 
 function listFiles(publicDir) {
   const files = VERSIONED_FILES.map(f => path.join(publicDir, f)).filter(f => fs.existsSync(f));

@@ -32,6 +32,12 @@ router.get(['/', '/index.html'], (req, res) => {
   res.type('html').send(renderVersioned(path.join(PUBLIC_DIR, 'index.html'), PUBLIC_DIR));
 });
 
+// --- SONDE DE DISPONIBILITÉ (page hors ligne du service worker) ---
+router.get('/api/ping', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true });
+});
+
 // --- STATUT ET INFORMATIONS SYSTEME ---
 router.get('/api/server/status', async (req, res) => {
   const torrserverOnline = await isTorrserverOnline();

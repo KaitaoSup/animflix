@@ -48,6 +48,25 @@ describe('Ressources du front', () => {
   });
 });
 
+describe('Page hors ligne (service worker)', () => {
+  const offlineHtml = fs.readFileSync(path.join(PUBLIC_DIR, 'offline.html'), 'utf8');
+
+  test('offline.html est pré-cachée et utilisée par le service worker', () => {
+    assert.ok(precached.includes('/offline.html'));
+    assert.ok(swJs.includes("const OFFLINE_URL = '/offline.html'"));
+  });
+
+  test('offline.html est autonome (aucun script ni feuille de style externe)', () => {
+    assert.ok(!/<script[^>]+src=/i.test(offlineHtml));
+    assert.ok(!/<link[^>]+rel="stylesheet"/i.test(offlineHtml));
+    assert.ok(offlineHtml.includes('/api/ping'));
+  });
+
+  test('la sonde /api/ping n\'est jamais servie depuis le cache', () => {
+    assert.ok(swJs.includes("if (url.pathname === '/api/ping') return;"));
+  });
+});
+
 describe('getAssetVersion', () => {
   test('stable si rien ne change, différente dès qu\'un fichier du front change', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'animflix-assets-'));

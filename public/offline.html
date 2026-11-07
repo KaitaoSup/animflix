@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#141414">
+  <title>Animflix – Serveur hors ligne</title>
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <!-- Page servie par le service worker quand le serveur est injoignable :
+       tout doit rester autonome (CSS et JS en ligne, aucune dépendance réseau). -->
+  <style>
+    :root {
+      --primary: #e50914;
+      --primary-hover: #b80710;
+      --bg: #141414;
+      --card-bg: #1e1e1e;
+      --card-border: #2e2e2e;
+      --text: #ffffff;
+      --text-muted: #aaaaaa;
+      --accent-green: #46d369;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      text-align: center;
+    }
+    .logo {
+      color: var(--primary);
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      margin-bottom: 32px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 32px 28px;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #ff8a8a;
+      background: rgba(229, 9, 20, 0.1);
+      border: 1px solid rgba(229, 9, 20, 0.35);
+      border-radius: 999px;
+      padding: 5px 12px;
+      margin-bottom: 18px;
+    }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--primary);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    body.back-online .status { color: var(--accent-green); background: rgba(70, 211, 105, 0.1); border-color: rgba(70, 211, 105, 0.35); }
+    body.back-online .dot { background: var(--accent-green); }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    h1 { font-size: 22px; margin: 0 0 12px; }
+    p { color: var(--text-muted); font-size: 14.5px; line-height: 1.55; margin: 0 0 24px; }
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 11px 26px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--primary-hover); }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .hint { font-size: 12.5px; color: #777; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <div class="logo">ANIMFLIX</div>
+  <div class="card">
+    <div class="status"><span class="dot"></span><span id="statusText">Hors ligne</span></div>
+    <h1>Le serveur Animflix est hors ligne</h1>
+    <p>Le serveur ne répond pas pour le moment : il est peut-être éteint ou en cours de redémarrage.
+       Vérifiez aussi votre connexion internet.</p>
+    <button id="retryBtn" type="button">Réessayer</button>
+    <div class="hint" id="hint">Nouvelle vérification automatique toutes les 15 secondes.</div>
+  </div>
+
+  <script>
+    (function () {
+      var CHECK_INTERVAL_MS = 15000;
+      var retryBtn = document.getElementById('retryBtn');
+      var statusText = document.getElementById('statusText');
+      var hint = document.getElementById('hint');
+      var checking = false;
+
+      // /api/ping n'est jamais servi depuis le cache par le service worker :
+      // une réponse 200 prouve que le serveur Animflix répond vraiment.
+      function checkServer(manual) {
+        if (checking) return;
+        checking = true;
+        if (manual) {
+          retryBtn.disabled = true;
+          retryBtn.textContent = 'Vérification…';
+        }
+        var controller = 'AbortController' in window ? new AbortController() : null;
+        var timer = controller ? setTimeout(function () { controller.abort(); }, 8000) : null;
+
+        fetch('/api/ping?t=' + Date.now(), { cache: 'no-store', signal: controller ? controller.signal : undefined })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            document.body.classList.add('back-online');
+            statusText.textContent = 'En ligne';
+            hint.textContent = 'Le serveur est de retour, rechargement…';
+            setTimeout(function () { window.location.reload(); }, 600);
+          })
+          .catch(function () {
+            if (manual) hint.textContent = 'Toujours hors ligne. Nouvelle vérification automatique toutes les 15 secondes.';
+          })
+          .finally(function () {
+            if (timer) clearTimeout(timer);
+            checking = false;
+            retryBtn.disabled = false;
+            retryBtn.textContent = 'Réessayer';
+          });
+      }
+
+      retryBtn.addEventListener('click', function () { checkServer(true); });
+      setInterval(function () { checkServer(false); }, CHECK_INTERVAL_MS);
+      window.addEventListener('online', function () { checkServer(false); });
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') checkServer(false);
+      });
+    })();
+  </script>
+</body>
+</html>
