@@ -155,7 +155,7 @@
             left: 0;
             top: 0;
             height: 100%;
-            background: var(--primary, #e50914);
+            background: var(--primary);
             border-radius: 4px;
             width: 0%;
             pointer-events: none;
@@ -231,8 +231,8 @@
             transform: scale(0.94);
         }
         .player-btn-skip {
-            background: rgba(229, 9, 20, 0.2);
-            border: 1px solid rgba(229, 9, 20, 0.5);
+            background: rgba(var(--primary-rgb), 0.2);
+            border: 1px solid rgba(var(--primary-rgb), 0.5);
             font-size: 12px;
             font-weight: 600;
             padding: 5px 10px;
@@ -240,8 +240,8 @@
             color: #fff;
         }
         .player-btn-skip:hover {
-            background: var(--primary, #e50914);
-            border-color: var(--primary, #e50914);
+            background: var(--primary);
+            border-color: var(--primary);
         }
         .player-volume-group {
             display: flex;
@@ -251,7 +251,7 @@
         .player-volume-slider {
             width: 65px;
             height: 4px;
-            accent-color: var(--primary, #e50914);
+            accent-color: var(--primary);
             cursor: pointer;
         }
         .player-time-label {
@@ -456,7 +456,7 @@
             border-color: var(--primary);
             color: #fff;
             font-weight: 700;
-            box-shadow: 0 0 12px rgba(229, 9, 20, 0.5);
+            box-shadow: 0 0 12px rgba(var(--primary-rgb), 0.5);
         }
         .btn-seek-jump {
             background: #252525;
@@ -493,13 +493,13 @@
             z-index: 28;
             background: rgba(14, 14, 20, 0.94);
             backdrop-filter: blur(14px);
-            border: 1px solid rgba(229, 9, 20, 0.55);
+            border: 1px solid rgba(var(--primary-rgb), 0.55);
             border-radius: 12px;
             padding: 12px 18px;
             display: flex;
             align-items: center;
             gap: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 18px rgba(229, 9, 20, 0.25);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 18px rgba(var(--primary-rgb), 0.25);
             animation: resumeSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             max-width: 90%;
         }
@@ -556,7 +556,7 @@
         .btn-resume-primary {
             background: var(--primary);
             color: #ffffff;
-            box-shadow: 0 2px 8px rgba(229, 9, 20, 0.4);
+            box-shadow: 0 2px 8px rgba(var(--primary-rgb), 0.4);
         }
         .btn-resume-primary:hover {
             background: var(--primary-hover);
@@ -588,9 +588,9 @@
 
         .badge-pack-resume {
             font-size: 10px;
-            background: rgba(229, 9, 20, 0.25);
+            background: rgba(var(--primary-rgb), 0.25);
             color: #ff7675;
-            border: 1px solid rgba(229, 9, 20, 0.4);
+            border: 1px solid rgba(var(--primary-rgb), 0.4);
             padding: 1px 5px;
             border-radius: 4px;
             margin-left: auto;
@@ -623,7 +623,7 @@
             background: var(--primary);
             border-color: var(--primary);
             transform: scale(1.04);
-            box-shadow: 0 8px 25px rgba(229, 9, 20, 0.5);
+            box-shadow: 0 8px 25px rgba(var(--primary-rgb), 0.5);
         }
         @keyframes aniSkipSlideIn {
             from { opacity: 0; transform: translateX(20px); }
@@ -922,10 +922,10 @@
         .p2p-progress-fill {
             height: 100%;
             width: 0%;
-            background: linear-gradient(90deg, #e50914 0%, #ff6b35 50%, #34d399 100%);
+            background: linear-gradient(90deg, var(--primary) 0%, #ff6b35 50%, #34d399 100%);
             border-radius: 999px;
             transition: width 0.35s ease;
-            box-shadow: 0 0 10px rgba(229, 9, 20, 0.6);
+            box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.6);
         }
 
         .p2p-sub-detail {

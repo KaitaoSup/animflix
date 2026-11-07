@@ -362,6 +362,10 @@ function loadUserSettings() {
 
     if (typeof loadReleasePrefsIntoSettings === 'function') loadReleasePrefsIntoSettings();
 
+    // Couleur d'interface (peut avoir changé via la synchro depuis un autre appareil)
+    if (typeof applyThemeColor === 'function') applyThemeColor(getThemeColor());
+    if (typeof renderThemeColorSettings === 'function') renderThemeColorSettings();
+
     renderSettingsProfiles();
 }
 

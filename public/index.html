@@ -21,6 +21,8 @@
     <link rel="stylesheet" href="/css/player.css?v={{ASSET_VERSION}}">
     <link rel="stylesheet" href="/css/anilist.css?v={{ASSET_VERSION}}">
     <link rel="stylesheet" href="/css/tv.css?v={{ASSET_VERSION}}">
+    <!-- Couleur d'interface préférée : appliquée avant l'affichage pour éviter un flash du rouge par défaut -->
+    <script src="/js/theme.js?v={{ASSET_VERSION}}"></script>
 </head>
 <body>
   <div class="navbar">
@@ -186,7 +188,7 @@
                       <button id="detailCopyMagnetBtn" class="btn-secondary" title="Copier le lien magnet P2P">
                           📋 Copier
                       </button>
-                      <button onclick="scrollToPlayer()" class="btn-secondary" style="background: #e50914; border-color: #e50914;">
+                      <button onclick="scrollToPlayer()" class="btn-secondary" style="background: var(--primary); border-color: var(--primary);">
                           ▶️ Aller au lecteur
                       </button>
                   </div>
@@ -784,6 +786,18 @@
                   <div id="settingsProfileList" class="settings-profiles-chips">
                       <!-- Rempli dynamiquement -->
                   </div>
+              </div>
+
+              <!-- Couleur d'interface préférée -->
+              <div class="settings-group">
+                  <div class="settings-label">
+                      <span>🎨 Couleur de l'interface :</span>
+                      <label class="theme-custom-picker" title="Choisir une couleur personnalisée">
+                          <input type="color" id="prefThemeColor" value="#e50914" oninput="previewThemeColor(this.value)" onchange="commitThemeColor(this.value)">
+                          <span>Personnalisée…</span>
+                      </label>
+                  </div>
+                  <div id="themeColorSwatches" class="theme-swatches" role="radiogroup" aria-label="Couleur de l'interface"></div>
               </div>
 
               <!-- Langue de recherche par défaut -->

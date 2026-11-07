@@ -26,10 +26,10 @@
 }
 
 .btn-tv-nav.active {
-    background: rgba(229, 9, 20, 0.2);
-    border-color: #e50914;
+    background: rgba(var(--primary-rgb), 0.2);
+    border-color: var(--primary);
     color: #ff4d58;
-    box-shadow: 0 0 10px rgba(229, 9, 20, 0.35);
+    box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.35);
 }
 
 /* --- INDICATEUR DE FOCUS HAUTE VISIBILITÉ (10-FOOT FOCUS RING) --- */
@@ -37,9 +37,9 @@
 body.tv-focus-active :focus-visible,
 body.tv-focus-active .tv-focused,
 .tv-focused {
-    outline: 3px solid #e50914 !important;
+    outline: 3px solid var(--primary) !important;
     outline-offset: 3px !important;
-    box-shadow: 0 0 18px rgba(229, 9, 20, 0.85), 0 0 32px rgba(229, 9, 20, 0.4) !important;
+    box-shadow: 0 0 18px rgba(var(--primary-rgb), 0.85), 0 0 32px rgba(var(--primary-rgb), 0.4) !important;
     transition: transform 0.16s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.16s ease !important;
 }
 
@@ -48,7 +48,7 @@ body.tv-focus-active .card.tv-focused,
 .card.tv-focused {
     transform: scale(1.06) translateY(-4px) !important;
     z-index: 25 !important;
-    border-color: #e50914 !important;
+    border-color: var(--primary) !important;
 }
 
 body.tv-focus-active .card.tv-focused .card-overlay-hover,
@@ -60,8 +60,8 @@ body.tv-focus-active .card.tv-focused .card-overlay-hover,
 /* Boutons et contrôles du lecteur multimédia focusés */
 body.tv-focus-active .player-btn.tv-focused,
 .player-btn.tv-focused {
-    background: rgba(229, 9, 20, 0.35) !important;
-    border-color: #e50914 !important;
+    background: rgba(var(--primary-rgb), 0.35) !important;
+    border-color: var(--primary) !important;
     color: #ffffff !important;
     transform: scale(1.18) !important;
 }
@@ -69,7 +69,7 @@ body.tv-focus-active .player-btn.tv-focused,
 /* Onglets d'accueil focusés */
 body.tv-focus-active .home-tab-btn.tv-focused,
 .home-tab-btn.tv-focused {
-    background: #e50914 !important;
+    background: var(--primary) !important;
     color: #fff !important;
     transform: scale(1.05) !important;
 }
@@ -79,15 +79,15 @@ body.tv-focus-active .torrent-item.tv-focused,
 body.tv-focus-active .file-row.tv-focused,
 .torrent-item.tv-focused,
 .file-row.tv-focused {
-    background: rgba(229, 9, 20, 0.22) !important;
-    border-color: #e50914 !important;
+    background: rgba(var(--primary-rgb), 0.22) !important;
+    border-color: var(--primary) !important;
     transform: translateX(6px) !important;
 }
 
 /* Timeline scrubber focusée */
 .player-scrubber-track.tv-focused {
     height: 14px !important;
-    box-shadow: 0 0 14px rgba(229, 9, 20, 0.9) !important;
+    box-shadow: 0 0 14px rgba(var(--primary-rgb), 0.9) !important;
 }
 
 /* --- HUD FLOTTANT DE LA MANETTE / TÉLÉCOMMANDE (GAMEPAD CONTROLS HELPER) --- */
@@ -97,7 +97,7 @@ body.tv-focus-active .file-row.tv-focused,
     right: 28px;
     background: rgba(14, 14, 14, 0.92);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    border-left: 4px solid #e50914;
+    border-left: 4px solid var(--primary);
     padding: 10px 18px;
     border-radius: 10px;
     display: flex;

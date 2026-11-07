@@ -7,10 +7,12 @@ function posterFallback(name) {
     const label = String(name || 'Anime').trim();
     const initials = label.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'A';
     const safe = initials.replace(/[<>&"']/g, '');
+    // Image en data-URI : les variables CSS n'y sont pas résolues, on y inscrit la couleur du thème
+    const accent = (typeof getThemeColor === 'function') ? getThemeColor() : '#e50914';
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450" viewBox="0 0 300 450">` +
-        `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2a1416"/><stop offset="1" stop-color="#141414"/></linearGradient></defs>` +
-        `<rect width="300" height="450" fill="url(#g)"/>` +
-        `<text x="150" y="245" font-family="Segoe UI,Roboto,Arial,sans-serif" font-size="96" font-weight="800" fill="#e50914" fill-opacity="0.55" text-anchor="middle">${safe}</text>` +
+        `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${accent}" stop-opacity="0.12"/><stop offset="1" stop-color="${accent}" stop-opacity="0"/></linearGradient></defs>` +
+        `<rect width="300" height="450" fill="#141414"/><rect width="300" height="450" fill="url(#g)"/>` +
+        `<text x="150" y="245" font-family="Segoe UI,Roboto,Arial,sans-serif" font-size="96" font-weight="800" fill="${accent}" fill-opacity="0.55" text-anchor="middle">${safe}</text>` +
         `</svg>`;
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }

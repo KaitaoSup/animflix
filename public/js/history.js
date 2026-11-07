@@ -706,14 +706,14 @@ function renderFavoritesTabHtml(container) {
                     </button>
 
                     <div class="card-overlay-hover">
-                        <span class="btn-play-hover" style="background: #e50914;">
+                        <span class="btn-play-hover" style="background: var(--primary);">
                             🔍 Rechercher les épisodes
                         </span>
                     </div>
 
                     <div class="card-badges-top">
                         ${item.rating ? `<span class="badge-tag-mini" style="background:rgba(255,193,7,0.2);color:#ffc107;border-color:rgba(255,193,7,0.4);">⭐ ${escapeHtml(item.rating)}</span>` : ''}
-                        <span class="badge-tag-mini" style="background:rgba(229,9,20,0.25);border-color:rgba(229,9,20,0.4);color:#ff525d;">
+                        <span class="badge-tag-mini" style="background:rgba(var(--primary-rgb),0.25);border-color:rgba(var(--primary-rgb),0.4);color:var(--primary-light);">
                             ${escapeHtml(item.season || 'Anime')}
                         </span>
                     </div>

@@ -493,7 +493,7 @@
             align-items: center;
             justify-content: center;
             gap: 6px;
-            background: linear-gradient(135deg, rgba(229, 9, 20, 0.2), rgba(2, 169, 255, 0.2));
+            background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.2), rgba(2, 169, 255, 0.2));
             border: 1px solid rgba(2, 169, 255, 0.4);
             color: #fff;
             padding: 7px 10px;
@@ -505,7 +505,7 @@
         .card-watching:hover .card-next-ep-btn-pill {
             background: var(--primary);
             border-color: var(--primary);
-            box-shadow: 0 4px 12px rgba(229, 9, 20, 0.5);
+            box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.5);
         }
         .badge-tag-airing-timer {
             background: rgba(255, 153, 0, 0.25) !important;
@@ -522,7 +522,7 @@
             50% { opacity: 0.72; }
         }
         .card-next-ep-pill-airing {
-            background: linear-gradient(135deg, rgba(255, 153, 0, 0.18), rgba(229, 9, 20, 0.15)) !important;
+            background: linear-gradient(135deg, rgba(255, 153, 0, 0.18), rgba(var(--primary-rgb), 0.15)) !important;
             border: 1px solid rgba(255, 153, 0, 0.45) !important;
             color: #ffc266 !important;
         }
@@ -647,12 +647,12 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            box-shadow: 0 4px 14px rgba(229, 9, 20, 0.45);
+            box-shadow: 0 4px 14px rgba(var(--primary-rgb), 0.45);
             transition: transform 0.15s, box-shadow 0.2s;
         }
         .btn-play-target-direct:hover {
             transform: translateY(-1px);
-            box-shadow: 0 6px 18px rgba(229, 9, 20, 0.65);
+            box-shadow: 0 6px 18px rgba(var(--primary-rgb), 0.65);
         }
         .card-target-highlight {
             border: 2px solid var(--accent-green) !important;
@@ -1425,7 +1425,7 @@
         .btn-anime-play {
             display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: center;
             padding: 12px 26px; font-size: 16px; border-radius: 8px; min-height: 50px;
-            box-shadow: 0 8px 24px rgba(229, 9, 20, 0.35);
+            box-shadow: 0 8px 24px rgba(var(--primary-rgb), 0.35);
         }
         .btn-anime-play small { font-size: 12px; font-weight: 500; opacity: 0.85; }
         .btn-anime-play:disabled { background: #333; box-shadow: none; cursor: default; color: #bbb; }
@@ -1499,7 +1499,7 @@
         .anime-ep-tile.is-watched .anime-ep-thumb::after { background: rgba(0,0,0,0.6); }
         .anime-ep-tile.is-watched .anime-ep-label { color: #9a9a9a; }
         .anime-ep-tile.is-watched .anime-ep-progress span { background: #555; }
-        .anime-ep-tile.is-target { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), 0 8px 24px rgba(229,9,20,0.2); }
+        .anime-ep-tile.is-target { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), 0 8px 24px rgba(var(--primary-rgb), 0.2); }
         .anime-ep-tile.is-target .anime-ep-play { opacity: 1; transform: scale(1); }
         .anime-ep-tile.is-loading { pointer-events: none; }
         .anime-ep-tile.is-loading .anime-ep-play { display: none; }
@@ -1545,7 +1545,7 @@
 /* =========================================================================
    --- ONGLET STATISTIQUES ---
    ========================================================================= */
-        .stats-page { --stats-mark: #e50914; --stats-track: #2a2a2a; --stats-grid: #333; }
+        .stats-page { --stats-mark: var(--primary); --stats-track: #2a2a2a; --stats-grid: #333; }
         .stats-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 22px; }
         .stats-tile { background: #1e1e1e; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 16px; min-width: 0; }
         .stats-tile-label { font-size: 12px; color: #aaa; font-weight: 600; }

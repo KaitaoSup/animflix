@@ -19,7 +19,8 @@ const SYNCED_PREF_KEYS = [
     'animflix_aniskip_mode',
     'animflix_autoplay_next',
     'animflix_pref_release_groups',
-    'animflix_pref_resolution'
+    'animflix_pref_resolution',
+    'animflix_theme_color'
 ];
 
 let cloudSyncRunning = null;    // Promise de la synchro en cours

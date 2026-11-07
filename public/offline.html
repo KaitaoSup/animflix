@@ -6,6 +6,16 @@
   <meta name="theme-color" content="#141414">
   <title>Animflix – Serveur hors ligne</title>
   <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <script>
+    // Couleur d'interface préférée (déjà validée par js/theme.js lors de l'enregistrement)
+    try {
+      var c = localStorage.getItem('animflix_theme_color');
+      if (/^#[0-9a-f]{6}$/i.test(c || '')) {
+        document.documentElement.style.setProperty('--primary', c);
+        document.documentElement.style.setProperty('--primary-hover', 'color-mix(in srgb, ' + c + ' 80%, black)');
+      }
+    } catch (e) {}
+  </script>
   <!-- Page servie par le service worker quand le serveur est injoignable :
        tout doit rester autonome (CSS et JS en ligne, aucune dépendance réseau). -->
   <style>

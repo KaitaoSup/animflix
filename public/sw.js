@@ -17,6 +17,7 @@ const PRECACHE_ASSETS = [
   '/css/player.css',
   '/css/anilist.css',
   '/css/tv.css',
+  '/js/theme.js',
   '/js/auth.js',
   '/js/app.js',
   '/js/ui.js',
