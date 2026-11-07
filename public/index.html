@@ -257,7 +257,7 @@
                   <!-- Bannière d'enchaînement automatique (Binge Mode / Épisode suivant) -->
                   <div id="playerNextEpOverlay" class="player-next-ep-overlay" style="display: none;">
                       <div class="next-ep-header">
-                          <span class="next-ep-title-badge">🎬 Épisode suivant</span>
+                          <span class="next-ep-title-badge" id="nextEpBadge">🎬 Épisode suivant</span>
                           <button class="next-ep-dismiss-btn" onclick="dismissNextEpisodeCountdown()">&times;</button>
                       </div>
                       <div class="next-ep-label" id="nextEpLabel">Épisode suivant</div>
@@ -854,6 +854,12 @@
                   </label>
               </div>
 
+              <!-- Notifications de nouveaux épisodes -->
+              <div class="settings-group">
+                  <div style="font-size: 13.5px; font-weight: 700; color: #fff; margin-bottom: 6px;">🔔 Notifications de nouveaux épisodes</div>
+                  <div id="settingsNotifContent" style="font-size: 12px; color: #aaa; line-height: 1.5;">Chargement...</div>
+              </div>
+
               <!-- Vitesse par défaut -->
               <div class="settings-group">
                   <label class="settings-label">
@@ -1076,6 +1082,7 @@
   <script src="/js/player/cast.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/history.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/sync.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/notifications.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/release-prefs.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/search.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/anilist/core.js?v={{ASSET_VERSION}}"></script>

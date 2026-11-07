@@ -16,6 +16,7 @@
     "better-sqlite3": "^11.10.0",
     "express": "^5.2.1",
     "jassub": "^2.5.23",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "web-push": "^3.6.7"
   }
 }

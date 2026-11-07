@@ -88,6 +88,7 @@ Application web complète et moderne de streaming d'animes en direct à partir d
   - Saut d'opening en 1 clic (**Skip OP +85s**).
   - Sauts temporels rapides (`-10s` / `+10s`).
   - Sélecteur de vitesse de lecture (`0.75x`, `1x`, `1.25x`, `1.5x`, `2x`).
+  - **Enchaînement automatique** : épisode suivant (même pack ou nouvelle recherche), puis **saison suivante** à la fin du dernier épisode (suite AniList TV / ONA / film déjà sortie : sa fiche s'ouvre et l'épisode 1 démarre après un compte à rebours de 10 s).
   - **Boost Vocal & Égalisation (Web Audio API)** : Compresseur dynamique pour rendre les voix intelligibles sans subir d'explosions sonores assourdissantes.
 - **Moteur de Sous-Titres Sur-Mesure** :
   - Synchronisation temporelle calée au **Keyframe réel** (`/api/play-sync`).
@@ -106,6 +107,11 @@ Application web complète et moderne de streaming d'animes en direct à partir d
 - **Synchronisation AniList Bi-directionnelle** : Connexion OAuth sécurisée, synchronisation automatique de l'épisode visionné à 85% ou à la fin, affichage des animés en cours.
 - **Historique Local & Reprise** : Mémorisation exacte de la position de lecture à la seconde près dans `localStorage`, avec bannière de reprise automatique.
 - **Favoris Locaux Hors Ligne** : Sauvegarde d'animes favoris accessible sans compte tiers.
+- **🔔 Notifications de nouveaux épisodes (Web Push)** : *Paramètres ⚙️ → Notifications*, avec un compte Animflix lié à AniList. Toutes les 15 min, le serveur regarde les épisodes diffusés de votre liste « En cours » et cherche une source torrent dans la langue de recherche par défaut :
+  - source trouvée → « Épisode N disponible » ; toujours rien 6 h après la diffusion → « Épisode N sorti » ;
+  - une seule notification par épisode, rien pour un épisode déjà vu ou diffusé avant l'activation ;
+  - un clic ouvre la fiche de l'anime sur l'épisode. HTTPS requis (Tailscale Funnel convient) ; sur iPhone / iPad, l'app doit être installée sur l'écran d'accueil (iOS 16.4+).
+  - Variables `.env` optionnelles : `VAPID_SUBJECT` (contact, `mailto:…`), `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` (sinon générées au premier démarrage et gardées dans la base), `EPISODE_NOTIFIER=off` pour couper la surveillance.
 
 ### ⚡ 8. Feedback P2P & TorrServer en Direct
 - **Télémétrie en temps réel (`/api/torrserver/stats`)** :

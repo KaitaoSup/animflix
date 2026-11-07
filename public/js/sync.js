@@ -371,6 +371,7 @@ function flushCloudSyncOnHide() {
  * Appelée par auth.js à chaque changement de session (démarrage, connexion, inscription, déconnexion)
  */
 function onAnimflixAuthChanged() {
+    if (typeof refreshPushSubscription === 'function') refreshPushSubscription();
     clearTimeout(cloudSyncTimer);
     cloudSyncTimer = null;
     clearInterval(cloudSyncPollTimer);

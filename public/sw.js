@@ -38,6 +38,7 @@ const PRECACHE_ASSETS = [
   '/js/player/cast.js',
   '/js/history.js',
   '/js/sync.js',
+  '/js/notifications.js',
   '/js/release-prefs.js',
   '/js/search.js',
   '/js/anilist/core.js',
@@ -185,4 +186,46 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(req).catch(() => caches.match(req, { ignoreSearch: true }))
   );
+});
+
+// =========================================================================
+// --- NOTIFICATIONS PUSH (NOUVEAUX ÉPISODES) ---
+// =========================================================================
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { body: event.data ? event.data.text() : '' };
+  }
+  const title = data.title || 'Animflix';
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || '',
+      icon: data.icon || '/icons/icon-192.png',
+      badge: '/icons/icon-maskable-192.png',
+      tag: data.tag || undefined,
+      renotify: !!data.tag,
+      data: { url: data.url || '/#/', mediaId: data.mediaId || null, episode: data.episode || null }
+    })
+  );
+});
+
+// Clic : fiche de l'anime sur l'épisode concerné, dans l'onglet / la PWA déjà ouverte si possible
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const { url = '/#/', mediaId = null, episode = null } = event.notification.data || {};
+  const target = new URL(url, self.location.origin).href;
+
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const client = windows.find(c => new URL(c.url).origin === self.location.origin);
+    if (client) {
+      await client.focus();
+      client.postMessage({ type: 'animflix-notification-open', url: target, mediaId, episode });
+      return;
+    }
+    await self.clients.openWindow(target);
+  })());
 });

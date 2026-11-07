@@ -7,6 +7,71 @@
     let preparedNextEpisode = null;
     let nextEpisodePreloadKey = null; // épisode en cours pour lequel le préchargement a déjà été lancé
     const NEXT_EPISODE_PRELOAD_AT = 0.8;
+    const SEQUEL_COUNTDOWN_SEC = 10;
+
+    // --- SAISON SUIVANTE (SUITE ANILIST) ---
+
+    // Formats enchaînés après le dernier épisode (pas les OVA / spéciaux, souvent hors de l'histoire principale)
+    const SEQUEL_FORMAT_PRIORITY = ['TV', 'TV_SHORT', 'ONA', 'MOVIE'];
+    const sequelLookups = new Map(); // id AniList -> Promise<{ id, title } | null>
+
+    function pickSequelEdge(edges) {
+        return (edges || [])
+            .filter(e => e?.relationType === 'SEQUEL'
+                && e.node?.type === 'ANIME'
+                && SEQUEL_FORMAT_PRIORITY.includes(e.node.format)
+                && e.node.status !== 'NOT_YET_RELEASED'
+                && e.node.status !== 'CANCELLED')
+            .sort((a, b) => SEQUEL_FORMAT_PRIORITY.indexOf(a.node.format) - SEQUEL_FORMAT_PRIORITY.indexOf(b.node.format))[0] || null;
+    }
+
+    /**
+     * Suite AniList de l'anime en cours ({ id, title }), ou null s'il n'y en a pas (ou pas encore diffusée).
+     * Une recherche par anime : lancée pendant le préchargement, elle est prête à la fin de l'épisode.
+     */
+    function findSequelMedia(mediaId) {
+        mediaId = Number(mediaId);
+        if (!mediaId || typeof callAnilistGraphQL !== 'function') return Promise.resolve(null);
+        if (!sequelLookups.has(mediaId)) {
+            const query = `
+                query ($id: Int) {
+                    Media(id: $id, type: ANIME) {
+                        relations {
+                            edges {
+                                relationType
+                                node { id type format status title { english userPreferred romaji } }
+                            }
+                        }
+                    }
+                }
+            `;
+            const lookup = callAnilistGraphQL(query, { id: mediaId })
+                .then(data => {
+                    const edge = pickSequelEdge(data?.Media?.relations?.edges);
+                    if (!edge) return null;
+                    const t = edge.node.title || {};
+                    return { id: edge.node.id, title: t.english || t.userPreferred || t.romaji || 'Saison suivante' };
+                })
+                .catch(err => {
+                    sequelLookups.delete(mediaId); // erreur réseau : nouvel essai au prochain appel
+                    console.warn('[Saison suivante] Recherche AniList impossible :', err.message);
+                    return null;
+                });
+            sequelLookups.set(mediaId, lookup);
+        }
+        return sequelLookups.get(mediaId);
+    }
+
+    async function playSequelFirstEpisode(sequel) {
+        dismissNextEpisodeCountdown();
+        if (!sequel || typeof openAnimePage !== 'function') return;
+        showToast(`📺 Saison suivante : ${sequel.title}`);
+        // Fiche de la suite (URL #/anime/<id>?ep=1, le retour y ramène), puis lecture de l'épisode 1
+        await openAnimePage(sequel.id, { ep: 1 });
+        if (window._currentAnimePageId === sequel.id && typeof playAnimeEpisode === 'function') {
+            playAnimeEpisode(1);
+        }
+    }
 
     /**
      * Ce qui suit l'épisode en cours : { kind: 'pack', file, label } (fichier suivant du même torrent),
@@ -52,7 +117,12 @@
         nextEpisodePreloadKey = epKey;
 
         const target = resolveNextEpisodeTarget();
-        if (!target || target.kind === 'finished') return;
+        if (!target) return;
+        if (target.kind === 'finished') {
+            // Dernier épisode : la suite AniList est cherchée maintenant pour proposer la saison suivante sans attente
+            findSequelMedia(currentAnilistMedia?.id);
+            return;
+        }
         if (target.kind === 'pack') {
             requestTorrentPreload(currentActiveMagnet, target.file.id);
             return;
@@ -88,27 +158,49 @@
 
         const target = resolveNextEpisodeTarget();
         if (!target) return;
+        hasNextEpisodeTriggered = true;
+
         if (target.kind === 'finished') {
-            showToast("🎉 Vous avez terminé tous les épisodes de cette saison !");
-            hasNextEpisodeTriggered = true;
+            // Fin de saison : enchaîner sur la suite AniList si elle existe
+            const epKey = window._currentPlayingEpisodeKey;
+            findSequelMedia(currentAnilistMedia?.id).then(sequel => {
+                if (window._currentPlayingEpisodeKey !== epKey) return; // autre épisode lancé entre-temps
+                if (!sequel) {
+                    showToast("🎉 Vous avez terminé tous les épisodes de cette saison !");
+                    return;
+                }
+                showNextEpisodeOverlay({
+                    badge: '📺 Saison suivante',
+                    label: sequel.title,
+                    action: () => playSequelFirstEpisode(sequel),
+                    countdown: forceImmediate ? 5 : SEQUEL_COUNTDOWN_SEC
+                });
+            });
             return;
         }
-        const targetLabel = target.label;
-        const targetAction = target.kind === 'pack'
-            ? () => playNextPackEpisode(target.file)
-            : () => playNextEpisodeSearch(target.epNum);
 
-        hasNextEpisodeTriggered = true;
-        pendingNextEpisodeAction = targetAction;
+        showNextEpisodeOverlay({
+            badge: '🎬 Épisode suivant',
+            label: target.label,
+            action: target.kind === 'pack'
+                ? () => playNextPackEpisode(target.file)
+                : () => playNextEpisodeSearch(target.epNum),
+            countdown: forceImmediate ? 3 : 6
+        });
+    }
+
+    function showNextEpisodeOverlay({ badge, label, action, countdown }) {
+        pendingNextEpisodeAction = action;
 
         const overlay = document.getElementById('playerNextEpOverlay');
+        const badgeEl = document.getElementById('nextEpBadge');
         const labelEl = document.getElementById('nextEpLabel');
         const timerEl = document.getElementById('nextEpCountdownSec');
 
         if (!overlay) return;
 
-        if (labelEl) labelEl.textContent = targetLabel;
-        let countdown = forceImmediate ? 3 : 6;
+        if (badgeEl) badgeEl.textContent = badge;
+        if (labelEl) labelEl.textContent = label;
         if (timerEl) timerEl.textContent = countdown;
         overlay.style.display = 'flex';
 

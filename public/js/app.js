@@ -473,6 +473,8 @@ function saveUserSettings() {
     if (prefVoice) localStorage.setItem('animflix_default_voice_boost', prefVoice);
     if (typeof saveReleasePrefsFromSettings === 'function') saveReleasePrefsFromSettings();
     if (typeof scheduleCloudSync === 'function') scheduleCloudSync();
+    // Langue des sources utilisée par le serveur pour vérifier qu'un nouvel épisode est disponible
+    if (typeof refreshPushSubscription === 'function') refreshPushSubscription();
 
     showToast("💾 Préférences enregistrées !");
 }
@@ -632,6 +634,7 @@ function toggleSettingsModal() {
         loadUserSettings();
         loadTorrentSettings();
         fetchServerStatus();
+        if (typeof renderNotificationSettings === 'function') renderNotificationSettings();
         modal.style.display = 'flex';
     }
 }

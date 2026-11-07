@@ -251,6 +251,10 @@ async function registerAnimflix(username, password, linkLocalAnilist = true) {
 
 // Déconnexion complète
 async function logoutAnimflix() {
+    // Avant la fin de session : cet appareil ne doit plus recevoir les notifications de ce compte
+    if (typeof unbindPushSubscription === 'function') {
+        await unbindPushSubscription().catch(() => {});
+    }
     try {
         await fetch('/api/auth/logout', {
             method: 'POST',

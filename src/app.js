@@ -7,6 +7,7 @@ import streamRoutes from './routes/streamRoutes.js';
 import torrserverRoutes from './routes/torrserverRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
 import syncRoutes from './routes/syncRoutes.js';
+import pushRoutes from './routes/pushRoutes.js';
 import { validateTorrentParams } from './utils/network.js';
 
 export function createApp() {
@@ -45,6 +46,7 @@ export function createApp() {
   app.use(streamRoutes);
   app.use(torrserverRoutes);
   app.use(syncRoutes);
+  app.use(pushRoutes);
 
   return app;
 }

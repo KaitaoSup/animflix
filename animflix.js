@@ -5,6 +5,7 @@ import { killAllProcesses } from './src/utils/sessionManager.js';
 import { createApp } from './src/app.js';
 import { startDiskCacheCleaner } from './src/utils/diskCacheCleaner.js';
 import { startDbMaintenance } from './src/services/dbMaintenance.js';
+import { startEpisodeNotifier } from './src/services/episodeNotifier.js';
 import { db, dbBackupDir, cleanupExpiredSessions } from './database.js';
 
 // Privilégier IPv4 pour éviter les lenteurs et blocages de résolution DNS
@@ -26,6 +27,7 @@ const app = createApp();
 const server = app.listen(PORT, async () => {
   startDiskCacheCleaner();
   startDbMaintenance({ db, backupDir: dbBackupDir, cleanupExpiredSessions });
+  startEpisodeNotifier();
   await checkHardwareAcceleration();
   console.log(`✅ Serveur Animflix modulaire prêt sur http://localhost:${PORT} !`);
 });
