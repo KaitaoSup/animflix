@@ -56,7 +56,7 @@ const RECENT_AIRINGS_QUERY = `
   }
 `;
 
-async function anilistRequest(query, variables, token) {
+export async function anilistRequest(query, variables, token) {
   const headers = { 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': 'Animflix/1.0' };
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await axios.post(ANILIST_URL, { query, variables }, { headers, timeout: 15000 });

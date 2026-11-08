@@ -16,8 +16,34 @@ describe('detectSkipChapters', () => {
     ], 1420);
     assert.deepEqual(result, {
       op: { startTime: 95.5, endTime: 185.5 },
-      ed: { startTime: 1290, endTime: 1380 }
+      ed: { startTime: 1290, endTime: 1380 },
+      preview: { startTime: 1380, endTime: 1420 }
     });
+  });
+
+  test('récap en début d’épisode et aperçu du prochain épisode', () => {
+    const result = detectSkipChapters([
+      ch(0, 60, 'Recap'),
+      ch(60, 150, 'OP'),
+      ch(150, 1300, 'Episode'),
+      ch(1300, 1390, 'ED'),
+      ch(1390, 1420, 'Next Episode')
+    ], 1420);
+    assert.deepEqual(result.recap, { startTime: 0, endTime: 60 });
+    assert.deepEqual(result.preview, { startTime: 1390, endTime: 1420 });
+    assert.ok(detectSkipChapters([ch(0, 45, 'Résumé')], 1400).recap);
+    assert.ok(detectSkipChapters([ch(0, 45, 'Précédemment')], 1400).recap);
+    assert.ok(detectSkipChapters([ch(1370, 1400, 'Prochain épisode')], 1400).preview);
+    assert.ok(detectSkipChapters([ch(1370, 1400, 'Avant-première')], 1400).preview);
+  });
+
+  test('récap ou aperçu mal placés ou de durée improbable ignorés', () => {
+    // « Recap » au milieu de l'épisode, « Preview » en début : chapitres mal nommés
+    assert.equal(detectSkipChapters([ch(700, 760, 'Recap'), ch(10, 40, 'Preview')], 1400), null);
+    assert.equal(detectSkipChapters([ch(1380, 1382, 'Preview')], 1400), null);
+    assert.equal(detectSkipChapters([ch(0, 600, 'Recap')], 1400), null);
+    // « Resume » ne doit pas attraper un titre de chapitre comme « Résurrection »
+    assert.equal(detectSkipChapters([ch(0, 60, 'Résurrection')], 1400), null);
   });
 
   test('variantes de noms : OP1 / ED, français accentué, « Opening Song »', () => {

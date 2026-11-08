@@ -211,15 +211,21 @@
                         <h2>📅 Planning des Sorties Hebdomadaires</h2>
                         <p>Calendrier simulcast en direct — Horaires de diffusion des épisodes au Japon et heure locale</p>
                     </div>
-                    <button class="btn-refresh-watching" onclick="renderScheduleTabHtml(null, true)" title="Actualiser le calendrier">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="23 4 23 10 17 10"></polyline>
-                            <polyline points="1 20 1 14 7 14"></polyline>
-                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                        </svg>
-                        <span>Actualiser</span>
-                    </button>
+                    <div class="schedule-banner-actions">
+                        <button type="button" class="btn-refresh-watching" id="calendarExportToggle" onclick="toggleCalendarExportPanel()" aria-expanded="${typeof calendarExport !== 'undefined' && calendarExport.open}" aria-controls="scheduleCalendarPanel" title="Ajouter mes prochains épisodes à mon agenda (Google, Apple, Outlook…)">
+                            <span>📅 Mon agenda</span>
+                        </button>
+                        <button class="btn-refresh-watching" onclick="renderScheduleTabHtml(null, true)" title="Actualiser le calendrier">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <polyline points="1 20 1 14 7 14"></polyline>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            <span>Actualiser</span>
+                        </button>
+                    </div>
                 </div>
+                ${typeof renderCalendarExportPanel === 'function' ? renderCalendarExportPanel() : ''}
                 ${renderSkeletonGrid(8, 'Chargement du calendrier…')}
             </div>
         `;
@@ -257,15 +263,21 @@
                             <h2>📅 Planning des Sorties Hebdomadaires</h2>
                             <p>Calendrier simulcast en direct — Horaires de diffusion des épisodes au Japon et heure locale</p>
                         </div>
-                        <button class="btn-refresh-watching" onclick="renderScheduleTabHtml(null, true)" title="Actualiser le calendrier">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="23 4 23 10 17 10"></polyline>
-                                <polyline points="1 20 1 14 7 14"></polyline>
-                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                            </svg>
-                            <span>Actualiser</span>
-                        </button>
+                        <div class="schedule-banner-actions">
+                            <button type="button" class="btn-refresh-watching" id="calendarExportToggle" onclick="toggleCalendarExportPanel()" aria-expanded="${typeof calendarExport !== 'undefined' && calendarExport.open}" aria-controls="scheduleCalendarPanel" title="Ajouter mes prochains épisodes à mon agenda (Google, Apple, Outlook…)">
+                                <span>📅 Mon agenda</span>
+                            </button>
+                            <button class="btn-refresh-watching" onclick="renderScheduleTabHtml(null, true)" title="Actualiser le calendrier">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <polyline points="1 20 1 14 7 14"></polyline>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                </svg>
+                                <span>Actualiser</span>
+                            </button>
+                        </div>
                     </div>
+                    ${typeof renderCalendarExportPanel === 'function' ? renderCalendarExportPanel() : ''}
 
                     <!-- Barre des 7 jours de la semaine -->
                     <div class="schedule-days-bar-wrapper">

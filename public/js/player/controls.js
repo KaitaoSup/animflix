@@ -98,8 +98,8 @@
         const totalDur = currentTotalDuration > 0 ? currentTotalDuration : 1440;
         const target = Math.max(0, Math.min(totalDur, Math.round(targetSeconds)));
 
-        // Masquer immédiatement le bouton AniSkip si la cible de saut est hors de l'opening
-        if (!currentAniSkipIntervals?.op || target >= currentAniSkipIntervals.op.endTime) {
+        // Masquer immédiatement le bouton AniSkip si la cible de saut est hors d'un passage à sauter
+        if (!getSkipSegmentAt(target)) {
             hideAniSkipButton();
         }
 

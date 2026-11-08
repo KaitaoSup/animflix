@@ -1210,6 +1210,14 @@
             background: linear-gradient(90deg, #06b6d4, #38bdf8);
             box-shadow: 0 0 6px rgba(56, 189, 248, 0.65);
         }
+        .scrubber-marker-recap {
+            background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+            box-shadow: 0 0 6px rgba(167, 139, 250, 0.65);
+        }
+        .scrubber-marker-preview {
+            background: linear-gradient(90deg, #10b981, #34d399);
+            box-shadow: 0 0 6px rgba(52, 211, 153, 0.65);
+        }
 
         /* Tooltip enrichi avec miniature 16:9 au survol de la timeline */
         .player-scrubber-tooltip {

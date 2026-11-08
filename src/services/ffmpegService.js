@@ -223,7 +223,7 @@ export async function analyzeStreams(videoUrl, { timeoutMs = 15000 } = {}) {
 
     const skipChapters = detectSkipChapters(data.chapters, duration);
 
-    console.log(`✅ FFPROBE: Analyse terminée. Vidéo = ${videoCodec} (${videoPixFmt}), Durée = ${duration}s, Sous-titres = ${subTracks.length}, Audio = ${audioTracks.length}${skipChapters ? `, Chapitres OP/ED = ${JSON.stringify(skipChapters)}` : ''}`);
+    console.log(`✅ FFPROBE: Analyse terminée. Vidéo = ${videoCodec} (${videoPixFmt}), Durée = ${duration}s, Sous-titres = ${subTracks.length}, Audio = ${audioTracks.length}${skipChapters ? `, Chapitres à sauter = ${JSON.stringify(skipChapters)}` : ''}`);
     return { subIndex, subTracks, frAudioIndex, audioTracks, duration, videoCodec, videoPixFmt, videoWidth, videoHeight, skipChapters };
   } catch (e) {
     console.log("⚠️ FFPROBE: Analyse rapide streams terminée avec fallback:", e.message);

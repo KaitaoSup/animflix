@@ -385,6 +385,7 @@ function onAnimflixAuthChanged() {
     if (typeof refreshPushSubscription === 'function') refreshPushSubscription();
     if (typeof refreshAdminUi === 'function') refreshAdminUi();
     if (typeof refreshServerDownloads === 'function') refreshServerDownloads();
+    if (typeof onCalendarExportAuthChanged === 'function') onCalendarExportAuthChanged();
     clearTimeout(cloudSyncTimer);
     cloudSyncTimer = null;
     clearInterval(cloudSyncPollTimer);

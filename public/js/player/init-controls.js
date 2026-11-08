@@ -260,19 +260,13 @@
                     scrubberTooltip.textContent = formatTimestamp(hoverSec);
                 }
 
-                // Détection si le curseur survole l'Opening ou l'Ending AniSkip
+                // Détection si le curseur survole un passage à sauter (récap, opening, ending, aperçu)
                 if (chapterBadgeEl) {
-                    const op = currentAniSkipIntervals?.op;
-                    const ed = currentAniSkipIntervals?.ed;
-                    if (op && hoverSec >= op.startTime && hoverSec <= op.endTime) {
-                        chapterBadgeEl.textContent = '⏭️ OPENING';
+                    const seg = typeof getSkipSegmentAt === 'function' ? getSkipSegmentAt(hoverSec) : null;
+                    if (seg) {
+                        chapterBadgeEl.textContent = seg.badge;
                         chapterBadgeEl.style.display = 'inline-block';
-                        chapterBadgeEl.style.background = 'rgba(245, 158, 11, 0.92)';
-                        chapterBadgeEl.style.color = '#000';
-                    } else if (ed && hoverSec >= ed.startTime && hoverSec <= ed.endTime) {
-                        chapterBadgeEl.textContent = '⏭️ ENDING';
-                        chapterBadgeEl.style.display = 'inline-block';
-                        chapterBadgeEl.style.background = 'rgba(56, 189, 248, 0.92)';
+                        chapterBadgeEl.style.background = seg.color;
                         chapterBadgeEl.style.color = '#000';
                     } else {
                         chapterBadgeEl.style.display = 'none';

@@ -135,8 +135,8 @@
         hasNextEpisodeTriggered = false;
         dismissNextEpisodeCountdown();
 
-        // Cacher immédiatement le bouton AniSkip si la lecture reprend hors de l'opening
-        if (!currentAniSkipIntervals?.op || seekSeconds >= currentAniSkipIntervals.op.endTime) {
+        // Cacher immédiatement le bouton AniSkip si la lecture reprend hors d'un passage à sauter
+        if (!getSkipSegmentAt(seekSeconds)) {
             hideAniSkipButton();
         }
 
@@ -145,15 +145,13 @@
         window._currentPlayingEpisodeKey = epKey;
 
         if (isNewEp) {
-            hasSkippedCurrentOp = false;
-            hasSkippedCurrentEd = false;
+            resetSkippedSegments();
             currentAniSkipIntervals = null;
             window.currentAniSkipIntervals = null;
             aniSkipLoadedFor = null;
             checkAniSkipForCurrentEpisode();
         } else if (seekSeconds === 0) {
-            hasSkippedCurrentOp = false;
-            hasSkippedCurrentEd = false;
+            resetSkippedSegments();
         } else if (aniSkipNeedsRefresh()) {
             checkAniSkipForCurrentEpisode();
         }

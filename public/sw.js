@@ -41,6 +41,7 @@ const PRECACHE_ASSETS = [
   '/js/stats.js',
   '/js/admin.js',
   '/js/downloads.js',
+  '/js/calendar-export.js',
   '/js/sync.js',
   '/js/notifications.js',
   '/js/release-prefs.js',

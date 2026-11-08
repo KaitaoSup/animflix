@@ -87,6 +87,7 @@ Application web complète et moderne de streaming d'animes en direct à partir d
 - **Timeline Scrubber Fluide** : Prévisualisation temporelle (tooltip), indicateur de tampon réseau (buffer), scrubbing interactif à la souris et au toucher.
 - **Contrôles Avancés** :
   - Saut d'opening en 1 clic (**Skip OP +85s**).
+  - **Passer le récap, l'opening, l'ending et l'aperçu du prochain épisode** : bouton « Passer… » pendant le passage (ou saut automatique, *Paramètres ⚙️*), marqueurs colorés sur la timeline. Les temps viennent des chapitres du fichier (« Recap », « Résumé », « OP », « ED », « Preview », « Prochain épisode »…) en priorité, sinon d'AniSkip (opening, ending, récap, génériques « mixtes »). Passer l'aperçu final lance directement l'épisode suivant si le compte à rebours est affiché.
   - Sauts temporels rapides (`-10s` / `+10s`).
   - Sélecteur de vitesse de lecture (`0.75x`, `1x`, `1.25x`, `1.5x`, `2x`).
   - **Enchaînement automatique** : épisode suivant (même pack ou nouvelle recherche), puis **saison suivante** à la fin du dernier épisode (suite AniList TV / ONA / film déjà sortie : sa fiche s'ouvre et l'épisode 1 démarre après un compte à rebours de 10 s).
@@ -110,6 +111,7 @@ Application web complète et moderne de streaming d'animes en direct à partir d
   - statut (En cours, À voir, Terminé, Je le revois, En pause, Abandonné), ajout ou retrait de la liste (avec confirmation) ; « Terminé » met la progression au dernier épisode ;
   - note en 5 étoiles par demi-étoile (= note sur 10), recliquer sur la note la retire ; AniList la convertit dans votre format de notation (sur 10, sur 100, sur 5, smileys) ;
   - un anime terminé sans note est mis en avant (« Terminé : votre note ? ») et, à la fin du dernier épisode sans saison suivante, le lecteur propose de le noter.
+- **📅 Planning dans votre agenda (.ics)** : onglet *Planning* → **📅 Mon agenda** (compte Animflix lié à AniList). Un lien d'abonnement personnel ajoute à Google Agenda, Apple Calendrier, Outlook ou Thunderbird les épisodes de vos animes « En cours » (option : « À voir aussi ») sur 7 jours passés et 5 semaines à venir, mis à jour toutes les heures ; chaque événement renvoie vers la fiche de l'épisode dans Animflix. Le lien contient un jeton secret (« Nouveau lien » révoque l'ancien). Les agendas en ligne (Google, Outlook.com) doivent pouvoir joindre le serveur : utilisez son adresse HTTPS publique (Tailscale Funnel).
 - **💾 Garder sur le serveur (épisodes hors ligne)** : le bouton 💾 du lecteur télécharge l'épisode en entier sur le serveur (dossier `downloads/`, ou `DOWNLOADS_DIR` dans `.env`). Ensuite :
   - toute lecture de ce torrent (direct, transcodage, HLS, sous-titres, miniatures) lit le fichier local : l'épisode reste regardable **sans seeders**, même si TorrServer est arrêté ;
   - sur la fiche anime, l'épisode porte un badge 💾 et un clic lance la copie du serveur en priorité ;
