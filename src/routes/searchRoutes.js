@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { searchAnime, testNyaaMirrors, setWorkingNyaaUrl } from '../services/nyaaService.js';
 import { getTorrentSourcesStatus } from '../services/torrentAggregator.js';
 import { testTorznabConnection } from '../services/torznabService.js';
-import { getServerSetting, setServerSetting } from '../../database.js';
+import { getServerSetting, setServerSetting, isAdminUser } from '../../database.js';
+import { requireAdmin } from '../utils/admin.js';
 
 const router = Router();
 
@@ -40,11 +41,14 @@ router.get('/api/torrent/sources', (req, res) => {
  * Récupère les paramètres de configuration des sources
  */
 router.get('/api/torrent/settings', (req, res) => {
+  const admin = isAdminUser(req.user);
   res.json({
     mode: getServerSetting('torrent_source_mode', 'resilient'),
-    torznabUrl: getServerSetting('torznab_url', ''),
+    // Adresse de l'indexeur (souvent sur le réseau local) : visible par l'administrateur seulement
+    torznabUrl: admin ? getServerSetting('torznab_url', '') : '',
     hasTorznabApiKey: Boolean(getServerSetting('torznab_api_key', '')),
-    customNyaaUrl: getServerSetting('custom_nyaa_url', '')
+    customNyaaUrl: admin ? getServerSetting('custom_nyaa_url', '') : '',
+    canEdit: admin
   });
 });
 
@@ -52,6 +56,8 @@ router.get('/api/torrent/settings', (req, res) => {
  * Enregistre les paramètres de configuration des sources torrents
  */
 router.post('/api/torrent/settings', (req, res) => {
+  // Réglage commun à tous les utilisateurs : une source modifiée détourne les recherches de tout le monde
+  if (!requireAdmin(req, res)) return;
   const { mode, torznabUrl, torznabApiKey, customNyaaUrl } = req.body || {};
 
   if (mode && ['resilient', 'aggregate', 'nyaa_only'].includes(mode)) {
@@ -88,6 +94,8 @@ router.post('/api/torrent/settings', (req, res) => {
  * Teste la connexion à une instance Jackett / Prowlarr via Torznab
  */
 router.post('/api/torrent/test-torznab', async (req, res) => {
+  // Le serveur appelle l'URL fournie : réservé à l'administrateur (sinon sonde du réseau local)
+  if (!requireAdmin(req, res)) return;
   let { url, apiKey } = req.body || {};
   if (!url) {
     url = getServerSetting('torznab_url', '');

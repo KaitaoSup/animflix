@@ -243,11 +243,25 @@ export function createEpisodeNotifier({
   return { runOnce };
 }
 
+// État affiché sur la page « Serveur »
+const notifierStatus = { enabled: false, lastRunAt: null, lastSent: 0, totalSent: 0, lastError: null, nextRunAt: null };
+
+export function getEpisodeNotifierStatus() {
+  return { ...notifierStatus, subscribedUsers: (() => { try { return pushStore.usersToNotify().length; } catch (e) { return 0; } })() };
+}
+
 export function startEpisodeNotifier() {
   if ((process.env.EPISODE_NOTIFIER || '').toLowerCase() === 'off') return null;
   const notifier = createEpisodeNotifier();
+  notifierStatus.enabled = true;
+  notifierStatus.nextRunAt = Date.now() + NOTIFIER_CONFIG.FIRST_RUN_DELAY_MS;
   const tick = async () => {
-    const { sent } = await notifier.runOnce();
+    const { sent, error } = await notifier.runOnce();
+    notifierStatus.lastRunAt = Date.now();
+    notifierStatus.nextRunAt = Date.now() + NOTIFIER_CONFIG.INTERVAL_MS;
+    notifierStatus.lastSent = sent;
+    notifierStatus.totalSent += sent;
+    notifierStatus.lastError = error || null;
     if (sent > 0) console.log(`🔔 ${sent} notification(s) de nouvel épisode envoyée(s)`);
     try { pushStore.pruneNotified(); } catch (e) {}
   };

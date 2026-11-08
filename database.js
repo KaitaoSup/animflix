@@ -75,6 +75,26 @@ export function verifyPassword(password, hash, salt) {
 }
 
 /**
+ * Administrateur du serveur (page « Serveur », réglages des sources torrent) :
+ *  - les noms listés dans ANIMFLIX_ADMINS (séparés par des virgules), s'il est défini ;
+ *  - sinon le premier compte créé.
+ */
+export function isAdminUser(user) {
+  if (!user || !user.id) return false;
+  const configured = (process.env.ANIMFLIX_ADMINS || '')
+    .split(',').map(n => n.trim().toLowerCase()).filter(Boolean);
+  if (configured.length) {
+    return configured.includes(String(user.username || '').toLowerCase());
+  }
+  try {
+    const row = db.prepare('SELECT MIN(id) AS id FROM users').get();
+    return row?.id === user.id;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
  * Nettoyage des données utilisateur avant envoi au client
  */
 export function sanitizeUser(user) {
@@ -92,6 +112,7 @@ export function sanitizeUser(user) {
   return {
     id: user.id,
     username: user.username,
+    isAdmin: isAdminUser(user),
     createdAt: user.created_at,
     preferences,
     anilist: user.anilist_token ? {

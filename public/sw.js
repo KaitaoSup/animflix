@@ -39,6 +39,7 @@ const PRECACHE_ASSETS = [
   '/js/player/cast.js',
   '/js/history.js',
   '/js/stats.js',
+  '/js/admin.js',
   '/js/sync.js',
   '/js/notifications.js',
   '/js/release-prefs.js',

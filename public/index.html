@@ -926,6 +926,9 @@
                   <div style="font-size: 11px; color: #888; margin-top: 4px; line-height: 1.4;">
                       Bascule automatiquement sur Tokyo Toshokan si Nyaa est bloqué ou ne renvoie aucun résultat.
                   </div>
+                  <div id="torrentSettingsLockNote" style="display: none; font-size: 11.5px; color: #f5c518; margin-top: 6px;">
+                      🔒 Réglages communs à tout le serveur : seul l'administrateur peut les modifier.
+                  </div>
               </div>
 
               <!-- Miroirs Nyaa -->
@@ -958,7 +961,7 @@
                       <input type="password" id="prefTorznabApiKey" class="settings-select" placeholder="Clé API Jackett ou Prowlarr" autocomplete="new-password" onchange="saveTorrentSourceSettings()">
                   </label>
                   <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px;">
-                      <button type="button" class="btn-sub-style" style="padding: 5px 12px; font-size: 12px;" onclick="testTorznabUI()">
+                      <button type="button" id="torznabTestBtn" class="btn-sub-style" style="padding: 5px 12px; font-size: 12px;" onclick="testTorznabUI()">
                           🔌 Tester la connexion
                       </button>
                       <span id="torznabTestStatus" style="font-size: 12px;"></span>
@@ -1096,6 +1099,7 @@
   <script src="/js/player/cast.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/history.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/stats.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/admin.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/sync.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/notifications.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/release-prefs.js?v={{ASSET_VERSION}}"></script>

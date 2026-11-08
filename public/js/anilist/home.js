@@ -288,6 +288,11 @@
                 <button class="home-tab-btn ${activeTab === 'stats' ? 'active' : ''}" onclick="switchHomeTab('stats')">
                     <span>📊 Stats</span>
                 </button>
+                ${typeof isCurrentUserAdmin === 'function' && isCurrentUserAdmin() ? `
+                    <button class="home-tab-btn ${activeTab === 'admin' ? 'active' : ''}" onclick="switchHomeTab('admin')">
+                        <span>🛠️ Serveur</span>
+                    </button>
+                ` : ''}
                 ${!hasAnilist ? `
                     <button class="home-tab-btn ${activeTab === 'anilist' ? 'active' : ''}" onclick="switchHomeTab('anilist')" style="margin-left: auto;">
                         <span>☁️ Connexion AniList</span>
@@ -313,6 +318,8 @@
             renderFavoritesTabHtml(tabContent);
         } else if (activeTab === 'stats' && typeof renderStatsTabHtml === 'function') {
             renderStatsTabHtml(tabContent);
+        } else if (activeTab === 'admin' && typeof renderAdminTabHtml === 'function') {
+            renderAdminTabHtml(tabContent);
         } else {
             // Tab anilist
             if (hasAnilist) {

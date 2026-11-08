@@ -8,6 +8,7 @@ import torrserverRoutes from './routes/torrserverRoutes.js';
 import systemRoutes from './routes/systemRoutes.js';
 import syncRoutes from './routes/syncRoutes.js';
 import pushRoutes from './routes/pushRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import { validateTorrentParams } from './utils/network.js';
 
 export function createApp() {
@@ -47,6 +48,7 @@ export function createApp() {
   app.use(torrserverRoutes);
   app.use(syncRoutes);
   app.use(pushRoutes);
+  app.use(adminRoutes);
 
   return app;
 }

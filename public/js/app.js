@@ -529,7 +529,7 @@ async function fetchServerStatus() {
 // --- GESTION DES SOURCES TORRENT (RÉSILIENCE & TORZNAB) ---
 async function loadTorrentSettings() {
     try {
-        const res = await fetch('/api/torrent/settings');
+        const res = await fetch('/api/torrent/settings', { headers: getAuthHeaders(), credentials: 'include' });
         const data = await res.json();
         const modeEl = document.getElementById('prefTorrentSourceMode');
         const urlEl = document.getElementById('prefTorznabUrl');
@@ -540,6 +540,12 @@ async function loadTorrentSettings() {
         if (keyEl) {
             keyEl.value = data.hasTorznabApiKey ? '********' : '';
         }
+
+        // Réglages communs à tout le serveur : modifiables par l'administrateur seulement
+        const canEdit = data.canEdit === true;
+        [modeEl, urlEl, keyEl, document.getElementById('torznabTestBtn')].forEach(el => { if (el) el.disabled = !canEdit; });
+        const lockNote = document.getElementById('torrentSettingsLockNote');
+        if (lockNote) lockNote.style.display = canEdit ? 'none' : 'block';
     } catch (e) {
         console.warn('Impossible de charger les paramètres torrents:', e);
     }
@@ -551,11 +557,18 @@ async function saveTorrentSourceSettings() {
     const torznabApiKey = document.getElementById('prefTorznabApiKey')?.value;
 
     try {
-        await fetch('/api/torrent/settings', {
+        const res = await fetch('/api/torrent/settings', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
+            credentials: 'include',
             body: JSON.stringify({ mode, torznabUrl, torznabApiKey })
         });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            showToast("⚠️ " + (data.error || "Échec enregistrement torrents"), { isError: true });
+            loadTorrentSettings();
+            return;
+        }
         showToast("💾 Paramètres torrents enregistrés !");
         fetchServerStatus();
     } catch (e) {
@@ -582,11 +595,14 @@ async function testTorznabUI() {
     try {
         const res = await fetch('/api/torrent/test-torznab', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
+            credentials: 'include',
             body: JSON.stringify({ url, apiKey })
         });
         const data = await res.json();
-        if (data.success) {
+        if (!res.ok) {
+            statusEl.innerHTML = `<span style="color: #ff4757;">❌ ${escapeHtml(data.error || 'Test refusé')}</span>`;
+        } else if (data.success) {
             statusEl.innerHTML = `<span style="color: #46d369; font-weight: bold;">✅ ${escapeHtml(data.message)}</span>`;
         } else {
             statusEl.innerHTML = `<span style="color: #ff4757;">❌ ${escapeHtml(data.message)}</span>`;

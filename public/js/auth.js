@@ -63,6 +63,7 @@ async function initAnimflixAuth() {
         currentAnimflixUser = null;
     }
 
+    window.animflixAuthReady = true;
     renderUserAccountNav();
     if (typeof onAnimflixAuthChanged === 'function') onAnimflixAuthChanged();
 }
