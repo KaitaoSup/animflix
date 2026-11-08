@@ -13,6 +13,7 @@ import path from 'path';
 import axios from 'axios';
 import { TORRSERVER_LOCAL_URL } from '../config/constants.js';
 import { isValidMagnet } from '../utils/network.js';
+import { logServerError } from './errorLog.js';
 
 export const DOWNLOAD_LIMITS = {
   MAX_TITLE_LENGTH: 300,
@@ -371,6 +372,7 @@ export function createDownloadManager({
       if (job.cancelled) return;
       store.update(row.id, { status: 'error', error: String(err.message || err).slice(0, 300), downloaded: fileSize(partPath(row.id)) });
       log.warn?.(`📥 Échec du téléchargement ${row.id} : ${err.message}`);
+      logServerError('download', `Échec : ${err.message}`, `${row.title} (${row.id})`);
     } finally {
       if (active === job) active = null;
     }

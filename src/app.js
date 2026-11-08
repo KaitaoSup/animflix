@@ -11,6 +11,7 @@ import pushRoutes from './routes/pushRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import downloadRoutes from './routes/downloadRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
+import sourceRoutes from './routes/sourceRoutes.js';
 import { validateTorrentParams } from './utils/network.js';
 
 export function createApp() {
@@ -53,6 +54,7 @@ export function createApp() {
   app.use(adminRoutes);
   app.use(downloadRoutes);
   app.use(calendarRoutes);
+  app.use(sourceRoutes);
 
   return app;
 }

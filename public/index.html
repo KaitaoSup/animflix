@@ -176,6 +176,9 @@
                       <button id="detailKeepBtn" class="btn-secondary btn-keep-ep" onclick="onKeepOnServerClick()" title="Télécharger l'épisode sur le serveur : il restera regardable même sans seeders">
                           💾 Garder sur le serveur
                       </button>
+                      <button id="detailReportBtn" class="btn-secondary btn-report-source" onclick="reportCurrentSourceBroken()" title="Le torrent ne démarre pas ou est illisible : le signaler pour que le choix automatique en prenne un autre">
+                          🚫 Source cassée
+                      </button>
                       <button id="detailCastBtn" class="btn-secondary btn-cast-tv" onclick="openCastModal()" title="Diffuser sur TV (Chromecast, AirPlay, Smart TV, VLC Réseau)">
                           📺 Diffuser TV
                       </button>
@@ -1103,6 +1106,7 @@
   <script src="/js/player/streaming.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/player/init-controls.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/player/cast.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/player/source-health.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/history.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/stats.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/admin.js?v={{ASSET_VERSION}}"></script>

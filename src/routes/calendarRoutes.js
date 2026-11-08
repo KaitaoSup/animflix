@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db, getUserById } from '../../database.js';
 import { createCalendarStore, createCalendarBuilder, isValidCalendarToken } from '../services/calendarService.js';
 import { anilistRequest } from '../services/episodeNotifier.js';
+import { logServerError } from '../services/errorLog.js';
 
 const router = Router();
 const store = createCalendarStore(db);
@@ -72,6 +73,7 @@ router.get('/calendar/:file', async (req, res) => {
     res.send(ics);
   } catch (err) {
     console.warn(`📅 Agenda indisponible (utilisateur ${user.id}) : ${err.message}`);
+    logServerError('agenda', `Agenda de ${user.username} indisponible : ${err.message}`);
     const status = err.response?.status;
     res.status(502).type('text/plain').send(status === 400 || status === 401
       ? "Le lien AniList de ce compte a expiré ou a été révoqué : reconnectez AniList dans Animflix."

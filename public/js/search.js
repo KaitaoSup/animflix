@@ -238,6 +238,7 @@
             savePlaybackProgress(true);
         }
         if (typeof dismissPlayerRatingPrompt === 'function') dismissPlayerRatingPrompt();
+        if (typeof clearSourceStallReport === 'function') clearSourceStallReport();
         if (typeof dismissResumeBanner === 'function') {
             dismissResumeBanner(false);
         }
@@ -550,6 +551,7 @@
                 const rank = (m) => (m === 'exact' ? 3 : (m === 'pack' || m === 'batch' ? 2 : 1));
                 const rankDiff = rank(b.matchType) - rank(a.matchType);
                 if (rankDiff !== 0) return rankDiff;
+                if (!!a.torrent.reported !== !!b.torrent.reported) return a.torrent.reported ? 1 : -1;
                 return (b.torrent.seeders || 0) - (a.torrent.seeders || 0);
             }
             // Par défaut: seeders desc
@@ -557,6 +559,7 @@
                 if (a.matchType === 'exact' && b.matchType !== 'exact') return -1;
                 if (b.matchType === 'exact' && a.matchType !== 'exact') return 1;
             }
+            if (!!a.torrent.reported !== !!b.torrent.reported) return a.torrent.reported ? 1 : -1;
             return (b.torrent.seeders || 0) - (a.torrent.seeders || 0);
         });
 
@@ -617,6 +620,7 @@
                             <span class="badge-tag-mini">${escapeHtml(resolution)}</span>
                             <span class="badge-tag-mini badge-tag-audio">${audioLang.includes('MULTI') ? 'MULTI' : (audioLang.includes('VF') ? 'VF' : 'VOSTFR')}</span>
                             ${isPreferredGroup ? `<span class="badge-tag-mini badge-tag-preferred" title="Groupe de release préféré">💜 ${escapeHtml(extractReleaseGroup(t.titre))}</span>` : ''}
+                            ${t.reported ? `<span class="badge-tag-mini badge-tag-reported" title="Signalée par ${Number(t.reported.fails) || 1} lecteur(s) : ${escapeHtml(t.reported.reasonLabel || 'ne fonctionne pas')}. Passe après les autres dans le choix automatique.">⚠️ ${escapeHtml(t.reported.reasonLabel || 'Signalée')}</span>` : ''}
                             ${t.source && t.source !== 'nyaa' ? `<span class="badge-tag-mini badge-tag-source" title="Source: ${escapeHtml(t.source)}">🌐 ${escapeHtml(t.source === 'tokyotosho' ? 'TokyoTosho' : 'Torznab')}</span>` : ''}
                         </div>
                         ${highlightBadgeHtml}
@@ -660,6 +664,8 @@
         const candidates = (torrents || []).filter(t => extractEpisodeNumber(t.episode, t.titre) === nextEp);
         const releasePrefs = getReleasePrefs();
         if (hasReleasePrefs(releasePrefs)) candidates.sort((a, b) => compareByReleasePrefs(a, b, releasePrefs));
+        // Sources signalées (ne démarrent pas / illisibles) en dernier ; l'ordre Nyaa est gardé sinon
+        else candidates.sort((a, b) => (a.reported ? 1 : 0) - (b.reported ? 1 : 0));
         return candidates[0] || null;
     }
 

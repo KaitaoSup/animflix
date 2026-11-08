@@ -4,7 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
-import { backupDatabase } from '../src/services/dbMaintenance.js';
+import { backupDatabase, selectBackupsToKeep } from '../src/services/dbMaintenance.js';
 import { createSyncStore } from '../src/services/syncStore.js';
 
 function tempDir() {
@@ -47,6 +47,45 @@ describe('Sauvegarde quotidienne de la base', () => {
       assert.deepEqual(fs.readdirSync(backupDir).sort(), [
         'animflix-2026-11-03.db', 'animflix-2026-11-04.db', 'animflix-2026-11-05.db', 'notes.txt'
       ]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('Rétention par paliers', () => {
+  const name = (d) => `animflix-${d.toISOString().slice(0, 10)}.db`;
+
+  test('7 jours + la plus récente de 4 semaines + celle de 6 mois', () => {
+    // 200 sauvegardes quotidiennes jusqu'au dimanche 8 novembre 2026
+    const names = [];
+    for (let i = 0; i < 200; i++) names.push(name(new Date(Date.UTC(2026, 10, 8 - i))));
+    names.push('notes.txt');
+    const keep = selectBackupsToKeep(names, { daily: 7, weekly: 4, monthly: 6 });
+    const kept = [...keep].sort().map(n => n.slice(9, 19));
+    assert.ok(!keep.has('notes.txt'));
+    // Quotidiennes
+    for (let d = 2; d <= 8; d++) assert.ok(kept.includes(`2026-11-0${d}`));
+    // Hebdomadaires : dimanches des semaines précédentes
+    for (const d of ['2026-11-01', '2026-10-25', '2026-10-18']) assert.ok(kept.includes(d), d);
+    // Mensuelles : dernier jour des mois précédents
+    for (const d of ['2026-10-31', '2026-09-30', '2026-08-31', '2026-07-31', '2026-06-30']) assert.ok(kept.includes(d), d);
+    assert.ok(!kept.includes('2026-05-31'));
+    assert.ok(kept.length <= 7 + 4 + 6);
+  });
+
+  test('backupDatabase applique les paliers par défaut', async () => {
+    const dir = tempDir();
+    try {
+      const db = new Database(':memory:');
+      const backupDir = path.join(dir, 'backups');
+      for (let i = 60; i >= 0; i--) {
+        await backupDatabase(db, { backupDir, retention: { daily: 3, weekly: 2, monthly: 2 }, now: new Date(2026, 10, 8 - i, 12) });
+      }
+      const files = fs.readdirSync(backupDir).sort();
+      assert.ok(files.includes('animflix-2026-11-08.db'));
+      assert.ok(files.includes('animflix-2026-10-31.db'), 'dernier jour du mois précédent');
+      assert.ok(files.length <= 3 + 2 + 2);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

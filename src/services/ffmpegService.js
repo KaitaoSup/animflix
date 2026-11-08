@@ -14,6 +14,7 @@ import {
   cleanupHlsSession
 } from '../utils/sessionManager.js';
 import { mediaInputUrl } from './downloadService.js';
+import { logServerError } from './errorLog.js';
 
 const execFilePromise = promisify(execFile);
 
@@ -227,6 +228,10 @@ export async function analyzeStreams(videoUrl, { timeoutMs = 15000 } = {}) {
     return { subIndex, subTracks, frAudioIndex, audioTracks, duration, videoCodec, videoPixFmt, videoWidth, videoHeight, skipChapters };
   } catch (e) {
     console.log("⚠️ FFPROBE: Analyse rapide streams terminée avec fallback:", e.message);
+    const reason = e.killed ? 'délai dépassé (torrent trop lent ou sans pairs ?)'
+      : (String(e.stderr || '').split(/[\r\n]+/).filter(Boolean).pop() || 'erreur inconnue').replace(/ @ 0x[0-9a-f]+/gi, '').replace(/^(?:https?:\/\/|file:)\S*?:\s+/i, '');
+    const hash = /btih(?:%3A|:)([a-z0-9]+)/i.exec(String(videoUrl))?.[1]?.toLowerCase() || (String(videoUrl).startsWith('file:') ? 'fichier gardé sur le serveur' : null);
+    logServerError('ffprobe', `Analyse du fichier impossible : ${reason}`, hash ? `Torrent ${hash}` : null);
     // Analyse impossible (torrent encore lent…) : on ne connaît PAS les pistes.
     // Ne surtout pas prétendre que la piste 0 est en français : c'est souvent l'anglais.
     return {

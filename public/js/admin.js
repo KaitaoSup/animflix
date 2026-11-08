@@ -119,7 +119,14 @@ function renderAdminReport(r) {
                         ${adminRow('Dernière sauvegarde', `${escapeHtml(new Date(b.latest.at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }))} <small>(il y a ${adminFormatAgo(b.latest.ageMs)})</small>`)}
                         ${adminRow('Sauvegardes conservées', `${b.count} <small>(${adminFormatBytes(b.totalBytes)})</small>`)}
                     ` : `<div class="admin-card-error">Aucune sauvegarde trouvée.</div>`}
-                    <div class="admin-card-sub" style="margin-top: 8px;">Une sauvegarde par jour, les 7 dernières sont gardées.</div>
+                    <div class="admin-card-sub" style="margin-top: 8px;">${escapeHtml(adminRetentionText(b.retention))}</div>
+                    ${b.list && b.list.length ? `
+                        <details class="admin-backup-list">
+                            <summary>Télécharger une sauvegarde (copie hors du serveur)</summary>
+                            <ul>${b.list.map(f => `
+                                <li><a href="/api/admin/backups/${encodeURIComponent(f.name)}" download>⬇ ${escapeHtml(f.name)}</a> <small>${adminFormatBytes(f.size)}</small></li>`).join('')}
+                            </ul>
+                        </details>` : ''}
                     <button type="button" class="btn-sub-style" style="margin-top: 10px;" onclick="runAdminBackup(this)">💾 Sauvegarder maintenant</button>
                 </div>
 
@@ -145,6 +152,85 @@ function renderAdminReport(r) {
             ${adminRow('Appareils notifiés', String(a.pushDevices ?? '—'))}
             ${adminRow('Éléments synchronisés', String(a.syncItems ?? '—'))}
         </div>`;
+}
+
+function adminRetentionText(r) {
+    if (!r) return 'Une sauvegarde par jour, vérifiée avant d\'être gardée.';
+    const parts = [`les ${r.daily} derniers jours`];
+    if (r.weekly) parts.push(`une par semaine sur ${r.weekly} semaines`);
+    if (r.monthly) parts.push(`une par mois sur ${r.monthly} mois`);
+    return `Une sauvegarde par jour, vérifiée avant d'être gardée. Conservées : ${parts.join(', ')}.`;
+}
+
+// --- JOURNAL DES ERREURS ---
+
+const adminErrorsState = { source: '', expanded: new Set() };
+
+function renderAdminErrors(data) {
+    const sources = data.sources || {};
+    const counts = data.counts24h || {};
+    const total24h = Object.values(counts).reduce((s, n) => s + n, 0);
+    const chips = [['', 'Toutes'], ...Object.entries(sources)].map(([id, label]) => {
+        const n = id ? counts[id] : total24h;
+        return `<button type="button" class="filter-chip ${adminErrorsState.source === id ? 'active' : ''}" onclick="loadAdminErrors(${jsArg(id)})">${escapeHtml(label)}${n ? ` <small>(${n})</small>` : ''}</button>`;
+    }).join('');
+    const rows = (data.items || []).map(e => {
+        const when = new Date(e.lastAt).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'medium' });
+        return `
+            <li class="admin-error">
+                <div class="admin-error-head">
+                    <span class="admin-error-source admin-error-${escapeHtml(e.source)}">${escapeHtml(e.sourceLabel)}</span>
+                    <span class="admin-error-time" title="Première fois : ${escapeHtml(new Date(e.firstAt).toLocaleString('fr-FR'))}">${escapeHtml(when)}</span>
+                    ${e.count > 1 ? `<span class="admin-error-count" title="Répétée ${e.count} fois">×${e.count}</span>` : ''}
+                </div>
+                <div class="admin-error-message">${escapeHtml(e.message)}</div>
+                ${e.details ? `<details class="admin-error-details"><summary>Détails</summary><pre>${escapeHtml(e.details)}</pre></details>` : ''}
+            </li>`;
+    }).join('');
+    return `
+        <h3 class="admin-section-title">Journal des erreurs ${total24h ? `<span class="admin-pill admin-pill-warn">${total24h} sur 24 h</span>` : '<span class="admin-pill admin-pill-ok">✅ Rien sur 24 h</span>'}</h3>
+        <div class="admin-card">
+            <div class="admin-error-toolbar">
+                <div class="admin-error-chips">${chips}</div>
+                <div class="admin-error-actions">
+                    <button type="button" class="btn-sub-style" onclick="loadAdminErrors()">🔄</button>
+                    <button type="button" class="btn-sub-style" onclick="clearAdminErrors()" ${rows ? '' : 'disabled'}>🗑️ Vider</button>
+                </div>
+            </div>
+            ${rows ? `<ul class="admin-error-list">${rows}</ul>` : '<div class="admin-card-sub" style="padding: 10px 0;">Aucune erreur enregistrée.</div>'}
+        </div>`;
+}
+
+async function loadAdminErrors(source) {
+    if (typeof source === 'string') adminErrorsState.source = source;
+    const el = document.getElementById('adminErrorsContent');
+    if (!el) return;
+    try {
+        const q = new URLSearchParams({ limit: '150' });
+        if (adminErrorsState.source) q.set('source', adminErrorsState.source);
+        const res = await fetch('/api/admin/errors?' + q, { headers: getAuthHeaders(), credentials: 'include' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        if (!document.body.contains(el)) return;
+        el.innerHTML = renderAdminErrors(data);
+    } catch (err) {
+        el.innerHTML = `<div class="admin-card admin-card-error">Journal indisponible : ${escapeHtml(err.message)}</div>`;
+    }
+}
+
+async function clearAdminErrors() {
+    const ok = typeof openUiDialog === 'function'
+        ? await openUiDialog({ title: 'Vider le journal ?', message: 'Toutes les erreurs enregistrées seront effacées.', okLabel: 'Vider', cancelLabel: 'Annuler', danger: true })
+        : confirm('Vider le journal des erreurs ?');
+    if (!ok) return;
+    try {
+        const res = await fetch('/api/admin/errors', { method: 'DELETE', headers: getAuthHeaders(), credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        showToast('🗑️ Journal vidé');
+    } catch (err) {
+        showToast('❌ ' + err.message);
+    }
+    loadAdminErrors();
 }
 
 async function loadAdminHealth(force = false) {
@@ -213,12 +299,16 @@ function renderAdminTabHtml(container) {
             <div id="adminHealthContent">
                 <div class="admin-card admin-loading"><div class="spinner" style="width: 20px; height: 20px; border-width: 3px; margin: 0;"></div> Vérification des services…</div>
             </div>
+            <div id="adminErrorsContent"></div>
         </div>`;
     loadAdminHealth();
+    loadAdminErrors();
 }
 
 window.renderAdminTabHtml = renderAdminTabHtml;
 window.loadAdminHealth = loadAdminHealth;
 window.runAdminBackup = runAdminBackup;
+window.loadAdminErrors = loadAdminErrors;
+window.clearAdminErrors = clearAdminErrors;
 window.isCurrentUserAdmin = isCurrentUserAdmin;
 window.refreshAdminUi = refreshAdminUi;

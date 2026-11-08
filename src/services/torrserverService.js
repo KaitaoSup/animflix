@@ -6,6 +6,7 @@ import { torrentFilesCache } from '../utils/cache.js';
 import { extractFileEpisodeNumber } from '../utils/animeParser.js';
 import { activeHlsSessions, cleanupHlsSession } from '../utils/sessionManager.js';
 import { cleanDiskCaches } from '../utils/diskCacheCleaner.js';
+import { logServerError } from './errorLog.js';
 
 const VIDEO_EXTENSIONS = new Set(['.mkv', '.mp4', '.avi', '.webm', '.mov', '.m4v', '.ts']);
 
@@ -101,6 +102,10 @@ export async function getTorrentFiles(magnet) {
     if (a.episode !== null && b.episode !== null) return a.episode - b.episode;
     return a.name.localeCompare(b.name, undefined, { numeric: true });
   });
+
+  if (fileStats.length === 0) {
+    logServerError('torrserver', 'Liste des fichiers du torrent introuvable (aucun pair joignable ?)', `Torrent ${hash}`);
+  }
 
   const isMultiFile = videoFiles.length > 1;
   const responseData = {

@@ -71,6 +71,11 @@ function compareByReleasePrefs(a, b, prefs) {
     const aliveB = (Number(b.seeders) || 0) > 0 ? 1 : 0;
     if (aliveA !== aliveB) return aliveB - aliveA;
 
+    // Source signalée par un lecteur (ne démarre pas / illisible) : après les autres
+    const reportedA = a.reported ? 1 : 0;
+    const reportedB = b.reported ? 1 : 0;
+    if (reportedA !== reportedB) return reportedA - reportedB;
+
     const rankA = releaseGroupRank(a, prefs);
     const rankB = releaseGroupRank(b, prefs);
     const gA = rankA === -1 ? Infinity : rankA;

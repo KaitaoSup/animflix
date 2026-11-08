@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { HLS_CACHE_DIR } from '../config/constants.js';
+import { logServerError } from '../services/errorLog.js';
 
 // --- SUIVI ET ISOLATION DES SESSIONS CLIENTS ---
 export const activeClientFfmpegProcesses = new Map(); // key: clientId, value: ChildProcess
@@ -63,8 +64,13 @@ export function drainFfmpegStderr(proc, label = 'FFmpeg') {
   proc.on('close', (code) => {
     // code null = tué volontairement (seek, arrêt) : rien à signaler
     if (code === 0 || code === null || !tail.trim()) return;
-    const lastLines = tail.split(/[\r\n]+/).filter(Boolean).slice(-6).join('\n   ');
+    const lines = tail.split(/[\r\n]+/).filter(Boolean).slice(-6);
+    const lastLines = lines.join('\n   ');
     console.warn(`⚠️ ${label} terminé en erreur (code ${code}) :\n   ${lastLines}`);
+    // Message regroupable : sans identifiant de client / session ni adresse mémoire
+    const kind = label.replace(/\s*\(.*?\)\s*$/, '').replace(/^(FFmpeg HLS)\s.*$/, '$1');
+    const lastLine = (lines[lines.length - 1] || '').replace(/ @ 0x[0-9a-f]+/gi, '').trim();
+    logServerError('ffmpeg', `${kind} : ${lastLine || `code ${code}`}`, `${label} — code ${code}\n${lines.join('\n')}`);
   });
 }
 

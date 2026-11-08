@@ -214,6 +214,7 @@
 
         const playId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         currentPlaySessionId = playId;
+        if (typeof armSourceStallReport === 'function') armSourceStallReport(playId, magnet, currentActiveFileIndex);
 
         const clientId = getOrCreateClientId();
 
@@ -350,6 +351,11 @@
 
         video.onplaying = () => {
             if (streamTimeout) clearTimeout(streamTimeout);
+            // La source fonctionne : efface ses éventuels signalements d'échec
+            if (typeof clearSourceStallReport === 'function') clearSourceStallReport();
+            if (currentPlaySessionId === playId && typeof reportSourceOutcome === 'function') {
+                reportSourceOutcome('ok', null, { magnet, fileIndex: currentActiveFileIndex });
+            }
             resetStreamCapacityRetry();
             playerStatus.style.display = 'none';
             const playIcon = document.getElementById('customPlayIcon');
@@ -438,7 +444,8 @@
                 if (lastP2pData && lastP2pData.totalPeers === 0) {
                     peerNote = "<br><span style='font-size:12px; color:#f87171;'>⚠️ Aucun pair détecté dans le swarm pour le moment.</span>";
                 }
-                statusText.innerHTML = "⏳ Le flux torrent met du temps à démarrer..." + peerNote + "<br><span style='font-size:13px; color:#ffa033;'>Cliquez sur <b>Ouvrir dans VLC</b> ci-dessous pour une lecture immédiate et fluide !</span>";
+                statusText.innerHTML = "⏳ Le flux torrent met du temps à démarrer..." + peerNote + "<br><span style='font-size:13px; color:#ffa033;'>Cliquez sur <b>Ouvrir dans VLC</b> ci-dessous pour une lecture immédiate et fluide !</span>"
+                    + "<br><button type='button' class='btn-secondary btn-report-source-inline' onclick='reportCurrentSourceBroken()'>🚫 Source cassée ? Signaler et en choisir une autre</button>";
             }
         }, 8500);
 
@@ -460,6 +467,7 @@
                 startStreamingInPlayer(magnet, titre, vlcUrl, currentActiveFileIndex, currentStreamOffset);
                 return;
             }
+            if (typeof reportSourceOutcome === 'function') reportSourceOutcome('fail', 'unplayable', { magnet, fileIndex: currentActiveFileIndex });
             statusText.innerHTML = "⚠️ Le navigateur ne peut pas lire ce format directement.<br><span style='font-size:13px; color:#ffa033;'>Utilisez le mode <b>HLS / Transcodage</b> ou cliquez sur <b>Ouvrir dans VLC</b> !</span>";
         };
     }

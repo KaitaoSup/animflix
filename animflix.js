@@ -8,6 +8,7 @@ import { startDbMaintenance } from './src/services/dbMaintenance.js';
 import { startEpisodeNotifier } from './src/services/episodeNotifier.js';
 import { db, dbBackupDir, cleanupExpiredSessions } from './database.js';
 import { initDownloadManager, createDownloadStore } from './src/services/downloadService.js';
+import { initErrorLog } from './src/services/errorLog.js';
 import { getTorrentFiles } from './src/services/torrserverService.js';
 
 // Privilégier IPv4 pour éviter les lenteurs et blocages de résolution DNS
@@ -24,6 +25,7 @@ if (typeof process.loadEnvFile === 'function') {
   }
 }
 
+initErrorLog(db);
 const downloads = initDownloadManager({ store: createDownloadStore(db), dir: DOWNLOADS_DIR, getFiles: getTorrentFiles });
 
 const app = createApp();

@@ -9,6 +9,7 @@ import {
 } from '../services/torrserverService.js';
 import { getTorrentHash } from '../utils/network.js';
 import { parseFileIndex } from '../utils/params.js';
+import { logServerError } from '../services/errorLog.js';
 
 const router = Router();
 
@@ -67,6 +68,7 @@ router.get('/api/torrserver/stats', async (req, res) => {
     const stats = await getTorrServerStats(torrentHash);
     res.json(stats);
   } catch (err) {
+    logServerError('torrserver', 'TorrServer injoignable', err.message);
     res.json({
       online: false,
       found: false,

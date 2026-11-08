@@ -1369,3 +1369,9 @@
             border-radius: 6px;
         }
 
+
+        /* Sources signalées (ne démarrent pas / illisibles) */
+        .badge-tag-mini.badge-tag-reported { background: rgba(229, 9, 20, 0.85); color: #fff; }
+        .btn-report-source { border-color: rgba(248, 113, 113, 0.4) !important; color: #fca5a5 !important; }
+        .btn-report-source:hover { background: rgba(248, 113, 113, 0.14) !important; border-color: #f87171 !important; color: #fff !important; }
+        .btn-report-source-inline { margin-top: 10px; font-size: 12.5px; padding: 6px 12px; }

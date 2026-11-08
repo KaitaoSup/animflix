@@ -1773,3 +1773,29 @@
             .cal-export-url { flex-direction: column; }
             .cal-export-actions .cal-export-reset { margin-left: 0; }
         }
+
+        /* --- PAGE SERVEUR : JOURNAL DES ERREURS & SAUVEGARDES --- */
+        .admin-error-toolbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .admin-error-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .admin-error-chips .filter-chip small { opacity: 0.75; }
+        .admin-error-actions { display: flex; gap: 6px; }
+        .admin-error-list { list-style: none; margin: 0; padding: 0; max-height: 520px; overflow-y: auto; }
+        .admin-error { padding: 9px 2px; border-top: 1px solid #262626; min-width: 0; }
+        .admin-error:first-child { border-top: 0; }
+        .admin-error-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: #999; }
+        .admin-error-source { font-weight: 700; padding: 1px 7px; border-radius: 4px; background: #2a2a2a; color: #ddd; }
+        .admin-error-lecture { background: rgba(229, 9, 20, 0.25); color: #ffb3b3; }
+        .admin-error-ffmpeg, .admin-error-ffprobe { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+        .admin-error-torrserver { background: rgba(56, 189, 248, 0.18); color: #7dd3fc; }
+        .admin-error-count { font-weight: 700; color: #fcd34d; }
+        .admin-error-message { font-size: 13px; color: #eee; margin-top: 3px; overflow-wrap: anywhere; }
+        .admin-error-details summary { font-size: 12px; color: #888; cursor: pointer; margin-top: 4px; }
+        .admin-error-details pre {
+            white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11.5px; color: #bbb;
+            background: #111; border-radius: 6px; padding: 8px; margin: 6px 0 0; max-height: 200px; overflow: auto;
+        }
+        .admin-backup-list { margin-top: 10px; font-size: 13px; }
+        .admin-backup-list summary { cursor: pointer; color: #bbb; }
+        .admin-backup-list ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+        .admin-backup-list a { color: #7dd3fc; text-decoration: none; }
+        .admin-backup-list small { color: #888; margin-left: 6px; }

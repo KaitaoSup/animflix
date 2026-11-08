@@ -13,6 +13,7 @@ import { getTorznabConfig, testTorznabConnection } from './torznabService.js';
 import { getTorrentSourcesStatus } from './torrentAggregator.js';
 import { getEpisodeNotifierStatus } from './episodeNotifier.js';
 import { getDetectedHwAccel } from './ffmpegService.js';
+import { BACKUP_RETENTION } from './dbMaintenance.js';
 import { countActiveStreams, activeHlsSessions } from '../utils/sessionManager.js';
 
 /**
@@ -238,6 +239,7 @@ export function getHealthReport({ force = false } = {}) {
   const promise = (async () => {
     const [services, storage, backupFiles] = await Promise.all([checkServices(), checkStorage(), listBackupFiles()]);
     const backups = summarizeBackups(backupFiles);
+    backups.retention = BACKUP_RETENTION;
     const notifier = getEpisodeNotifierStatus();
     notifier.level = !notifier.enabled ? 'off' : notifier.lastError ? 'warn' : 'ok';
     const activity = checkActivity();

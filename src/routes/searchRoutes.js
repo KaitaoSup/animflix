@@ -4,6 +4,8 @@ import { getTorrentSourcesStatus } from '../services/torrentAggregator.js';
 import { testTorznabConnection } from '../services/torznabService.js';
 import { getServerSetting, setServerSetting, isAdminUser } from '../../database.js';
 import { requireAdmin } from '../utils/admin.js';
+import { annotateTorrents } from '../services/sourceHealth.js';
+import { sourceHealthStore } from './sourceRoutes.js';
 
 const router = Router();
 
@@ -18,7 +20,10 @@ router.get('/api/search', async (req, res) => {
 
   try {
     const videos = await searchAnime(query, type, { mode });
-    res.json(videos);
+    // Sources signalées par les lecteurs (lecture échouée) : le client les fait passer après les autres
+    let annotated = videos;
+    try { annotated = annotateTorrents(sourceHealthStore, videos); } catch (e) {}
+    res.json(annotated);
   } catch (error) {
     console.error("⚠️ Erreur recherche multi-sources torrent:", error.message);
     res.status(500).json([]);

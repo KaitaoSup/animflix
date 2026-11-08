@@ -7,6 +7,7 @@ import { getTorrentHash } from '../utils/network.js';
 import { getCachedStreamInfo } from './ffmpegService.js';
 import { touchCacheFile } from '../utils/diskCacheCleaner.js';
 import { mediaInputUrl } from './downloadService.js';
+import { logServerError } from './errorLog.js';
 
 /**
  * Retire les segments en mode dessin vectoriel ({\p1} m 0 0 l 10 0 ... jusqu'à {\p0}) :
@@ -340,6 +341,7 @@ async function startSubExtraction({ magnet, parsedFileIndex, parsedSubIndex, cac
 
   ffmpeg.on('error', (err) => {
     console.error(`❌ FFmpeg sous-titres introuvable ou en erreur : ${err.message}`);
+    logServerError('ffmpeg', `Extraction des sous-titres : ${err.message}`);
   });
 
   ffmpeg.on('close', (code) => {

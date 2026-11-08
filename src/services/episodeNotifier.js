@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { pushStore, sendPushToUser } from './pushService.js';
 import { searchAllTorrents } from './torrentAggregator.js';
+import { logServerError } from './errorLog.js';
 
 /**
  * Notifications de nouveaux épisodes.
@@ -262,6 +263,7 @@ export function startEpisodeNotifier() {
     notifierStatus.lastSent = sent;
     notifierStatus.totalSent += sent;
     notifierStatus.lastError = error || null;
+    if (error) logServerError('notifier', `Surveillance des épisodes : ${error}`);
     if (sent > 0) console.log(`🔔 ${sent} notification(s) de nouvel épisode envoyée(s)`);
     try { pushStore.pruneNotified(); } catch (e) {}
   };
