@@ -119,6 +119,8 @@
 
     // --- LECTEUR VIDÉO ET STREAMING ---
     async function startStreamingInPlayer(magnet, titre, vlcUrl, fileIndex = null, seekSeconds = 0) {
+        // Relance différée (saut, synchro audio…) arrivée après la fermeture du lecteur : rien à lire
+        if (!magnet) return;
         currentActiveMagnet = magnet;
         if (fileIndex !== null) {
             currentActiveFileIndex = fileIndex;

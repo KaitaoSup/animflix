@@ -44,6 +44,9 @@
             const data = await res.json();
             const files = data.files || [];
 
+            // Page quittée (ou autre torrent lancé) pendant le chargement : ne surtout pas relancer la lecture
+            if (currentActiveMagnet !== anime.lienMagnet) return;
+
             if (data.isMultiFile && files.length > 1) {
                 window._currentPackFiles = files;
                 packCount.innerText = files.length;
@@ -247,12 +250,34 @@
         const menu = document.getElementById('subStyleMenu');
         if (menu) menu.style.display = 'none';
 
+        // Plus aucune session de lecture : invalide toutes les relances asynchrones encore en vol
+        // (bascule Direct -> HLS sur erreur, nouvel essai serveur saturé, reprise HLS expirée…)
+        currentPlaySessionId = null;
+        if (typeof seekDebounceTimeout !== 'undefined' && seekDebounceTimeout) {
+            clearTimeout(seekDebounceTimeout);
+            seekDebounceTimeout = null;
+        }
+        if (typeof audioSyncDebounceTimeout !== 'undefined' && audioSyncDebounceTimeout) {
+            clearTimeout(audioSyncDebounceTimeout);
+            audioSyncDebounceTimeout = null;
+        }
+        if (typeof resetStreamCapacityRetry === 'function') resetStreamCapacityRetry();
+
         const video = document.getElementById('videoPlayer');
+        // Détacher les gestionnaires de l'épisode AVANT de vider la source : `video.src = ""` déclenche
+        // un événement `error`, que l'ancien onerror prenait pour un codec non supporté et qui relançait
+        // l'épisode en HLS… en arrière-plan, sur la page d'accueil.
+        video.onerror = null;
+        video.oncanplay = null;
+        video.onplaying = null;
+        video.onwaiting = null;
         if (typeof destroyCurrentHlsInstance === 'function') {
             destroyCurrentHlsInstance(true);
         }
         video.pause();
-        video.src = "";
+        // Vider la source sans déclencher d'erreur et libérer réellement le flux
+        video.removeAttribute('src');
+        video.load();
         for (let i = 0; i < video.textTracks.length; i++) {
             video.textTracks[i].mode = 'disabled';
         }
