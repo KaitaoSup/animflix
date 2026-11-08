@@ -27,6 +27,10 @@
         if (!jassubInstance) return;
         try {
             const video = document.getElementById('videoPlayer');
+            // Vidéo pas encore chargée : ne rien dessiner. Une taille inventée (1920×1080) ferait croire à
+            // JASSUB que le canvas est déjà dimensionné alors qu'il a été calculé sur une vidéo de 0×0 (NaN) :
+            // il ne serait jamais redimensionné et les sous-titres resteraient invisibles.
+            if (!jassubInstance._lastDemandTime && !(video && video.videoWidth > 0)) return;
             const data = jassubInstance._lastDemandTime || {
                 mediaTime: video ? (video.currentTime || 0) : 0,
                 width: video ? (video.videoWidth || 1920) : 1920,

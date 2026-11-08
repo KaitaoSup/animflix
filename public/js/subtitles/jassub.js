@@ -101,12 +101,23 @@
                 return;
             }
 
-            try {
-                if (typeof instance.resize === 'function') {
-                    await instance.resize(true);
-                }
-                safeJassubRender(true);
-            } catch (e) {}
+            if (video.videoWidth > 0) {
+                try {
+                    if (typeof instance.resize === 'function') {
+                        await instance.resize(true);
+                    }
+                    safeJassubRender(true);
+                } catch (e) {}
+            } else {
+                // Lancement d'un épisode : les sous-titres arrivent souvent avant la vidéo. Sans ses dimensions,
+                // JASSUB calcule un canvas de taille invalide : dimensionner et dessiner dès qu'elles sont connues.
+                video.addEventListener('loadedmetadata', () => {
+                    if (jassubInstance !== instance) return;
+                    Promise.resolve(typeof instance.resize === 'function' ? instance.resize(true) : null)
+                        .then(() => safeJassubRender(true))
+                        .catch(() => {});
+                }, { once: true });
+            }
 
             // Polices de la team : ajoutées sans bloquer le premier affichage (téléchargement parfois lourd)
             applyEmbeddedFonts(instance);
