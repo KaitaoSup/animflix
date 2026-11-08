@@ -1,6 +1,7 @@
 import test, { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveClientId } from '../src/utils/sessionManager.js';
+import { spawn } from 'node:child_process';
+import { resolveClientId, drainFfmpegStderr } from '../src/utils/sessionManager.js';
 
 describe('Multi-Client Session Manager', () => {
   it('accepte un clientId valide depuis req.query', () => {
@@ -86,5 +87,25 @@ describe('Limite de flux et nettoyage HLS', () => {
     activeHlsSessions.set(playId, { ffmpegProcess: fakeProc(true) });
     cleanupHlsSession(playId);
     assert.ok(!fs.existsSync(dir));
+  });
+});
+
+describe('drainFfmpegStderr', () => {
+  // Régression : un FFmpeg HLS dont personne ne lit le stderr se bloquait après ~100 segments
+  // (tampon du socket plein), ce qui figeait la lecture et faisait tomber le débit torrent à 0.
+  it('évite le blocage d\'un processus qui écrit beaucoup sur stderr', async () => {
+    const script = "const l='x'.repeat(1023)+'\\n'; for (let i = 0; i < 2048; i++) process.stderr.write(l);";
+    const proc = spawn(process.execPath, ['-e', script]);
+    drainFfmpegStderr(proc, 'test');
+    const code = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { proc.kill('SIGKILL'); reject(new Error('processus bloqué sur stderr')); }, 10000);
+      proc.on('close', (c) => { clearTimeout(timer); resolve(c); });
+    });
+    assert.strictEqual(code, 0);
+  });
+
+  it('ignore un processus sans stderr', () => {
+    assert.doesNotThrow(() => drainFfmpegStderr(null));
+    assert.doesNotThrow(() => drainFfmpegStderr({}));
   });
 });

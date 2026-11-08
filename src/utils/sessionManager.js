@@ -44,6 +44,30 @@ export function killClientFfmpegProcess(clientId) {
   }
 }
 
+/**
+ * Lit en continu le stderr d'un processus FFmpeg de streaming.
+ *
+ * Sans lecteur, le tampon du socket stderr (~200 Ko) se remplit avec le journal de FFmpeg
+ * (une ligne par segment HLS, statistiques de progression, une ligne par image avec showinfo…).
+ * FFmpeg se bloque alors sur l'écriture de son journal, cesse de lire TorrServer, et la lecture
+ * se fige au bout de quelques minutes (débit du torrent à ~0 o/s malgré les seeders).
+ *
+ * Les dernières lignes sont gardées et affichées si FFmpeg se termine en erreur.
+ */
+export function drainFfmpegStderr(proc, label = 'FFmpeg') {
+  if (!proc?.stderr) return;
+  let tail = '';
+  proc.stderr.on('data', (chunk) => {
+    tail = (tail + chunk.toString('utf8')).slice(-4000);
+  });
+  proc.on('close', (code) => {
+    // code null = tué volontairement (seek, arrêt) : rien à signaler
+    if (code === 0 || code === null || !tail.trim()) return;
+    const lastLines = tail.split(/[\r\n]+/).filter(Boolean).slice(-6).join('\n   ');
+    console.warn(`⚠️ ${label} terminé en erreur (code ${code}) :\n   ${lastLines}`);
+  });
+}
+
 function isProcessAlive(proc) {
   return Boolean(proc) && proc.exitCode === null && proc.signalCode === null;
 }

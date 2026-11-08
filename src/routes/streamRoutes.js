@@ -22,7 +22,8 @@ import {
   clientActiveHlsMap,
   cleanupHlsSession,
   stopClientHlsSession,
-  killClientFfmpegProcess
+  killClientFfmpegProcess,
+  drainFfmpegStderr
 } from '../utils/sessionManager.js';
 import {
   getStreamInfo,
@@ -234,6 +235,7 @@ router.get('/play', async (req, res) => {
     });
 
     const ffmpeg = spawn('ffmpeg', directArgs);
+    drainFfmpegStderr(ffmpeg, `FFmpeg direct (${clientId})`);
     activeClientFfmpegProcesses.set(clientId, ffmpeg);
 
     if (playSession) {
@@ -330,6 +332,7 @@ router.get('/play', async (req, res) => {
   });
 
   const ffmpeg = spawn('ffmpeg', transcodeArgs);
+  drainFfmpegStderr(ffmpeg, `FFmpeg transcodage (${clientId})`);
   activeClientFfmpegProcesses.set(clientId, ffmpeg);
 
   ffmpeg.stdout.pipe(res);
@@ -441,6 +444,8 @@ router.get('/api/hls/:playId/index.m3u8', async (req, res) => {
   });
 
   const ffmpeg = spawn('ffmpeg', hlsArgs);
+  // Indispensable : sans lecture du stderr, FFmpeg se fige après ~100 segments (voir drainFfmpegStderr)
+  drainFfmpegStderr(ffmpeg, `FFmpeg HLS ${playId}`);
 
   const hlsSession = {
     playId,

@@ -2,7 +2,8 @@ module.exports = {
   apps: [
     {
       name: 'torrserver',
-      script: './TorrServer-linux-amd64',
+      // Attend que le réseau soit prêt (sinon le DHT de TorrServer reste vide jusqu'au prochain redémarrage)
+      script: './scripts/start-torrserver.sh',
       exec_mode: 'fork',
       interpreter: 'none',
       autorestart: true,

@@ -137,6 +137,28 @@
             }
         }
         
+        // ⚡ SEEK DANS LA PARTIE DÉJÀ GÉNÉRÉE PAR LE SERVEUR (HLS) : les segments existent déjà,
+        // inutile de tuer FFmpeg et de tout retélécharger (le remux va bien plus vite que la lecture)
+        if (video && typeof getHlsGeneratedRange === 'function') {
+            const range = getHlsGeneratedRange();
+            const relTarget = target - currentStreamOffset;
+            if (range && relTarget >= range.start && relTarget <= range.end - 1) {
+                if (seekDebounceTimeout) {
+                    clearTimeout(seekDebounceTimeout);
+                    seekDebounceTimeout = null;
+                }
+                pendingSeekTarget = null;
+                try {
+                    video.currentTime = relTarget;
+                    updatePlayerProgress();
+                    if (typeof updateMediaSessionPositionState === 'function') {
+                        updateMediaSessionPositionState(true);
+                    }
+                    return;
+                } catch (e) {}
+            }
+        }
+
         // Rafraîchissement visuel immédiat de la timeline vers la cible demandée
         pendingSeekTarget = target;
         updatePlayerProgress(target);

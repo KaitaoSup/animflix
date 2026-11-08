@@ -22,6 +22,30 @@
     }
     window.destroyCurrentHlsInstance = destroyCurrentHlsInstance;
 
+    /**
+     * Plage (secondes, relative au début du flux en cours) que FFmpeg a déjà générée dans la session HLS.
+     * Un saut dans cette plage se fait sans relancer FFmpeg : les segments sont déjà sur le serveur.
+     * Retourne null hors HLS ou si la playlist n'est pas encore connue.
+     */
+    function getHlsGeneratedRange() {
+        if (currentHlsInstance) {
+            const levels = currentHlsInstance.levels || [];
+            const level = levels[currentHlsInstance.currentLevel] || levels[0];
+            const frags = level && level.details && level.details.fragments;
+            if (!frags || frags.length === 0) return null;
+            const last = frags[frags.length - 1];
+            return { start: frags[0].start, end: last.start + last.duration };
+        }
+        // HLS natif (Safari / iOS) : la plage navigable couvre toute la playlist EVENT
+        const video = document.getElementById('videoPlayer');
+        if (video && typeof video.src === 'string' && video.src.includes('/api/hls/') &&
+            video.seekable && video.seekable.length > 0) {
+            return { start: video.seekable.start(0), end: video.seekable.end(video.seekable.length - 1) };
+        }
+        return null;
+    }
+    window.getHlsGeneratedRange = getHlsGeneratedRange;
+
     // --- SERVEUR SATURÉ (HTTP 503 : limite de lectures simultanées atteinte) ---
     // Une <video> ne donne pas le code HTTP de son échec : on interroge /api/streams/capacity pour savoir
     // si le refus vient de la saturation, plutôt que d'annoncer à tort un format illisible.
@@ -236,6 +260,17 @@
                                     statusText.innerHTML = "⚠️ Le serveur a refusé le flux HLS. Réessayez dans un instant.";
                                 }
                             });
+                        return;
+                    }
+                    // 404 : la session HLS n'existe plus côté serveur (supprimée après 2 min sans requête,
+                    // typiquement une longue pause). Relancer le flux à la position actuelle au lieu de
+                    // laisser hls.js réessayer indéfiniment une session disparue.
+                    if (data && data.fatal && data.response && data.response.code === 404 &&
+                        currentPlaySessionId === playId) {
+                        const resumeAt = Math.max(0, Math.floor(currentStreamOffset + (video.currentTime || 0)));
+                        console.warn(`📡 Session HLS ${playId} expirée côté serveur : reprise à ${resumeAt}s`);
+                        destroyCurrentHlsInstance(false);
+                        startStreamingInPlayer(magnet, titre, vlcUrl, currentActiveFileIndex, resumeAt);
                         return;
                     }
                     if (data && data.fatal) {
