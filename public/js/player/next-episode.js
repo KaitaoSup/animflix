@@ -166,7 +166,9 @@
             findSequelMedia(currentAnilistMedia?.id).then(sequel => {
                 if (window._currentPlayingEpisodeKey !== epKey) return; // autre épisode lancé entre-temps
                 if (!sequel) {
-                    showToast("🎉 Vous avez terminé tous les épisodes de cette saison !");
+                    // Pas de suite : invitation à noter la série (si elle n'a pas encore de note AniList)
+                    const prompted = typeof maybePromptAnilistRating === 'function' && maybePromptAnilistRating();
+                    if (!prompted) showToast("🎉 Vous avez terminé tous les épisodes de cette saison !");
                     return;
                 }
                 showNextEpisodeOverlay({

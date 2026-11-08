@@ -71,7 +71,7 @@
                             }
                         }
                     }
-                    ${token ? 'mediaListEntry { id status progress }' : ''}
+                    ${token ? 'mediaListEntry { id status progress score(format: POINT_100) }' : ''}
                 }
             }
         `;
@@ -451,15 +451,18 @@
         const searched = !!animePageState.torrents;
         const isTarget = ep === (animePageState.highlightEp || model.target);
         const isPlaying = animePageState.playingEp === ep;
+        const kept = typeof getKeptEpisodeDownload === 'function' ? getKeptEpisodeDownload(animePageState.media?.id, ep) : null;
 
         const classes = ['anime-ep-tile'];
         if (watched) classes.push('is-watched');
         if (partial) classes.push('is-partial');
         if (isTarget) classes.push('is-target');
         if (isPlaying) classes.push('is-loading');
-        if (searched && !avail) classes.push('no-source');
+        if (kept) classes.push('is-kept');
+        else if (searched && !avail) classes.push('no-source');
 
-        const sourceLabel = !searched ? '' : (avail === 'single' ? 'Source trouvée' : (avail === 'pack' ? 'Dans un pack' : 'Recherche à la demande'));
+        const sourceLabel = kept ? 'Gardé sur le serveur'
+            : !searched ? '' : (avail === 'single' ? 'Source trouvée' : (avail === 'pack' ? 'Dans un pack' : 'Recherche à la demande'));
         const stateLabel = watched ? 'vu' : (partial ? `en cours, ${pct} %` : 'non vu');
         const thumbStyle = info?.thumbnail ? ` style="background-image:url('${escapeHtml(info.thumbnail)}')"` : '';
 
@@ -469,13 +472,14 @@
                 <div class="anime-ep-thumb"${thumbStyle}>
                     <span class="anime-ep-num">${model.isMovie ? '🎬' : ep}</span>
                     ${watched ? '<span class="anime-ep-state" title="Vu">✓</span>' : ''}
+                    ${kept ? '<span class="anime-ep-kept" title="Gardé sur le serveur : regardable sans seeders">💾</span>' : ''}
                     ${isPlaying ? '<span class="anime-ep-spinner"></span>' : '<span class="anime-ep-play" aria-hidden="true">▶</span>'}
                 </div>
                 <div class="anime-ep-body">
                     <span class="anime-ep-label">${model.isMovie ? 'Film' : 'Épisode ' + ep}${partial ? ` · <span class="anime-ep-resume">${formatTimestamp(hist.currentTime)}</span>` : ''}</span>
                     ${info?.title ? `<span class="anime-ep-title">${escapeHtml(info.title)}</span>` : ''}
                 </div>
-                ${sourceLabel ? `<span class="anime-ep-source anime-ep-source-${avail || 'none'}" title="${sourceLabel}"></span>` : ''}
+                ${sourceLabel ? `<span class="anime-ep-source anime-ep-source-${kept ? 'kept' : (avail || 'none')}" title="${sourceLabel}"></span>` : ''}
                 ${pct > 0 ? `<div class="anime-ep-progress"><span style="width:${pct}%"></span></div>` : ''}
             </button>`;
     }
@@ -679,6 +683,7 @@
                                     <select onchange="onAnimePageLanguageChange(this.value)" title="Langue des sources Nyaa">${typeOptions}</select>
                                 </label>
                             </div>
+                            ${renderAnimeListPanel(media)}
                             <div id="animeSourceStatus" class="anime-source-status" role="status" aria-live="polite"></div>
                         </div>
                     </div>
@@ -847,7 +852,22 @@
                 return;
             }
 
-            // 2. Meilleur torrent parmi les résultats déjà chargés, sinon recherche ciblée sur l'épisode
+            // 2. Épisode gardé sur le serveur : lecture depuis le disque, sans dépendre des seeders
+            const kept = typeof getKeptEpisodeDownload === 'function' ? getKeptEpisodeDownload(media.id, ep) : null;
+            if (kept) {
+                showToast(`💾 Épisode ${ep} lu depuis le serveur`);
+                openAnimeDetail({
+                    titre: kept.fileName || kept.title,
+                    animeName: animeDisplayTitle(media),
+                    episode: ep,
+                    lienMagnet: kept.magnet,
+                    poster: kept.poster || media.coverImage?.large || null,
+                    seeders: 0
+                }, kept.fileIndex || 1, 0);
+                return;
+            }
+
+            // 3. Meilleur torrent parmi les résultats déjà chargés, sinon recherche ciblée sur l'épisode
             let torrents = await ensureAnimeTorrents();
             let pick = pickTorrentForEpisode(torrents, ep, media);
             if (!pick || pick.kind === 'pack') {
@@ -962,6 +982,94 @@
         if (!animePageState.media) return;
         onAnimePageLanguageChange(document.getElementById('searchType')?.value || 'vostfr');
         renderAnimePage();
+    }
+
+    // --- MA LISTE ANILIST (STATUT & NOTE) ---
+
+    function renderAnimeListPanel(media) {
+        if (!localStorage.getItem('anilist_token') || typeof renderAnilistRatingStars !== 'function') return '';
+        const entry = media.mediaListEntry;
+        const status = entry?.status || '';
+        const options = [
+            status ? '' : '<option value="" selected>➕ Ajouter à ma liste</option>',
+            ...ANILIST_LIST_STATUSES.map(([value, label]) =>
+                `<option value="${value}" ${value === status ? 'selected' : ''}>${escapeHtml(label)}</option>`),
+            status ? '<option value="__remove">🗑️ Retirer de ma liste</option>' : ''
+        ].join('');
+        const askRating = status === 'COMPLETED' && !entry?.score;
+        return `
+            <div class="anime-list-panel ${askRating ? 'is-asking' : ''}" id="animeListPanel">
+                <label class="anime-list-status">
+                    <span>Ma liste</span>
+                    <select onchange="setAnimeListStatus(this.value)" aria-label="Statut dans ma liste AniList">${options}</select>
+                </label>
+                <div class="anime-list-rating">
+                    <span>${askRating ? 'Terminé : votre note ?' : 'Ma note'}</span>
+                    ${renderAnilistRatingStars(entry?.score || 0, 'rateAnimePage')}
+                </div>
+            </div>`;
+    }
+
+    // Redessine seulement le panneau (garde le focus clavier / télécommande sur l'étoile choisie)
+    function refreshAnimeListPanel() {
+        const panel = document.getElementById('animeListPanel');
+        const media = animePageState.media;
+        if (!panel || !media) return renderAnimePage();
+        const focusedIdx = [...panel.querySelectorAll('button, select')].indexOf(document.activeElement);
+        const tmp = document.createElement('div');
+        tmp.innerHTML = renderAnimeListPanel(media);
+        const fresh = tmp.firstElementChild;
+        if (!fresh) return panel.remove();
+        panel.replaceWith(fresh);
+        if (focusedIdx >= 0) fresh.querySelectorAll('button, select')[focusedIdx]?.focus({ preventScroll: true });
+    }
+
+    async function setAnimeListStatus(value) {
+        const media = animePageState.media;
+        if (!media || !value) return;
+        const title = animeDisplayTitle(media);
+        try {
+            if (value === '__remove') {
+                const ok = typeof openUiDialog === 'function'
+                    ? await openUiDialog({
+                        title: 'Retirer de ma liste ?',
+                        message: `« ${title} » sera retiré de votre liste AniList, avec sa progression et sa note.`,
+                        okLabel: 'Retirer', cancelLabel: 'Annuler', danger: true
+                    })
+                    : confirm(`Retirer « ${title} » de votre liste AniList ?`);
+                if (!ok || !media.mediaListEntry?.id) return refreshAnimeListPanel();
+                await deleteAnilistListEntry(media.id, media.mediaListEntry.id);
+                showToast(`🗑️ « ${title} » retiré de votre liste`);
+            } else {
+                const fields = { status: value };
+                // « Terminé » : progression au dernier épisode, comme sur le site AniList
+                if (value === 'COMPLETED' && media.episodes) fields.progress = media.episodes;
+                await saveAnilistListEntry(media.id, fields);
+                const label = (ANILIST_LIST_STATUSES.find(([v]) => v === value) || [])[1] || value;
+                showToast(`✅ Ma liste : ${label}`);
+            }
+            renderAnimePage(); // la progression (tuiles vues, bouton principal) peut avoir changé
+        } catch (err) {
+            showToast('⚠️ Échec de la mise à jour AniList : ' + err.message);
+            refreshAnimeListPanel();
+        }
+    }
+
+    async function rateAnimePage(scoreRaw) {
+        const media = animePageState.media;
+        if (!media) return;
+        try {
+            const fields = { scoreRaw };
+            // Pas encore dans la liste : un anime noté a été vu (Terminé s'il est fini, sinon En cours)
+            if (!media.mediaListEntry?.status) fields.status = media.status === 'FINISHED' ? 'COMPLETED' : 'CURRENT';
+            await saveAnilistListEntry(media.id, fields);
+            showToast(scoreRaw ? `⭐ Note enregistrée : ${anilistScoreLabel(scoreRaw)}` : '⭐ Note retirée');
+            if (fields.status) renderAnimePage();
+            else refreshAnimeListPanel();
+        } catch (err) {
+            showToast('⚠️ Note non enregistrée : ' + err.message);
+            refreshAnimeListPanel();
+        }
     }
 
     // --- FAVORIS ---

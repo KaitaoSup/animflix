@@ -1663,3 +1663,87 @@
             .admin-refresh { margin-left: 0; width: 100%; }
             .admin-columns { grid-template-columns: minmax(0, 1fr); }
         }
+
+        /* --- MA LISTE ANILIST : STATUT & NOTE (FICHE ANIME, LECTEUR) --- */
+        .anime-list-panel {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px;
+            margin-top: 12px; padding: 10px 14px;
+            background: rgba(2, 169, 255, 0.07); border: 1px solid rgba(2, 169, 255, 0.22); border-radius: 10px;
+        }
+        .anime-list-panel.is-asking { border-color: rgba(255, 196, 0, 0.55); background: rgba(255, 196, 0, 0.08); }
+        .anime-list-status, .anime-list-rating { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #bbb; }
+        .anime-list-status select {
+            background: #182330; color: #fff; border: 1px solid #283e58; border-radius: 6px;
+            padding: 7px 10px; font-size: 13px;
+        }
+        .anime-list-panel.is-asking .anime-list-rating > span { color: #ffc400; font-weight: 600; }
+
+        .al-rating { display: inline-flex; align-items: center; gap: 2px; }
+        .al-star {
+            position: relative; display: inline-block; width: 26px; height: 26px;
+            font-size: 24px; line-height: 26px; text-align: center;
+        }
+        .al-star::before, .al-star::after {
+            content: '★'; position: absolute; inset: 0; pointer-events: none;
+        }
+        .al-star::before { color: #3a3f48; }
+        .al-star::after { color: #ffc400; overflow: hidden; width: 0; }
+        .al-star.is-half::after { width: 50%; }
+        .al-star.is-full::after { width: 100%; }
+        .al-rating.is-previewing .al-star::after { color: #ffd84d; }
+        .al-star-hit {
+            position: absolute; top: 0; bottom: 0; width: 50%; z-index: 1;
+            padding: 0; margin: 0; border: 0; border-radius: 3px;
+            background: transparent; cursor: pointer; min-height: 0;
+        }
+        .al-star-hit:hover, .al-star-hit:focus { background: transparent; }
+        .al-star-hit:focus-visible { outline: 2px solid #02a9ff; outline-offset: 1px; }
+        .al-star-hit.is-left { left: 0; }
+        .al-star-hit.is-right { right: 0; }
+        .al-rating-value { margin-left: 8px; font-size: 13px; font-weight: 700; color: #fff; min-width: 72px; }
+
+        .player-rating-prompt { z-index: 36; }
+        .player-rating-prompt .al-rating { margin-top: 2px; }
+
+        @media (max-width: 600px) {
+            .anime-list-panel { gap: 10px; }
+            .al-star { width: 30px; height: 30px; font-size: 28px; line-height: 30px; }
+        }
+
+        /* --- ÉPISODES GARDÉS SUR LE SERVEUR --- */
+        .anime-ep-source-kept { background: #02a9ff; }
+        .anime-ep-kept {
+            position: absolute; z-index: 1; bottom: 8px; right: 8px; padding: 2px 6px; border-radius: 6px;
+            background: rgba(0, 0, 0, 0.7); font-size: 12px; line-height: 1.3;
+        }
+
+        .dl-header { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; color: #bbb; font-size: 13.5px; margin: 4px 0 14px; }
+        .dl-header b { color: #fff; }
+        .dl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+        .dl-card {
+            display: flex; gap: 12px; min-width: 0; padding: 12px;
+            background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px;
+        }
+        .dl-card.dl-error { border-color: rgba(229, 9, 20, 0.45); }
+        .dl-card.dl-downloading { border-color: rgba(2, 169, 255, 0.45); }
+        .dl-cover { width: 74px; height: 106px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: #111; }
+        .dl-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+        .dl-title { font-weight: 700; color: #fff; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dl-sub { color: #bbb; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dl-status { font-size: 12.5px; color: #ddd; }
+        .dl-meta { font-size: 12px; color: #888; }
+        .dl-error { font-size: 12px; color: #ff8a8a; }
+        .dl-progress { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+        .dl-progress div { height: 100%; background: #02a9ff; transition: width 0.6s ease; }
+        .dl-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 6px; }
+        .dl-actions button { font-size: 12.5px; padding: 6px 10px; min-height: 0; }
+        .dl-actions .dl-btn-play { padding: 6px 14px; font-size: 13px; box-shadow: none; flex-direction: row; }
+        .dl-actions .dl-btn-delete { margin-left: auto; }
+
+        .player-btn-keep.is-done, .btn-keep-ep.is-done { color: #7dd87d; }
+        .player-btn-keep.is-busy, .btn-keep-ep.is-busy { color: #6cc8ff; }
+        .player-btn-keep.is-error, .btn-keep-ep.is-error { color: #ff8a8a; }
+
+        @media (max-width: 600px) {
+            .dl-grid { grid-template-columns: 1fr; }
+        }

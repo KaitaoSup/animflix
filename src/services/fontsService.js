@@ -3,9 +3,10 @@ import { promisify } from 'util';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { FONT_CACHE_DIR, TORRSERVER_LOCAL_URL } from '../config/constants.js';
+import { FONT_CACHE_DIR } from '../config/constants.js';
 import { getTorrentHash } from '../utils/network.js';
 import { touchCacheFile } from '../utils/diskCacheCleaner.js';
+import { mediaInputUrl } from './downloadService.js';
 
 const execFilePromise = promisify(execFile);
 
@@ -70,7 +71,7 @@ function readCachedManifest(manifestKey) {
 }
 
 async function extractFonts(magnet, fileIndex, manifestKey) {
-  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${fileIndex}&play`;
+  const torrUrl = mediaInputUrl(magnet, fileIndex);
 
   // 1. Lister les pièces jointes (elles sont dans l'en-tête Matroska : lecture rapide)
   const { stdout } = await execFilePromise('ffprobe', [

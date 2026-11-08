@@ -2,10 +2,11 @@ import { Transform } from 'stream';
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { SUB_CACHE_DIR, TORRSERVER_LOCAL_URL } from '../config/constants.js';
+import { SUB_CACHE_DIR } from '../config/constants.js';
 import { getTorrentHash } from '../utils/network.js';
 import { getCachedStreamInfo } from './ffmpegService.js';
 import { touchCacheFile } from '../utils/diskCacheCleaner.js';
+import { mediaInputUrl } from './downloadService.js';
 
 /**
  * Retire les segments en mode dessin vectoriel ({\p1} m 0 0 l 10 0 ... jusqu'à {\p0}) :
@@ -262,7 +263,7 @@ async function startSubExtraction({ magnet, parsedFileIndex, parsedSubIndex, cac
 
   const uniqueId = Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
   const tmpAssFile = path.join(SUB_CACHE_DIR, `${cacheKey}.${uniqueId}.ass.tmp`);
-  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
+  const torrUrl = mediaInputUrl(magnet, parsedFileIndex);
 
   const ffmpegArgs = [
     '-v', 'error',

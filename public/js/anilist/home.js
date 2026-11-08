@@ -285,6 +285,12 @@
                     <span>❤️ Favoris</span>
                     ${favCount > 0 ? `<span class="home-tab-badge">${favCount}</span>` : ''}
                 </button>
+                ${typeof currentAnimflixUser !== 'undefined' && currentAnimflixUser ? `
+                    <button class="home-tab-btn ${activeTab === 'downloads' ? 'active' : ''}" onclick="switchHomeTab('downloads')">
+                        <span>💾 Sur le serveur</span>
+                        ${typeof serverDownloads !== 'undefined' && serverDownloads.items.length > 0 ? `<span class="home-tab-badge">${serverDownloads.items.length}</span>` : ''}
+                    </button>
+                ` : ''}
                 <button class="home-tab-btn ${activeTab === 'stats' ? 'active' : ''}" onclick="switchHomeTab('stats')">
                     <span>📊 Stats</span>
                 </button>
@@ -316,6 +322,8 @@
             renderHistoryTabHtml(tabContent);
         } else if (activeTab === 'favorites' && typeof renderFavoritesTabHtml === 'function') {
             renderFavoritesTabHtml(tabContent);
+        } else if (activeTab === 'downloads' && typeof renderDownloadsTabHtml === 'function') {
+            renderDownloadsTabHtml(tabContent);
         } else if (activeTab === 'stats' && typeof renderStatsTabHtml === 'function') {
             renderStatsTabHtml(tabContent);
         } else if (activeTab === 'admin' && typeof renderAdminTabHtml === 'function') {

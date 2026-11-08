@@ -30,7 +30,7 @@
                             genres
                             siteUrl
                             coverImage { large medium }
-                            ${token ? 'mediaListEntry { id status progress score }' : ''}
+                            ${token ? 'mediaListEntry { id status progress score(format: POINT_100) }' : ''}
                         }
                     }
                 `;
@@ -48,7 +48,7 @@
                             genres
                             siteUrl
                             coverImage { large medium }
-                            ${token ? 'mediaListEntry { id status progress score }' : ''}
+                            ${token ? 'mediaListEntry { id status progress score(format: POINT_100) }' : ''}
                         }
                     }
                 `;

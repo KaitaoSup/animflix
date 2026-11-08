@@ -3,7 +3,7 @@ import path from 'path';
 import axios from 'axios';
 import { db, dbBackupDir } from '../../database.js';
 import {
-  ROOT_DIR, SUB_CACHE_DIR, THUMB_CACHE_DIR, HLS_CACHE_DIR, FONT_CACHE_DIR, MAX_CONCURRENT_STREAMS
+  ROOT_DIR, SUB_CACHE_DIR, THUMB_CACHE_DIR, HLS_CACHE_DIR, FONT_CACHE_DIR, DOWNLOADS_DIR, MAX_CONCURRENT_STREAMS
 } from '../config/constants.js';
 import { APP_VERSION } from '../utils/assetVersion.js';
 import { isTorrserverOnline, listTorrents } from './torrserverService.js';
@@ -203,6 +203,7 @@ async function checkStorage() {
     disk,
     database: { bytes: fileSize(dbPath) + fileSize(dbPath + '-wal') },
     caches,
+    downloads: await dirUsage(DOWNLOADS_DIR),
     level: disk.level
   };
 }

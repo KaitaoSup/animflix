@@ -207,6 +207,7 @@
 
         // Démarrage du monitoring P2P en temps réel
         startTorrServerP2pPolling(magnet);
+        if (typeof updateKeepOnServerButtons === 'function') updateKeepOnServerButtons();
 
         // Nettoyage d'une éventuelle instance HLS précédente
         destroyCurrentHlsInstance(false);

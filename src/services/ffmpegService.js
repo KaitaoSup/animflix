@@ -2,7 +2,7 @@ import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-import { VAAPI_DEVICE, FFMPEG_HWACCEL_PREF, TORRSERVER_LOCAL_URL, THUMB_CACHE_DIR, HLS_CACHE_DIR } from '../config/constants.js';
+import { VAAPI_DEVICE, FFMPEG_HWACCEL_PREF, THUMB_CACHE_DIR, HLS_CACHE_DIR } from '../config/constants.js';
 import { touchCacheFile } from '../utils/diskCacheCleaner.js';
 import { streamsCache } from '../utils/cache.js';
 import { getTorrentHash } from '../utils/network.js';
@@ -13,6 +13,7 @@ import {
   clientActiveHlsMap,
   cleanupHlsSession
 } from '../utils/sessionManager.js';
+import { mediaInputUrl } from './downloadService.js';
 
 const execFilePromise = promisify(execFile);
 
@@ -261,7 +262,7 @@ export async function getStreamInfo(magnet, fileIndex = 1) {
     return pendingStreamProbes.get(cacheKey);
   }
 
-  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
+  const torrUrl = mediaInputUrl(magnet, parsedFileIndex);
   const probe = (async () => {
     const data = await analyzeStreams(torrUrl);
     // Un échec n'est gardé que 20s : le lecteur relance l'analyse pour obtenir la vraie liste des pistes
@@ -314,7 +315,7 @@ export async function generateThumbnail({ magnet, fileIndex = 1, timestamp = 0, 
     activeClientThumbProcesses.delete(clientId);
   }
 
-  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
+  const torrUrl = mediaInputUrl(magnet, parsedFileIndex);
   const tempPath = path.join(THUMB_CACHE_DIR, `${thumbFileName}.${Date.now().toString(36)}.tmp`);
 
   const ffmpegArgs = [

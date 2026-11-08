@@ -107,6 +107,7 @@ function renderAdminReport(r) {
                         ${adminRow('Base de données', adminFormatBytes(r.storage.database.bytes))}
                         ${r.storage.caches.map(c => adminRow(`Cache ${c.name}`, `${adminFormatBytes(c.bytes)} <small>(${c.files} fichier${c.files > 1 ? 's' : ''})</small>`)).join('')}
                         ${adminRow('Total des caches', adminFormatBytes(cacheTotal))}
+                        ${r.storage.downloads ? adminRow('Épisodes gardés sur le serveur', `${adminFormatBytes(r.storage.downloads.bytes)} <small>(${r.storage.downloads.files} fichier${r.storage.downloads.files > 1 ? 's' : ''})</small>`) : ''}
                     </div>
                 </div>
             </section>

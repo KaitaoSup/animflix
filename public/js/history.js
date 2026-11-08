@@ -511,7 +511,7 @@ function getActiveHomeTab() {
 
     // L'onglet 'anilist' reste valide hors connexion : il affiche alors l'écran
     // « Connexion AniList » (renderLoggedOutHomeHtml) au lieu de renvoyer à l'accueil.
-    if (saved && (saved === 'home' || saved === 'anilist' || saved === 'history' || saved === 'favorites' || saved === 'discover' || saved === 'schedule' || saved === 'stats' || saved === 'admin')) {
+    if (saved && (saved === 'home' || saved === 'anilist' || saved === 'history' || saved === 'favorites' || saved === 'discover' || saved === 'schedule' || saved === 'stats' || saved === 'admin' || saved === 'downloads')) {
         return saved;
     }
 

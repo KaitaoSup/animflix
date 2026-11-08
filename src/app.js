@@ -9,6 +9,7 @@ import systemRoutes from './routes/systemRoutes.js';
 import syncRoutes from './routes/syncRoutes.js';
 import pushRoutes from './routes/pushRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import downloadRoutes from './routes/downloadRoutes.js';
 import { validateTorrentParams } from './utils/network.js';
 
 export function createApp() {
@@ -49,6 +50,7 @@ export function createApp() {
   app.use(syncRoutes);
   app.use(pushRoutes);
   app.use(adminRoutes);
+  app.use(downloadRoutes);
 
   return app;
 }

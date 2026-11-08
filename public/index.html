@@ -173,6 +173,9 @@
                       <button id="detailDownloadBtn" class="btn-secondary btn-download-ep" onclick="downloadCurrentEpisode()" title="Télécharger le fichier vidéo original sur votre appareil (Mode Hors-Ligne)">
                           📥 Télécharger
                       </button>
+                      <button id="detailKeepBtn" class="btn-secondary btn-keep-ep" onclick="onKeepOnServerClick()" title="Télécharger l'épisode sur le serveur : il restera regardable même sans seeders">
+                          💾 Garder sur le serveur
+                      </button>
                       <button id="detailCastBtn" class="btn-secondary btn-cast-tv" onclick="openCastModal()" title="Diffuser sur TV (Chromecast, AirPlay, Smart TV, VLC Réseau)">
                           📺 Diffuser TV
                       </button>
@@ -413,6 +416,9 @@
                               </button>
                               <button class="player-btn" id="playerDownloadBtn" onclick="downloadCurrentEpisode()" title="Télécharger l'épisode hors-ligne">
                                   <span>📥</span>
+                              </button>
+                              <button class="player-btn player-btn-keep" id="playerKeepBtn" onclick="onKeepOnServerClick()" title="Garder sur le serveur : l'épisode reste regardable même sans seeders">
+                                  <span>💾</span>
                               </button>
                               <button class="player-btn" id="playerPipBtn" onclick="togglePictureInPicture()" title="Picture-in-Picture [P]">
                                   <span>⧉</span>
@@ -1100,6 +1106,7 @@
   <script src="/js/history.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/stats.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/admin.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/downloads.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/sync.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/notifications.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/release-prefs.js?v={{ASSET_VERSION}}"></script>
@@ -1111,6 +1118,7 @@
   <script src="/js/anilist/watching.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/anilist/session.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/anilist/tracking.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/anilist/list-entry.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/anilist/anime-page.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/router.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/tv.js?v={{ASSET_VERSION}}"></script>

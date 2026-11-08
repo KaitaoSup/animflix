@@ -35,6 +35,9 @@ export const THUMB_CACHE_DIR = path.join(ROOT_DIR, 'cache', 'thumbnails');
 export const HLS_CACHE_DIR = path.join(ROOT_DIR, 'cache', 'hls');
 export const FONT_CACHE_DIR = path.join(ROOT_DIR, 'cache', 'fonts');
 
+// --- ÉPISODES GARDÉS SUR LE SERVEUR (bibliothèque hors ligne, jamais purgée automatiquement) ---
+export const DOWNLOADS_DIR = process.env.DOWNLOADS_DIR ? path.resolve(process.env.DOWNLOADS_DIR) : path.join(ROOT_DIR, 'downloads');
+
 // Initialisation automatique des répertoires de cache nécessaires
 for (const dir of [SUB_CACHE_DIR, THUMB_CACHE_DIR, HLS_CACHE_DIR, FONT_CACHE_DIR]) {
   if (!fs.existsSync(dir)) {

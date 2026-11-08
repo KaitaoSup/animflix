@@ -30,6 +30,15 @@
         if (hudDot) hudDot.className = 'p2p-hud-dot buffering';
         if (hudBadge) hudBadge.textContent = 'P2P';
 
+        // Épisode gardé sur le serveur : lecture depuis le disque, pas de statistiques P2P à suivre
+        if (typeof getKeptServerDownload === 'function' && getKeptServerDownload(magnet, currentActiveFileIndex)) {
+            if (liveBox) liveBox.style.display = 'none';
+            if (subDetail) subDetail.textContent = 'Lecture du fichier gardé sur le serveur';
+            if (hudDot) hudDot.className = 'p2p-hud-dot idle';
+            if (hudBadge) hudBadge.textContent = '💾 Local';
+            return;
+        }
+
         pollLoop();
 
         async function pollLoop() {

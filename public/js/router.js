@@ -13,7 +13,7 @@
 // et le bouton précédent/suivant du navigateur passe par dispatch() pour afficher la vue.
 
 (function () {
-    const HOME_TABS = ['discover', 'schedule', 'anilist', 'history', 'favorites', 'stats', 'admin'];
+    const HOME_TABS = ['discover', 'schedule', 'anilist', 'history', 'favorites', 'downloads', 'stats', 'admin'];
     const TORRENT_CACHE_KEY = 'animflix_route_torrents';
     const STACK_KEY = 'animflix_route_stack';
 

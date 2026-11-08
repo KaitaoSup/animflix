@@ -234,6 +234,7 @@
         if (typeof savePlaybackProgress === 'function') {
             savePlaybackProgress(true);
         }
+        if (typeof dismissPlayerRatingPrompt === 'function') dismissPlayerRatingPrompt();
         if (typeof dismissResumeBanner === 'function') {
             dismissResumeBanner(false);
         }

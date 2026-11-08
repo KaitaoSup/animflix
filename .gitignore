@@ -14,6 +14,9 @@ data/
 # Sauvegardes quotidiennes de animflix.db
 backups/
 
+# Épisodes gardés sur le serveur (« Garder sur le serveur »)
+downloads/
+
 # Variables d'environnement & Clés d'API (sécurité)
 .env
 .env.*

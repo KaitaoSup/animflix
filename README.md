@@ -106,6 +106,16 @@ Application web complète et moderne de streaming d'animes en direct à partir d
 
 ### ☁️ 7. Suivi AniList, Historique & Favoris
 - **Synchronisation AniList Bi-directionnelle** : Connexion OAuth sécurisée, synchronisation automatique de l'épisode visionné à 85% ou à la fin, affichage des animés en cours.
+- **⭐ Ma liste AniList depuis la fiche** : panneau « Ma liste » sous les boutons de la fiche anime (compte AniList connecté) :
+  - statut (En cours, À voir, Terminé, Je le revois, En pause, Abandonné), ajout ou retrait de la liste (avec confirmation) ; « Terminé » met la progression au dernier épisode ;
+  - note en 5 étoiles par demi-étoile (= note sur 10), recliquer sur la note la retire ; AniList la convertit dans votre format de notation (sur 10, sur 100, sur 5, smileys) ;
+  - un anime terminé sans note est mis en avant (« Terminé : votre note ? ») et, à la fin du dernier épisode sans saison suivante, le lecteur propose de le noter.
+- **💾 Garder sur le serveur (épisodes hors ligne)** : le bouton 💾 du lecteur télécharge l'épisode en entier sur le serveur (dossier `downloads/`, ou `DOWNLOADS_DIR` dans `.env`). Ensuite :
+  - toute lecture de ce torrent (direct, transcodage, HLS, sous-titres, miniatures) lit le fichier local : l'épisode reste regardable **sans seeders**, même si TorrServer est arrêté ;
+  - sur la fiche anime, l'épisode porte un badge 💾 et un clic lance la copie du serveur en priorité ;
+  - onglet **« 💾 Sur le serveur »** : progression et débit en direct, Regarder, « 📲 Sur l'appareil » (enregistre le fichier depuis le disque du serveur), suppression, nouvel essai en cas d'échec ;
+  - un téléchargement à la fois (les lectures en cours ne sont pas ralenties), reprise automatique après une coupure ou un redémarrage, refus si moins de 2 Go resteraient libres sur le disque ;
+  - bibliothèque commune aux comptes du serveur (compte Animflix requis) ; un épisode n'est supprimable que par la personne qui l'a ajouté ou par l'administrateur. La page « Serveur » affiche l'espace occupé.
 - **Historique Local & Reprise** : Mémorisation exacte de la position de lecture à la seconde près dans `localStorage`, avec bannière de reprise automatique.
 - **Favoris Locaux Hors Ligne** : Sauvegarde d'animes favoris accessible sans compte tiers.
 - **📊 Statistiques personnelles** (`#/stats`, par profil) : temps réellement regardé (total, 7 et 30 jours), épisodes terminés (à 85 %), série de jours consécutifs (en cours et record), activité des 30 derniers jours, animes et genres les plus regardés. Comptées à partir de leur installation et synchronisées entre appareils pour un compte connecté ; avec AniList lié, les statistiques de tout l'historique AniList s'y ajoutent (animes, épisodes, jours de visionnage, note moyenne, genres).

@@ -34,6 +34,7 @@ import {
 import { streamSubtitlesLive } from '../services/subtitlesService.js';
 import { getEmbeddedFonts, resolveFontFile } from '../services/fontsService.js';
 import { getTorrentFiles } from '../services/torrserverService.js';
+import { mediaInputUrl, getDownloadManager } from '../services/downloadService.js';
 
 const router = Router();
 
@@ -165,7 +166,7 @@ router.get('/play', async (req, res) => {
     seekSeconds,
     audioOffset: parsedAudioOffset
   } = parsePlaybackParams(req.query);
-  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
+  const torrUrl = mediaInputUrl(magnet, parsedFileIndex);
 
   // Création / liaison de la session de synchronisation
   let playSession = null;
@@ -384,7 +385,7 @@ router.get('/api/hls/:playId/index.m3u8', async (req, res) => {
   stopClientHlsSession(clientId);
   killClientFfmpegProcess(clientId);
 
-  const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
+  const torrUrl = mediaInputUrl(magnet, parsedFileIndex);
   const streamInfo = await getStreamInfo(magnet, parsedFileIndex).catch(() => null);
 
   // Vérification juste avant le lancement (aucun `await` entre les deux)
@@ -564,6 +565,19 @@ router.get('/api/download', async (req, res) => {
   if (!magnet) return res.status(400).send("Lien magnet manquant");
 
   const parsedFileIndex = parseFileIndex(req.query.fileIndex);
+
+  // Épisode gardé sur le serveur : envoi direct du fichier local (rapide, sans seeders ni TorrServer)
+  const downloads = getDownloadManager();
+  const localFile = downloads?.localPath(magnet, parsedFileIndex);
+  if (localFile) {
+    const item = downloads.get(path.basename(localFile, path.extname(localFile)));
+    let name = item?.fileName || title || 'video';
+    if (!path.extname(name)) name += path.extname(localFile);
+    return res.download(localFile, name, (err) => {
+      if (err && !res.headersSent) res.status(500).send("Fichier local illisible");
+    });
+  }
+
   const torrUrl = `${TORRSERVER_LOCAL_URL}/stream?link=${encodeURIComponent(magnet)}&index=${parsedFileIndex}&play`;
 
   let fileName = title || 'video';
