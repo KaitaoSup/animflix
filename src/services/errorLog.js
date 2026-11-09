@@ -20,6 +20,7 @@ export const ERROR_SOURCES = {
   lecture: 'Lecture',
   download: 'Téléchargement',
   notifier: 'Notifications',
+  autodl: 'Téléchargement auto',
   agenda: 'Agenda',
   sauvegarde: 'Sauvegarde',
   serveur: 'Serveur'

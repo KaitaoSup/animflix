@@ -163,6 +163,71 @@ function commitThemeColor(hex) {
     if (picker) picker.value = getThemeColor();
 }
 
+// --- FOND : SOMBRE (DÉFAUT) OU NOIR OLED ---
+// Propre à chaque appareil (non synchronisé) : le noir pur est surtout utile sur un écran OLED.
+const STORAGE_KEY_BG_THEME = 'animflix_bg_theme';
+
+function getBackgroundTheme() {
+    try { return localStorage.getItem(STORAGE_KEY_BG_THEME) === 'oled' ? 'oled' : 'dark'; } catch (e) { return 'dark'; }
+}
+
+function applyBackgroundTheme(value) {
+    if (value === 'oled') document.documentElement.setAttribute('data-bg', 'oled');
+    else document.documentElement.removeAttribute('data-bg');
+}
+
+function setBackgroundTheme(value) {
+    const v = value === 'oled' ? 'oled' : 'dark';
+    try {
+        if (v === 'oled') localStorage.setItem(STORAGE_KEY_BG_THEME, 'oled');
+        else localStorage.removeItem(STORAGE_KEY_BG_THEME);
+    } catch (e) {}
+    applyBackgroundTheme(v);
+    const sel = document.getElementById('prefBackgroundTheme');
+    if (sel) sel.value = v;
+}
+
+// --- COULEUR PROPRE À CHAQUE ANIME (FICHE ANIME) ---
+// AniList fournit la couleur dominante de l'affiche (coverImage.color) : la fiche reprend cette couleur
+// pour ses boutons, sa bannière et ses tuiles, ramenée dans la plage lisible comme la couleur d'interface.
+const STORAGE_KEY_ANIME_ACCENT = 'animflix_anime_accent';
+
+function isAnimeAccentEnabled() {
+    try { return localStorage.getItem(STORAGE_KEY_ANIME_ACCENT) !== 'off'; } catch (e) { return true; }
+}
+
+function setAnimeAccentEnabled(enabled) {
+    try {
+        if (enabled) localStorage.removeItem(STORAGE_KEY_ANIME_ACCENT);
+        else localStorage.setItem(STORAGE_KEY_ANIME_ACCENT, 'off');
+    } catch (e) {}
+    if (typeof refreshAnimePageAccent === 'function') refreshAnimePageAccent();
+}
+
+// Déclarations CSS (--primary, --primary-hover, --primary-light, --primary-rgb, --anime-accent) pour
+// une couleur d'anime, ou '' (couleur d'interface conservée) si l'option est coupée ou la couleur invalide
+function animeAccentStyle(hex) {
+    if (!isAnimeAccentEnabled()) return '';
+    const color = normalizeThemeColor(hex);
+    if (!color) return '';
+    const rgb = parseHexColor(color);
+    const hsl = rgbToHsl(rgb);
+    // Couleur presque grise (affiche en noir et blanc) : pas d'intérêt, on garde l'accent de l'interface
+    if (hsl.s < 0.18) return '';
+    return [
+        `--primary: ${color}`,
+        `--primary-hover: ${shiftLightness(hsl, -0.09)}`,
+        `--primary-light: ${shiftLightness(hsl, Math.min(0.15, 0.72 - hsl.l))}`,
+        `--primary-rgb: ${rgb.r}, ${rgb.g}, ${rgb.b}`,
+        `--anime-accent: ${color}`
+    ].join('; ') + ';';
+}
+
+window.getBackgroundTheme = getBackgroundTheme;
+window.setBackgroundTheme = setBackgroundTheme;
+window.isAnimeAccentEnabled = isAnimeAccentEnabled;
+window.setAnimeAccentEnabled = setAnimeAccentEnabled;
+window.animeAccentStyle = animeAccentStyle;
 window.getThemeColor = getThemeColor;
 window.applyThemeColor = applyThemeColor;
 window.setThemeColor = setThemeColor;
@@ -171,3 +236,4 @@ window.previewThemeColor = previewThemeColor;
 window.commitThemeColor = commitThemeColor;
 
 applyThemeColor(getThemeColor());
+applyBackgroundTheme(getBackgroundTheme());

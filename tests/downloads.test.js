@@ -125,14 +125,20 @@ describe('downloadService — gestionnaire', () => {
   test('repart de zéro si le serveur ignore la reprise', async () => {
     const content = Buffer.from('0123456789'.repeat(200));
     const { httpGet } = fakeHttp(content, { cutAfter: 500, ignoreRange: true });
+    const completed = [];
     const manager = createDownloadManager({
       store: freshStore(), dir, httpGet, log: quiet, retryDelayMs: () => 1,
       getFiles: async () => ({ files: [{ id: 1, name: 'ep.mkv', length: content.length }] }),
-      freeSpace: async () => 1e15
+      freeSpace: async () => 1e15,
+      onComplete: (done) => completed.push(done)
     });
     const { item } = manager.enqueue({ magnet: MAGNET, fileIndex: 1, title: 'ep' });
     await waitFor(() => manager.get(item.id).status === 'done');
     assert.deepEqual(fs.readFileSync(path.join(dir, `${HASH}_f1.mkv`)), content);
+    // Prévient le téléchargement automatique (notification « épisode prêt »)
+    assert.equal(completed.length, 1);
+    assert.equal(completed[0].id, item.id);
+    assert.equal(completed[0].status, 'done');
   });
 
   test('refuse quand le disque est presque plein', async () => {

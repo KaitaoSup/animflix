@@ -365,6 +365,10 @@ function loadUserSettings() {
     // Couleur d'interface (peut avoir changé via la synchro depuis un autre appareil)
     if (typeof applyThemeColor === 'function') applyThemeColor(getThemeColor());
     if (typeof renderThemeColorSettings === 'function') renderThemeColorSettings();
+    const prefBg = document.getElementById('prefBackgroundTheme');
+    if (prefBg && typeof getBackgroundTheme === 'function') prefBg.value = getBackgroundTheme();
+    const prefAccent = document.getElementById('prefAnimeAccent');
+    if (prefAccent && typeof isAnimeAccentEnabled === 'function') prefAccent.checked = isAnimeAccentEnabled();
 
     renderSettingsProfiles();
 }

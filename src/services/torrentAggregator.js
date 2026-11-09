@@ -252,6 +252,8 @@ export async function searchAllTorrents(query, type = 'vostfr', options = {}) {
       lienMagnet: t.magnetLink || t.link,
       taille: t.size || 'N/A',
       seeders: parseInt(t.seeders, 10) || 0,
+      // Date de publication : sert à écarter un ancien torrent au numéro d'épisode identique (notifications, téléchargement auto)
+      pubDate: t.pubDate || null,
       poster: meta.poster,
       rating: meta.rating,
       source: t.source || 'nyaa'

@@ -642,9 +642,12 @@
             `<option value="${escapeHtml(o.value)}" ${o.value === typeSel.value ? 'selected' : ''}>${escapeHtml(o.textContent)}</option>`).join('') : '';
         const progressLabel = model.progress > 0 ? `<span class="anime-progress-pill">AniList : ${model.progress}${model.total ? ' / ' + model.total : ''}</span>` : '';
 
+        // Couleur de l'affiche (AniList) pour toute la fiche : boutons, halo, tuiles (réglable dans Paramètres)
+        const accentStyle = typeof animeAccentStyle === 'function' ? animeAccentStyle(media.coverImage?.color) : '';
+
         container.innerHTML = `
-            <div class="anime-page">
-                <div class="anime-hero" style="${banner ? `--anime-banner: url('${escapeHtml(banner)}');` : ''}${media.coverImage?.color ? `--anime-accent: ${escapeHtml(media.coverImage.color)};` : ''}">
+            <div class="anime-page" style="${escapeHtml(accentStyle)}">
+                <div class="anime-hero" style="${banner ? `--anime-banner: url('${escapeHtml(banner)}');` : ''}">
                     <div class="anime-hero-top">
                         <button type="button" class="btn-back" onclick="AppRouter.back('/')">← Retour</button>
                     </div>
@@ -678,6 +681,7 @@
                                 <button type="button" class="btn-favorite-toggle ${isFav ? 'active' : ''}" onclick="toggleAnimePageFavorite()" aria-pressed="${isFav}">
                                     ${isFav ? '❤️ Dans mes favoris' : '🤍 Favori'}
                                 </button>
+                                ${typeof renderAutoDownloadToggle === 'function' ? renderAutoDownloadToggle(media) : ''}
                                 <label class="anime-lang-select">
                                     <span class="visually-hidden">Langue des sources</span>
                                     <select onchange="onAnimePageLanguageChange(this.value)" title="Langue des sources Nyaa">${typeOptions}</select>
@@ -728,6 +732,82 @@
         if (activeEp) section.querySelector(`.anime-ep-tile[data-ep="${activeEp}"]`)?.focus({ preventScroll: true });
     }
 
+    // --- TRANSITION ANIMÉE CARTE <-> FICHE (View Transitions API) ---
+    // L'affiche de la carte cliquée « vole » jusqu'à la couverture de la fiche, et revient à sa place au
+    // retour. Navigateurs sans l'API, mouvements réduits (préférence système) ou mode TV : affichage direct.
+
+    const COVER_TRANSITION_NAME = 'anime-cover';
+    const COVER_CLICK_MAX_AGE_MS = 1500;
+    let coverSource = null; // { el: <img> de la carte cliquée, at, id }
+
+    // Mémorise l'affiche de l'élément cliqué (carte, tuile de relation, résultat…) avant son onclick
+    if (typeof document.addEventListener === 'function') {
+        document.addEventListener('click', (e) => {
+            const host = e.target?.closest?.('[onclick]');
+            const img = host?.querySelector('img');
+            if (img) coverSource = { el: img, at: Date.now(), id: null };
+        }, true);
+    }
+
+    function canAnimateViews() {
+        return typeof document.startViewTransition === 'function'
+            && !document.hidden
+            && !document.body.classList.contains('tv-mode')
+            && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function isInViewport(el) {
+        if (!el || !el.isConnected) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth;
+    }
+
+    function setCoverName(el, on) {
+        if (el) el.style.viewTransitionName = on ? COVER_TRANSITION_NAME : '';
+    }
+
+    // Lance `update` dans une transition où `fromEl` devient l'élément trouvé par `findTarget` après la mise à jour
+    function runCoverTransition(fromEl, update, findTarget) {
+        let target = null;
+        setCoverName(fromEl, true);
+        const transition = document.startViewTransition(() => {
+            setCoverName(fromEl, false);
+            update();
+            target = findTarget();
+            if (isInViewport(target)) setCoverName(target, true);
+            else target = null; // pas de vol vers un élément hors écran : simple fondu
+        });
+        transition.finished.catch(() => {}).finally(() => {
+            setCoverName(fromEl, false);
+            setCoverName(target, false);
+        });
+        return transition;
+    }
+
+    // Affiche d'une carte de cet anime dans l'accueil ou la recherche (la grille a pu être redessinée)
+    function findCardCover(id) {
+        // openAnimePage(ID…) ou ID en dernier argument (searchFromDiscover(titre, affiche, ID))
+        const n = Number(id);
+        const re = new RegExp(`openAnimePage\\(${n}\\s*[,)]|,\\s*${n}\\s*\\)\\s*;?\\s*$`);
+        for (const host of document.querySelectorAll('#homeView [onclick], #searchView [onclick]')) {
+            if (re.test(host.getAttribute('onclick') || '')) {
+                const img = host.querySelector('img');
+                if (isInViewport(img)) return img;
+            }
+        }
+        return null;
+    }
+
+    /** Retour de la fiche vers la grille d'où on venait : l'affiche revient se poser sur sa carte. */
+    function animeCoverBackTransition(update) {
+        const id = animePageState.id;
+        const cover = document.querySelector('#animeView .anime-cover:not(.anime-cover-skeleton)');
+        if (!id || !canAnimateViews() || !isInViewport(cover)) return false;
+        const card = coverSource && coverSource.id === id ? coverSource.el : null;
+        runCoverTransition(cover, update, () => (card && card.isConnected && isInViewport(card) ? card : findCardCover(id)));
+        return true;
+    }
+
     // --- ACTIONS ---
 
     async function openAnimePage(id, opts = {}) {
@@ -735,50 +815,69 @@
         if (!id) return;
         const { ep = null, syncUrl = true } = opts;
 
-        if (typeof AppRouter !== 'undefined' && AppRouter.isDetailOpen() && typeof closeDetailView === 'function') {
-            closeDetailView({ navigate: false });
-        }
-        if (typeof showCatalogSubView === 'function') showCatalogSubView('anime');
-        if (syncUrl && typeof AppRouter !== 'undefined') AppRouter.sync(AppRouter.animePath(id, ep));
-
         const samePage = animePageState.id === id && animePageState.media;
-        if (!samePage) {
-            animePageState.id = id;
-            animePageState.media = null;
-            animePageState.torrents = null;
-            animePageState.torrentsKey = null;
-            animePageState.torrentsPromise = null;
-            animePageState.availability = new Map();
-            animePageState.synopsisOpen = false;
-            window.scrollTo({ top: 0, behavior: 'auto' });
-        }
-        animePageState.highlightEp = ep;
-        animePageState.rangeStartLocked = false;
-        animePageState.playingEp = null;
-        window._currentAnimePageId = id;
-
         const container = document.getElementById('animeView');
+
+        // Affichage immédiat de la fiche (en cache) ou de son squelette
+        const showPage = () => {
+            if (typeof AppRouter !== 'undefined' && AppRouter.isDetailOpen() && typeof closeDetailView === 'function') {
+                closeDetailView({ navigate: false });
+            }
+            if (typeof showCatalogSubView === 'function') showCatalogSubView('anime');
+            if (syncUrl && typeof AppRouter !== 'undefined') AppRouter.sync(AppRouter.animePath(id, ep));
+
+            if (!samePage) {
+                animePageState.id = id;
+                animePageState.media = null;
+                animePageState.torrents = null;
+                animePageState.torrentsKey = null;
+                animePageState.torrentsPromise = null;
+                animePageState.availability = new Map();
+                animePageState.synopsisOpen = false;
+                window.scrollTo({ top: 0, behavior: 'auto' });
+            }
+            animePageState.highlightEp = ep;
+            animePageState.rangeStartLocked = false;
+            animePageState.playingEp = null;
+            window._currentAnimePageId = id;
+
+            if (!container) return;
+            if (samePage) {
+                renderAnimePage(); // retour du lecteur : progression locale à jour
+            } else {
+                const cached = animeMediaCache.get(id);
+                if (cached) {
+                    animePageState.media = cached.media;
+                    renderAnimePage();
+                } else {
+                    renderAnimePageSkeleton(container);
+                }
+            }
+        };
+
+        // Carte cliquée à l'instant, visible et page différente : l'affiche vole jusqu'à la couverture
+        const source = coverSource && Date.now() - coverSource.at < COVER_CLICK_MAX_AGE_MS ? coverSource.el : null;
+        let transition = null;
+        if (!samePage && container && canAnimateViews() && isInViewport(source)) {
+            coverSource.id = id; // pour le vol retour
+            transition = runCoverTransition(source, showPage, () => container.querySelector('.anime-cover'));
+        } else {
+            if (coverSource && !samePage) coverSource = null;
+            showPage();
+        }
         if (!container) return;
 
-        if (samePage) {
-            renderAnimePage(); // retour du lecteur : progression locale à jour
-        } else {
-            const cached = animeMediaCache.get(id);
-            if (cached) {
-                animePageState.media = cached.media;
-                renderAnimePage();
-            } else {
-                renderAnimePageSkeleton(container);
-            }
-        }
-
         try {
-            const fresh = await fetchAnimeMedia(id, samePage);
+            const freshPromise = fetchAnimeMedia(id, samePage);
+            // La fiche n'est redessinée qu'une fois l'animation finie (sinon la couverture animée disparaît)
+            if (transition) await transition.finished.catch(() => {});
+            const fresh = await freshPromise;
             if (window._currentAnimePageId !== id) return;
             if (!fresh) throw new Error('Anime introuvable sur AniList');
             animePageState.media = fresh;
             renderAnimePage();
             ensureAnimeTorrents().catch(() => {});
+            if (typeof loadAutoDownloadState === 'function') loadAutoDownloadState(fresh);
         } catch (err) {
             if (window._currentAnimePageId !== id || animePageState.media) return;
             container.innerHTML = `
@@ -1168,3 +1267,11 @@
     window.renderSearchAnimeMatches = renderSearchAnimeMatches;
     window.pickTorrentForEpisode = pickTorrentForEpisode;
     window.pickRecommendations = pickRecommendations;
+    window.getCurrentAnimePageMedia = () => animePageState.media;
+    window.animeCoverBackTransition = animeCoverBackTransition;
+    // Option « couleurs de l'affiche » changée dans les Paramètres : la fiche ouverte suit tout de suite
+    window.refreshAnimePageAccent = () => {
+        const page = document.querySelector('#animeView .anime-page');
+        if (!page || !animePageState.media) return;
+        page.setAttribute('style', typeof animeAccentStyle === 'function' ? animeAccentStyle(animePageState.media.coverImage?.color) : '');
+    };

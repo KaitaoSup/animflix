@@ -39,8 +39,8 @@ RUN chmod +x scripts/*.sh
 # Création des dossiers de cache et données persistants
 RUN mkdir -p /app/cache/subtitles /app/data
 
-# Ports exposés : 3000 (Animflix Web), 8090 (TorrServer Engine)
-EXPOSE 3000 8090
+# Port exposé : 3000 (Animflix Web). TorrServer (8090, sans authentification) reste interne au conteneur
+EXPOSE 3000
 
 ENV PORT=3000
 ENV TORRSERVER_URL=http://127.0.0.1:8090

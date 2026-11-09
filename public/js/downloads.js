@@ -364,3 +364,97 @@ document.addEventListener('visibilitychange', () => {
 window.refreshServerDownloads = refreshServerDownloads;
 window.getKeptServerDownload = getKeptServerDownload;
 window.getKeptEpisodeDownload = getKeptEpisodeDownload;
+
+// =========================================================================
+// --- TÉLÉCHARGEMENT AUTOMATIQUE DES NOUVEAUX ÉPISODES (FICHE ANIME) ---
+// =========================================================================
+//
+// Interrupteur sur la fiche d'un anime en cours de diffusion : chaque nouvel épisode est gardé sur
+// le serveur dès qu'une source sort (vérifié toutes les 15 min), avec la langue de recherche et les
+// préférences de release de cet appareil. Compte Animflix requis.
+
+const autoDownloadState = new Map(); // mediaId -> { enabled, loading }
+
+function canAutoDownloadMedia(media) {
+    return isDownloadsAccountReady() && !!media && (media.status === 'RELEASING' || media.status === 'NOT_YET_RELEASED');
+}
+
+function renderAutoDownloadToggle(media) {
+    if (!canAutoDownloadMedia(media)) return '';
+    const st = autoDownloadState.get(media.id);
+    const on = !!st?.enabled;
+    const busy = !st || st.loading;
+    return `
+        <button type="button" id="autoDownloadToggle" class="btn-favorite-toggle btn-auto-download ${on ? 'active' : ''}"
+            onclick="toggleAutoDownload()" aria-pressed="${on}" ${busy ? 'aria-busy="true"' : ''}
+            title="Garder automatiquement chaque nouvel épisode sur le serveur dès qu'une source sort">
+            ${on ? '🤖 Téléchargement auto activé' : '🤖 Télécharger automatiquement'}
+        </button>`;
+}
+
+function refreshAutoDownloadToggle(media) {
+    const btn = document.getElementById('autoDownloadToggle');
+    if (!btn) return;
+    const hadFocus = document.activeElement === btn;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = renderAutoDownloadToggle(media);
+    const fresh = tmp.firstElementChild;
+    if (!fresh) return btn.remove();
+    btn.replaceWith(fresh);
+    if (hadFocus) fresh.focus({ preventScroll: true });
+}
+
+async function loadAutoDownloadState(media) {
+    if (!canAutoDownloadMedia(media)) return;
+    try {
+        const res = await fetch('/api/auto-downloads/' + encodeURIComponent(media.id), {
+            headers: getAuthHeaders(), credentials: 'include', cache: 'no-store'
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        autoDownloadState.set(media.id, { enabled: !!data.enabled, loading: false });
+        if (window._currentAnimePageId === media.id) refreshAutoDownloadToggle(media);
+    } catch (e) {}
+}
+
+async function toggleAutoDownload() {
+    const media = typeof getCurrentAnimePageMedia === 'function' ? getCurrentAnimePageMedia() : null;
+    if (!canAutoDownloadMedia(media)) return;
+    const st = autoDownloadState.get(media.id) || { enabled: false };
+    if (st.loading) return;
+    const enabled = !st.enabled;
+    autoDownloadState.set(media.id, { ...st, loading: true });
+    refreshAutoDownloadToggle(media);
+
+    const prefs = typeof getReleasePrefs === 'function' ? getReleasePrefs() : { groups: [], resolution: 'any' };
+    const title = media.title?.english || media.title?.userPreferred || media.title?.romaji || 'Anime';
+    try {
+        const res = await fetch('/api/auto-downloads/' + encodeURIComponent(media.id), {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            credentials: 'include',
+            body: JSON.stringify({
+                enabled,
+                title,
+                poster: media.coverImage?.large || null,
+                lang: document.getElementById('searchType')?.value || 'vostfr',
+                resolution: prefs.resolution,
+                groups: prefs.groups
+            })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        autoDownloadState.set(media.id, { enabled: !!data.enabled, loading: false });
+        showToast(data.enabled
+            ? `🤖 Les nouveaux épisodes de « ${title} » seront gardés sur le serveur dès leur sortie`
+            : `🤖 Téléchargement automatique désactivé pour « ${title} »`);
+    } catch (err) {
+        autoDownloadState.set(media.id, { ...st, loading: false });
+        showToast('⚠️ ' + err.message);
+    }
+    refreshAutoDownloadToggle(media);
+}
+
+window.renderAutoDownloadToggle = renderAutoDownloadToggle;
+window.loadAutoDownloadState = loadAutoDownloadState;
+window.toggleAutoDownload = toggleAutoDownload;

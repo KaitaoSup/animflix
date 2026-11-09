@@ -12,6 +12,7 @@ import { testTokyoToshoConnection } from './tokyoToshoService.js';
 import { getTorznabConfig, testTorznabConnection } from './torznabService.js';
 import { getTorrentSourcesStatus } from './torrentAggregator.js';
 import { getEpisodeNotifierStatus } from './episodeNotifier.js';
+import { getAutoDownloaderStatus } from './autoDownloader.js';
 import { getDetectedHwAccel } from './ffmpegService.js';
 import { BACKUP_RETENTION } from './dbMaintenance.js';
 import { countActiveStreams, activeHlsSessions } from '../utils/sessionManager.js';
@@ -242,8 +243,10 @@ export function getHealthReport({ force = false } = {}) {
     backups.retention = BACKUP_RETENTION;
     const notifier = getEpisodeNotifierStatus();
     notifier.level = !notifier.enabled ? 'off' : notifier.lastError ? 'warn' : 'ok';
+    const autoDownload = getAutoDownloaderStatus();
+    autoDownload.level = !autoDownload.enabled ? 'off' : autoDownload.lastError ? 'warn' : 'ok';
     const activity = checkActivity();
-    const levels = [...services.map(s => s.level), storage.level, backups.level, notifier.level];
+    const levels = [...services.map(s => s.level), storage.level, backups.level, notifier.level, autoDownload.level];
     return {
       generatedAt: Date.now(),
       level: worstLevel(levels),
@@ -252,6 +255,7 @@ export function getHealthReport({ force = false } = {}) {
       storage,
       backups,
       notifier,
+      autoDownload,
       activity
     };
   })();

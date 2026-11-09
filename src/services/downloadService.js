@@ -148,6 +148,7 @@ export function createDownloadManager({
   getFiles = null,
   freeSpace = async (d) => { const st = await fs.promises.statfs(d); return st.bavail * st.bsize; },
   retryDelayMs = (attempt) => Math.min(60000, 5000 * attempt),
+  onComplete = null, // (item) => void : appelé quand un épisode est entièrement gardé
   log = console
 }) {
   let active = null; // { id, controller, bytes, total, speed, lastSample }
@@ -368,6 +369,9 @@ export function createDownloadManager({
       }
       store.update(row.id, { status: 'done', local_file: localFile, size, downloaded: size, completed_at: Date.now(), error: null });
       log.log?.(`📥 Épisode gardé sur le serveur : ${row.title} (${Math.round(size / 1024 / 1024)} Mo)`);
+      if (onComplete) {
+        try { onComplete(publicItem(store.get(row.id))); } catch (e) {}
+      }
     } catch (err) {
       if (job.cancelled) return;
       store.update(row.id, { status: 'error', error: String(err.message || err).slice(0, 300), downloaded: fileSize(partPath(row.id)) });

@@ -12,6 +12,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import downloadRoutes from './routes/downloadRoutes.js';
 import calendarRoutes from './routes/calendarRoutes.js';
 import sourceRoutes from './routes/sourceRoutes.js';
+import autoDownloadRoutes from './routes/autoDownloadRoutes.js';
 import { validateTorrentParams } from './utils/network.js';
 
 export function createApp() {
@@ -55,6 +56,7 @@ export function createApp() {
   app.use(downloadRoutes);
   app.use(calendarRoutes);
   app.use(sourceRoutes);
+  app.use(autoDownloadRoutes);
 
   return app;
 }

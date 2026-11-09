@@ -195,7 +195,16 @@
 
     // --- AFFICHAGE D'UNE ROUTE ---
 
+    // Retour de la fiche anime vers l'accueil ou la recherche : transition animée si possible
     function dispatch(route) {
+        const leavingAnimePage = (route.name === 'home' || route.name === 'search')
+            && catalogSubView() === 'anime' && !isDetailOpen();
+        if (leavingAnimePage && typeof animeCoverBackTransition === 'function'
+            && animeCoverBackTransition(() => dispatchNow(route))) return;
+        dispatchNow(route);
+    }
+
+    function dispatchNow(route) {
         dispatching = true;
         try {
             if (route.name !== 'watch' && isDetailOpen() && typeof closeDetailView === 'function') {

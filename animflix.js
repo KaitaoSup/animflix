@@ -1,3 +1,5 @@
+// Doit rester le premier import : charge le .env avant que les autres modules lisent process.env
+import './src/config/env.js';
 import dns from 'dns';
 import { PORT, DOWNLOADS_DIR } from './src/config/constants.js';
 import { checkHardwareAcceleration } from './src/services/ffmpegService.js';
@@ -10,23 +12,31 @@ import { db, dbBackupDir, cleanupExpiredSessions } from './database.js';
 import { initDownloadManager, createDownloadStore } from './src/services/downloadService.js';
 import { initErrorLog } from './src/services/errorLog.js';
 import { getTorrentFiles } from './src/services/torrserverService.js';
+import { startAutoDownloader, buildReadyPayload } from './src/services/autoDownloader.js';
+import { sendPushToUser } from './src/services/pushService.js';
+import { annotateTorrents } from './src/services/sourceHealth.js';
+import { autoDownloadStore } from './src/routes/autoDownloadRoutes.js';
+import { sourceHealthStore } from './src/routes/sourceRoutes.js';
 
 // Privilégier IPv4 pour éviter les lenteurs et blocages de résolution DNS
 if (typeof dns.setDefaultResultOrder === 'function') {
   dns.setDefaultResultOrder('ipv4first');
 }
 
-// Chargement automatique des variables d'environnement (.env)
-if (typeof process.loadEnvFile === 'function') {
-  try {
-    process.loadEnvFile();
-  } catch (e) {
-    // Le fichier .env est optionnel
-  }
+initErrorLog(db);
+// Épisode téléchargé automatiquement terminé : « Prêt à regarder » aux comptes qui suivent l'anime
+function notifyAutoDownloadReady(item) {
+  const ready = buildReadyPayload(autoDownloadStore, item);
+  if (!ready) return;
+  for (const userId of ready.users) sendPushToUser(userId, ready.payload).catch(() => {});
 }
 
-initErrorLog(db);
-const downloads = initDownloadManager({ store: createDownloadStore(db), dir: DOWNLOADS_DIR, getFiles: getTorrentFiles });
+const downloads = initDownloadManager({
+  store: createDownloadStore(db),
+  dir: DOWNLOADS_DIR,
+  getFiles: getTorrentFiles,
+  onComplete: notifyAutoDownloadReady
+});
 
 const app = createApp();
 
@@ -35,6 +45,14 @@ const server = app.listen(PORT, async () => {
   startDbMaintenance({ db, backupDir: dbBackupDir, cleanupExpiredSessions });
   startEpisodeNotifier();
   downloads.resume();
+  startAutoDownloader({
+    store: autoDownloadStore,
+    enqueue: (request, userId) => downloads.enqueue(request, userId),
+    // Épisode déjà gardé à la main (ou en cours) : pas de second exemplaire
+    isAlreadyKept: (mediaId, episode) => downloads.list().some(i => i.mediaId === mediaId && i.episode === episode && i.status !== 'error'),
+    getFiles: getTorrentFiles,
+    annotate: (list) => { try { return annotateTorrents(sourceHealthStore, list); } catch (e) { return list; } }
+  });
   await checkHardwareAcceleration();
   console.log(`✅ Serveur Animflix modulaire prêt sur http://localhost:${PORT} !`);
 });

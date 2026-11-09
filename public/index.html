@@ -807,6 +807,21 @@
                       </label>
                   </div>
                   <div id="themeColorSwatches" class="theme-swatches" role="radiogroup" aria-label="Couleur de l'interface"></div>
+                  <label class="theme-anime-accent">
+                      <input type="checkbox" id="prefAnimeAccent" checked onchange="setAnimeAccentEnabled(this.checked)">
+                      <span>Fiches anime aux couleurs de leur affiche</span>
+                  </label>
+              </div>
+
+              <!-- Fond de l'interface (propre à cet appareil) -->
+              <div class="settings-group">
+                  <label class="settings-label">
+                      <span>🌑 Fond :</span>
+                      <select id="prefBackgroundTheme" class="settings-select" onchange="setBackgroundTheme(this.value)">
+                          <option value="dark">Sombre (par défaut)</option>
+                          <option value="oled">Noir OLED (noir pur, économise la batterie)</option>
+                      </select>
+                  </label>
               </div>
 
               <!-- Langue de recherche par défaut -->

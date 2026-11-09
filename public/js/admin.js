@@ -137,6 +137,7 @@ function renderAdminReport(r) {
                     ${adminRow('Envoyées', `${n.lastSent} au dernier passage · ${n.totalSent} depuis le démarrage`)}
                     ${n.lastError ? `<div class="admin-card-error">${escapeHtml(n.lastError)}</div>` : ''}
                 </div>
+                ${r.autoDownload ? renderAdminAutoDownload(r.autoDownload) : ''}
             </section>
         </div>
 
@@ -151,6 +152,17 @@ function renderAdminReport(r) {
             ${adminRow('Sessions actives', String(a.sessions ?? '—'))}
             ${adminRow('Appareils notifiés', String(a.pushDevices ?? '—'))}
             ${adminRow('Éléments synchronisés', String(a.syncItems ?? '—'))}
+        </div>`;
+}
+
+function renderAdminAutoDownload(d) {
+    return `
+        <h3 class="admin-section-title">Téléchargement automatique ${adminStatusPill(d.level, d.enabled ? null : 'Désactivé')}</h3>
+        <div class="admin-card">
+            ${adminRow('Animes suivis', String(d.subscriptions))}
+            ${adminRow('Dernière vérification', d.lastRunAt ? `il y a ${adminFormatAgo(Date.now() - d.lastRunAt)}` : 'pas encore')}
+            ${adminRow('Épisodes ajoutés', `${d.lastQueued} au dernier passage · ${d.totalQueued} depuis le démarrage`)}
+            ${d.lastError ? `<div class="admin-card-error">${escapeHtml(d.lastError)}</div>` : ''}
         </div>`;
 }
 

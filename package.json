@@ -1,6 +1,6 @@
 {
   "name": "serveuranime",
-  "version": "0.5.8",
+  "version": "0.5.13",
   "description": "",
   "main": "animflix.js",
   "type": "module",
