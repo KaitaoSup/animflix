@@ -53,13 +53,92 @@
     const STREAM_CAPACITY_MAX_RETRIES = 6; // 1 minute d'essais automatiques
     let streamCapacityRetry = { key: null, count: 0, timer: null, retryFn: null };
 
-    async function fetchStreamCapacity() {
+    async function fetchStreamCapacity(playId = null) {
         try {
-            const res = await fetch('/api/streams/capacity', { cache: 'no-store' });
+            const q = new URLSearchParams();
+            if (playId) q.set('playId', playId);
+            const clientId = typeof getOrCreateClientId === 'function' ? getOrCreateClientId() : null;
+            if (clientId) q.set('clientId', clientId);
+            const res = await fetch('/api/streams/capacity?' + q, { cache: 'no-store', credentials: 'include' });
             return res.ok ? await res.json() : null;
         } catch (e) {
             return null;
         }
+    }
+
+    // --- LECTURE COUPÉE PAR L'ADMINISTRATEUR (page « Serveur ») ---
+    // Le serveur arrête FFmpeg ; le lecteur l'apprend (vérification toutes les 15 s, et à chaque erreur
+    // ou fin de flux) et affiche un message au lieu de relancer, d'enchaîner l'épisode suivant ou de
+    // signaler la source comme cassée.
+    const ADMIN_STOP_POLL_MS = 15000;
+    let adminStopWatch = null;
+
+    function stopAdminStopWatch() {
+        if (adminStopWatch) clearInterval(adminStopWatch);
+        adminStopWatch = null;
+    }
+
+    function startAdminStopWatch(playId) {
+        stopAdminStopWatch();
+        adminStopWatch = setInterval(async () => {
+            if (currentPlaySessionId !== playId) return stopAdminStopWatch();
+            if (document.visibilityState !== 'visible') return;
+            const cap = await fetchStreamCapacity(playId);
+            if (cap && cap.stopped) showStoppedByAdmin(playId, cap.stopped);
+        }, ADMIN_STOP_POLL_MS);
+    }
+
+    function showStoppedByAdmin(playId, notice) {
+        if (currentPlaySessionId !== playId) return;
+        stopAdminStopWatch();
+        if (streamTimeout) clearTimeout(streamTimeout);
+        if (typeof clearSourceStallReport === 'function') clearSourceStallReport();
+        resetStreamCapacityRetry();
+        // Neutralise les gestionnaires de cette lecture (relance auto, épisode suivant, bascule HLS…)
+        currentPlaySessionId = null;
+        destroyCurrentHlsInstance(false);
+        const video = document.getElementById('videoPlayer');
+        // Position enregistrée AVANT de détacher le flux (currentTime repasse ensuite à 0)
+        if (typeof savePlaybackProgress === 'function') savePlaybackProgress(true);
+        if (video) {
+            const reached = Math.max(0, currentStreamOffset + (video.currentTime || 0));
+            video.onended = null;
+            video.onerror = null;
+            video.onwaiting = null;
+            try { video.pause(); } catch (e) {}
+            video.removeAttribute('src');
+            try { video.load(); } catch (e) {}
+            // Les sauvegardes suivantes (fermeture du lecteur) gardent la position atteinte
+            currentStreamOffset = reached;
+        }
+        const playerStatus = document.getElementById('player-status');
+        const statusText = document.getElementById('status-text');
+        if (playerStatus) playerStatus.style.display = 'block';
+        if (statusText) {
+            statusText.innerHTML = `🛑 ${escapeHtml(notice?.message || "Lecture arrêtée par l'administrateur du serveur.")}` +
+                `<br><span style='font-size:13px; color:#ffa033;'>Votre position est enregistrée : vous pourrez reprendre plus tard.</span>`;
+        }
+    }
+
+    // Vérifie (fin ou erreur de flux) si l'arrêt vient de l'administrateur ; true si c'est le cas
+    async function checkStoppedByAdmin(playId) {
+        const cap = await fetchStreamCapacity(playId);
+        if (cap && cap.stopped) {
+            showStoppedByAdmin(playId, cap.stopped);
+            return true;
+        }
+        return false;
+    }
+
+    // Libellé de la lecture pour la page « Serveur » (anime et épisode plutôt que le nom du torrent)
+    function streamDisplayTitle(titre) {
+        if (typeof currentSourceTitle === 'function') {
+            try {
+                const t = currentSourceTitle();
+                if (t) return t;
+            } catch (e) {}
+        }
+        return titre || '';
     }
 
     function resetStreamCapacityRetry() {
@@ -80,8 +159,17 @@
      * essai. Retourne false si le serveur n'est pas saturé (autre cause d'erreur).
      */
     async function handleStreamCapacityError(playId, retryFn) {
-        const cap = await fetchStreamCapacity();
-        if (!cap || !cap.full || currentPlaySessionId !== playId) return false;
+        const cap = await fetchStreamCapacity(playId);
+        if (cap && cap.stopped && currentPlaySessionId === playId) {
+            showStoppedByAdmin(playId, cap.stopped);
+            return true;
+        }
+        const userFull = !!(cap && cap.user && cap.user.full);
+        if (!cap || !(cap.full || userFull) || currentPlaySessionId !== playId) return false;
+        // Message selon la cause : serveur saturé, ou trop de lectures pour ce compte
+        const busyText = userFull
+            ? `⛔ Vous avez déjà ${cap.user.active} lecture(s) en cours sur d'autres appareils (maximum ${cap.user.max} par compte).`
+            : `⛔ Le serveur est occupé : ${cap.active} lecture(s) en cours sur ${cap.max} possibles.`;
 
         const playerStatus = document.getElementById('player-status');
         const statusText = document.getElementById('status-text');
@@ -97,7 +185,7 @@
         const retryButton = `<button class="btn-secondary" style="margin-top:10px;" onclick="retryStreamNow()">↻ Réessayer maintenant</button>`;
         if (streamCapacityRetry.count >= STREAM_CAPACITY_MAX_RETRIES) {
             if (statusText) {
-                statusText.innerHTML = `⛔ Le serveur est occupé : ${cap.active} lecture(s) en cours sur ${cap.max} possibles.` +
+                statusText.innerHTML = busyText +
                     `<br><span style='font-size:13px; color:#ffa033;'>Arrêtez une lecture sur un autre appareil, puis réessayez.</span><br>${retryButton}`;
             }
             return true;
@@ -105,7 +193,7 @@
 
         streamCapacityRetry.count++;
         if (statusText) {
-            statusText.innerHTML = `⛔ Le serveur est occupé : ${cap.active} lecture(s) en cours sur ${cap.max} possibles.` +
+            statusText.innerHTML = busyText +
                 `<br><span style='font-size:13px; color:#ffa033;'>Nouvel essai automatique dans ${STREAM_CAPACITY_RETRY_MS / 1000} s ` +
                 `(${streamCapacityRetry.count}/${STREAM_CAPACITY_MAX_RETRIES})…</span><br>${retryButton}`;
         }
@@ -217,11 +305,13 @@
         if (typeof armSourceStallReport === 'function') armSourceStallReport(playId, magnet, currentActiveFileIndex);
 
         const clientId = getOrCreateClientId();
+        startAdminStopWatch(playId);
 
         if (streamMode === 'hls') {
             let hlsUrl = `/api/hls/${encodeURIComponent(playId)}/index.m3u8?magnet=` + encodeURIComponent(magnet) +
                          `&fileIndex=` + encodeURIComponent(currentActiveFileIndex) +
-                         `&clientId=` + encodeURIComponent(clientId);
+                         `&clientId=` + encodeURIComponent(clientId) +
+                         `&title=` + encodeURIComponent(streamDisplayTitle(titre).slice(0, 140));
 
             if (currentActiveAudioIndex !== null && currentActiveAudioIndex !== '') {
                 hlsUrl += '&audioIndex=' + encodeURIComponent(currentActiveAudioIndex);
@@ -252,8 +342,9 @@
                     video.play().catch(() => {});
                 });
                 hls.on(Hls.Events.ERROR, (event, data) => {
-                    // 503 : serveur saturé. Inutile de laisser hls.js réessayer en boucle
-                    if (data && data.response && data.response.code === 503) {
+                    // 503 : serveur saturé, 429 : limite du compte, 403 : appareil coupé par l'administrateur.
+                    // Inutile de laisser hls.js réessayer en boucle
+                    if (data && data.response && [403, 429, 503].includes(data.response.code)) {
                         if (streamTimeout) clearTimeout(streamTimeout);
                         destroyCurrentHlsInstance(false);
                         handleStreamCapacityError(playId, () => startStreamingInPlayer(magnet, titre, vlcUrl, currentActiveFileIndex, currentStreamOffset))
@@ -270,9 +361,13 @@
                     if (data && data.fatal && data.response && data.response.code === 404 &&
                         currentPlaySessionId === playId) {
                         const resumeAt = Math.max(0, Math.floor(currentStreamOffset + (video.currentTime || 0)));
-                        console.warn(`📡 Session HLS ${playId} expirée côté serveur : reprise à ${resumeAt}s`);
                         destroyCurrentHlsInstance(false);
-                        startStreamingInPlayer(magnet, titre, vlcUrl, currentActiveFileIndex, resumeAt);
+                        // Session supprimée par l'administrateur : ne pas relancer
+                        checkStoppedByAdmin(playId).then(stopped => {
+                            if (stopped || currentPlaySessionId !== playId) return;
+                            console.warn(`📡 Session HLS ${playId} expirée côté serveur : reprise à ${resumeAt}s`);
+                            startStreamingInPlayer(magnet, titre, vlcUrl, currentActiveFileIndex, resumeAt);
+                        });
                         return;
                     }
                     if (data && data.fatal) {
@@ -307,7 +402,8 @@
                          '&type=' + encodeURIComponent(type) +
                          '&fileIndex=' + encodeURIComponent(currentActiveFileIndex) +
                          '&playId=' + encodeURIComponent(playId) +
-                         '&clientId=' + encodeURIComponent(clientId);
+                         '&clientId=' + encodeURIComponent(clientId) +
+                         '&title=' + encodeURIComponent(streamDisplayTitle(titre).slice(0, 140));
 
             if (currentActiveAudioIndex !== null && currentActiveAudioIndex !== '') {
                 webUrl += '&audioIndex=' + encodeURIComponent(currentActiveAudioIndex);
@@ -425,7 +521,9 @@
             }
         };
 
-        video.onended = () => {
+        video.onended = async () => {
+            // Flux coupé par l'administrateur : pas d'épisode suivant
+            if (currentPlaySessionId === playId && await checkStoppedByAdmin(playId)) return;
             if ('mediaSession' in navigator) {
                 navigator.mediaSession.playbackState = 'none';
             }

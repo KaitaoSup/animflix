@@ -3,7 +3,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
-import { TORRSERVER_LOCAL_URL, HLS_CACHE_DIR, VAAPI_DEVICE, MAX_CONCURRENT_STREAMS } from '../config/constants.js';
+import { TORRSERVER_LOCAL_URL, HLS_CACHE_DIR, VAAPI_DEVICE, MAX_CONCURRENT_STREAMS, MAX_STREAMS_PER_USER } from '../config/constants.js';
 import { getTorrentHash } from '../utils/network.js';
 import {
   parseFileIndex,
@@ -23,7 +23,12 @@ import {
   cleanupHlsSession,
   stopClientHlsSession,
   killClientFfmpegProcess,
-  drainFfmpegStderr
+  drainFfmpegStderr,
+  buildStreamMeta,
+  countUserStreams,
+  getClientBlock,
+  markPlayStopped,
+  getPlayStopNotice
 } from '../utils/sessionManager.js';
 import {
   getStreamInfo,
@@ -59,8 +64,43 @@ function releasePlaySession(playSession, actualStart) {
 router.get('/api/streams/capacity', (req, res) => {
   const active = countActiveStreams();
   res.setHeader('Cache-Control', 'no-store');
-  res.json({ active, max: MAX_CONCURRENT_STREAMS, full: active >= MAX_CONCURRENT_STREAMS });
+  const clientId = typeof req.query.clientId === 'string' ? req.query.clientId : null;
+  const playId = typeof req.query.playId === 'string' && isValidPlayId(req.query.playId) ? req.query.playId : null;
+  // Limite par compte : lectures du compte sur ses AUTRES appareils
+  let user = null;
+  if (req.user && MAX_STREAMS_PER_USER > 0) {
+    const mine = countUserStreams(req.user.id, clientId);
+    user = { active: mine, max: MAX_STREAMS_PER_USER, full: mine >= MAX_STREAMS_PER_USER };
+  }
+  res.json({
+    active,
+    max: MAX_CONCURRENT_STREAMS,
+    full: active >= MAX_CONCURRENT_STREAMS,
+    user,
+    // Lecture coupée par l'administrateur (le lecteur l'affiche au lieu de relancer)
+    stopped: getPlayStopNotice(playId)
+  });
 });
+
+/**
+ * Refus d'une nouvelle lecture : appareil coupé par l'administrateur il y a moins d'une minute (403),
+ * limite de lectures du compte atteinte (429). Retourne true si la réponse est envoyée.
+ */
+function refuseStreamStart(req, res, clientId, playId) {
+  const block = getClientBlock(clientId);
+  if (block) {
+    markPlayStopped(playId, block.message);
+    res.setHeader('Retry-After', String(block.retryAfterS));
+    res.status(403).send(block.message);
+    return true;
+  }
+  if (req.user && MAX_STREAMS_PER_USER > 0 && countUserStreams(req.user.id, clientId) >= MAX_STREAMS_PER_USER) {
+    console.warn(`⛔ Limite de ${MAX_STREAMS_PER_USER} lecture(s) par compte atteinte (${req.user.username})`);
+    res.status(429).send(`Vous avez déjà ${MAX_STREAMS_PER_USER} lecture(s) en cours sur d'autres appareils.`);
+    return true;
+  }
+  return false;
+}
 
 router.get('/api/streams', async (req, res) => {
   const { magnet } = req.query;
@@ -201,6 +241,11 @@ router.get('/play', async (req, res) => {
   stopClientHlsSession(clientId);
   killClientFfmpegProcess(clientId);
 
+  if (refuseStreamStart(req, res, clientId, playId)) {
+    releasePlaySession(playSession, seekSeconds);
+    return;
+  }
+
   // Analyse des pistes (mode direct) AVANT la vérification de limite : aucun `await` ne doit séparer
   // le comptage des flux du lancement de FFmpeg, sinon deux requêtes simultanées dépassent la limite.
   const streamInfo = mode === 'direct'
@@ -237,6 +282,7 @@ router.get('/play', async (req, res) => {
 
     const ffmpeg = spawn('ffmpeg', directArgs);
     drainFfmpegStderr(ffmpeg, `FFmpeg direct (${clientId})`);
+    ffmpeg.animflixMeta = buildStreamMeta(req, { clientId, playId, mode: 'direct', magnet, fileIndex: parsedFileIndex, local: torrUrl.startsWith('file:') });
     activeClientFfmpegProcesses.set(clientId, ffmpeg);
 
     if (playSession) {
@@ -334,6 +380,7 @@ router.get('/play', async (req, res) => {
 
   const ffmpeg = spawn('ffmpeg', transcodeArgs);
   drainFfmpegStderr(ffmpeg, `FFmpeg transcodage (${clientId})`);
+  ffmpeg.animflixMeta = buildStreamMeta(req, { clientId, playId, mode: `transcode-${detectedHwAccel}`, magnet, fileIndex: parsedFileIndex, local: torrUrl.startsWith('file:') });
   activeClientFfmpegProcesses.set(clientId, ffmpeg);
 
   ffmpeg.stdout.pipe(res);
@@ -384,6 +431,7 @@ router.get('/api/hls/:playId/index.m3u8', async (req, res) => {
   // Interrompre toute ancienne session HLS du même client
   stopClientHlsSession(clientId);
   killClientFfmpegProcess(clientId);
+  if (refuseStreamStart(req, res, clientId, playId)) return;
 
   const torrUrl = mediaInputUrl(magnet, parsedFileIndex);
   const streamInfo = await getStreamInfo(magnet, parsedFileIndex).catch(() => null);
@@ -458,7 +506,11 @@ router.get('/api/hls/:playId/index.m3u8', async (req, res) => {
     m3u8Path,
     ffmpegProcess: ffmpeg,
     createdAt: Date.now(),
-    lastAccess: Date.now()
+    lastAccess: Date.now(),
+    meta: buildStreamMeta(req, {
+      clientId, playId, mode: videoIsCopied ? 'hls-copy' : `hls-transcode-${detectedHwAccel}`,
+      magnet, fileIndex: parsedFileIndex, local: torrUrl.startsWith('file:')
+    })
   };
 
   activeHlsSessions.set(playId, hlsSession);

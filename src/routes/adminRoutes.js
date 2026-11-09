@@ -6,6 +6,8 @@ import path from 'path';
 import fs from 'fs';
 import { backupDatabase, BACKUP_NAME_RE } from '../services/dbMaintenance.js';
 import { getErrorLog, ERROR_SOURCES } from '../services/errorLog.js';
+import { listActiveStreams, stopClientStreams, STREAM_CONTROL } from '../utils/sessionManager.js';
+import { MAX_CONCURRENT_STREAMS, MAX_STREAMS_PER_USER } from '../config/constants.js';
 
 const router = Router();
 
@@ -20,6 +22,50 @@ router.get('/api/admin/health', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * Lectures en cours : compte, appareil, titre, mode (direct, transcodage, HLS), depuis quand
+ */
+router.get('/api/admin/streams', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  res.setHeader('Cache-Control', 'no-store');
+  const now = Date.now();
+  res.json({
+    now,
+    max: MAX_CONCURRENT_STREAMS,
+    maxPerUser: MAX_STREAMS_PER_USER,
+    blockSeconds: STREAM_CONTROL.BLOCK_MS / 1000,
+    items: listActiveStreams(now).map(s => ({
+      clientId: s.clientId,
+      kind: s.kind,
+      mode: s.mode,
+      username: s.username,
+      title: s.title,
+      hash: s.hash,
+      fileIndex: s.fileIndex,
+      local: s.local,
+      device: s.device,
+      startedAt: s.startedAt,
+      lastAccess: s.lastAccess,
+      own: s.clientId === (typeof req.query.clientId === 'string' ? req.query.clientId : null)
+    }))
+  });
+});
+
+/**
+ * Coupe la lecture d'un appareil (il ne peut pas relancer pendant 1 minute)
+ */
+router.post('/api/admin/streams/stop', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const clientId = req.body?.clientId;
+  if (typeof clientId !== 'string' || !/^[a-zA-Z0-9_-]{4,64}$/.test(clientId)) {
+    return res.status(400).json({ error: 'Appareil invalide' });
+  }
+  const stopped = stopClientStreams(clientId);
+  if (!stopped) return res.status(404).json({ error: 'Cette lecture est déjà terminée.' });
+  console.log(`🛑 Lecture coupée par l'administrateur ${req.user.username} (appareil ${clientId})`);
+  res.json({ success: true, stopped });
 });
 
 /**

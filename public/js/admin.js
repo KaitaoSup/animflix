@@ -174,6 +174,109 @@ function adminRetentionText(r) {
     return `Une sauvegarde par jour, vérifiée avant d'être gardée. Conservées : ${parts.join(', ')}.`;
 }
 
+// --- LECTURES EN COURS (QUI REGARDE QUOI, BOUTON « COUPER ») ---
+
+const ADMIN_STREAMS_REFRESH_MS = 10000;
+let adminStreamsTimer = null;
+
+function adminStreamModeLabel(s) {
+    const mode = String(s.mode || '');
+    const hw = (m) => {
+        const acc = m.split('-').pop();
+        return acc && acc !== 'software' && acc !== 'transcode' ? ` ${acc.toUpperCase()}` : '';
+    };
+    let label;
+    if (mode === 'direct') label = '⚡ Direct';
+    else if (mode === 'hls-copy') label = '📡 HLS (copie)';
+    else if (mode.startsWith('hls-transcode')) label = `📡 HLS transcodé${hw(mode)}`;
+    else if (mode.startsWith('transcode')) label = `🎬 Transcodage${hw(mode)}`;
+    else label = mode || '—';
+    return s.local ? `${label} · 💾 fichier du serveur` : label;
+}
+
+function renderAdminStreams(data) {
+    const items = data.items || [];
+    const full = items.length >= data.max;
+    const rows = items.map(s => `
+        <li class="admin-stream">
+            <div class="admin-stream-main">
+                <span class="admin-stream-title" title="${escapeHtml(s.title)}">${escapeHtml(s.title)}</span>
+                <span class="admin-stream-meta">
+                    <b>${s.username ? '👤 ' + escapeHtml(s.username) : '👻 Sans compte'}</b>
+                    · ${escapeHtml(s.device)}${s.own ? ' <small>(cet appareil)</small>' : ''}
+                    · ${escapeHtml(adminStreamModeLabel(s))}
+                    · depuis ${adminFormatAgo(data.now - s.startedAt)}
+                </span>
+            </div>
+            <button type="button" class="btn-sub-style admin-stream-stop" onclick="stopAdminStream(${jsArg(s.clientId)}, ${jsArg(s.title)}, ${jsArg(s.username || '')})">⏹ Couper</button>
+        </li>`).join('');
+    const limitText = data.maxPerUser
+        ? `Au plus ${data.maxPerUser} lecture${data.maxPerUser > 1 ? 's' : ''} par compte (MAX_STREAMS_PER_USER).`
+        : 'Pas de limite par compte (MAX_STREAMS_PER_USER dans .env).';
+    return `
+        <h3 class="admin-section-title">Lectures en cours ${adminStatusPill(full ? 'warn' : 'ok', `${items.length} / ${data.max}`)}</h3>
+        <div class="admin-card">
+            ${rows ? `<ul class="admin-stream-list">${rows}</ul>` : '<div class="admin-card-sub">Personne ne regarde en ce moment.</div>'}
+            <div class="admin-card-sub admin-stream-note">${escapeHtml(limitText)} Un appareil coupé ne peut pas relancer de lecture pendant ${Number(data.blockSeconds) || 60} s.</div>
+        </div>`;
+}
+
+async function loadAdminStreams() {
+    const el = document.getElementById('adminStreamsContent');
+    if (!el || !document.body.contains(el)) {
+        clearInterval(adminStreamsTimer);
+        adminStreamsTimer = null;
+        return;
+    }
+    try {
+        const clientId = typeof getOrCreateClientId === 'function' ? getOrCreateClientId() : '';
+        const res = await fetch('/api/admin/streams?clientId=' + encodeURIComponent(clientId || ''), {
+            headers: getAuthHeaders(), credentials: 'include', cache: 'no-store'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        if (!document.body.contains(el)) return;
+        el.innerHTML = renderAdminStreams(data);
+    } catch (err) {
+        el.innerHTML = `<div class="admin-card admin-card-error">Lectures en cours indisponibles : ${escapeHtml(err.message)}</div>`;
+    }
+}
+
+async function stopAdminStream(clientId, title, username) {
+    const who = username ? ` de ${username}` : '';
+    const ok = typeof openUiDialog === 'function'
+        ? await openUiDialog({
+            title: 'Couper cette lecture ?',
+            message: `« ${title} »${who} s'arrête immédiatement. Le lecteur affichera « Lecture arrêtée par l'administrateur » et l'appareil ne pourra pas relancer pendant une minute.`,
+            okLabel: 'Couper', cancelLabel: 'Annuler', danger: true
+        })
+        : confirm(`Couper « ${title} »${who} ?`);
+    if (!ok) return;
+    try {
+        const res = await fetch('/api/admin/streams/stop', {
+            method: 'POST', headers: getAuthHeaders(), credentials: 'include',
+            body: JSON.stringify({ clientId })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        showToast('⏹ Lecture coupée');
+    } catch (err) {
+        showToast('⚠️ ' + err.message);
+    }
+    loadAdminStreams();
+}
+
+function startAdminStreamsRefresh() {
+    clearInterval(adminStreamsTimer);
+    loadAdminStreams();
+    adminStreamsTimer = setInterval(() => {
+        if (document.visibilityState === 'visible') loadAdminStreams();
+    }, ADMIN_STREAMS_REFRESH_MS);
+}
+
+window.stopAdminStream = stopAdminStream;
+window.loadAdminStreams = loadAdminStreams;
+
 // --- JOURNAL DES ERREURS ---
 
 const adminErrorsState = { source: '', expanded: new Set() };
@@ -308,11 +411,13 @@ function renderAdminTabHtml(container) {
                     <h2 class="home-watching-title"><span style="font-size: 24px;">🛠️</span> État du serveur</h2>
                 </div>
             </div>
+            <div id="adminStreamsContent"></div>
             <div id="adminHealthContent">
                 <div class="admin-card admin-loading"><div class="spinner" style="width: 20px; height: 20px; border-width: 3px; margin: 0;"></div> Vérification des services…</div>
             </div>
             <div id="adminErrorsContent"></div>
         </div>`;
+    startAdminStreamsRefresh();
     loadAdminHealth();
     loadAdminErrors();
 }

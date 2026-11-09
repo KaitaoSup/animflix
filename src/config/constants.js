@@ -27,6 +27,8 @@ export const FFMPEG_HWACCEL_PREF = (process.env.FFMPEG_HWACCEL || 'auto').toLowe
 // --- LIMITE DE FLUX FFMPEG SIMULTANÉS (lecture directe, transcodage, HLS) ---
 // Chaque flux est un processus FFmpeg (transcodage = CPU/GPU intensif) : au-delà, réponse 503.
 export const MAX_CONCURRENT_STREAMS = Math.max(1, parseInt(process.env.MAX_CONCURRENT_STREAMS, 10) || 4);
+// Lectures simultanées par compte Animflix (appareils différents) ; 0 = pas de limite
+export const MAX_STREAMS_PER_USER = Math.max(0, parseInt(process.env.MAX_STREAMS_PER_USER, 10) || 0);
 
 // --- REPERTOIRES DE CACHE DISQUE ---
 export const ROOT_DIR = process.cwd();
