@@ -156,6 +156,22 @@
                 // Mise à jour de la carte HUD détaillée si ouverte
                 updatePlayerP2pHudCardUI(data);
 
+            } else if (data.online && !data.found && data.playback) {
+                // Lecture depuis le serveur (fichier gardé ou épisode entièrement transcodé) : plus besoin du swarm
+                const isLocal = data.playback === 'local';
+                if (liveBox) liveBox.style.display = 'none';
+                if (hudDot) hudDot.className = 'p2p-hud-dot idle';
+                if (hudBadge) hudBadge.textContent = isLocal ? '💾 Local' : '✓ Chargé';
+                if (subDetail) {
+                    subDetail.textContent = isLocal
+                        ? 'Lecture du fichier gardé sur le serveur'
+                        : 'Épisode entièrement chargé sur le serveur, plus de P2P nécessaire';
+                }
+                const engine = document.getElementById('p2pHudEngineStatus');
+                if (engine) {
+                    engine.textContent = isLocal ? 'Fichier local' : 'Épisode chargé';
+                    engine.style.color = '#4ade80';
+                }
             } else if (data.online && !data.found) {
                 if (hudDot) hudDot.className = 'p2p-hud-dot buffering';
                 if (hudBadge) hudBadge.textContent = 'Init...';

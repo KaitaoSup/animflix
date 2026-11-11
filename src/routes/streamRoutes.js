@@ -522,6 +522,8 @@ router.get('/api/hls/:playId/index.m3u8', async (req, res) => {
 
   ffmpeg.on('close', (code) => {
     console.log(`📡 FFmpeg HLS session ${playId} s'est arrêté (code ${code})`);
+    // Épisode entièrement transcodé : la lecture continue depuis les segments, TorrServer peut fermer le torrent
+    if (code === 0) hlsSession.completed = true;
   });
 
   // Attendre la génération du fichier .m3u8 initial avec au moins 1 segment

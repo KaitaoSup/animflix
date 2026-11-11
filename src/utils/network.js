@@ -15,6 +15,22 @@ export function getTorrentHash(magnet) {
   return Math.abs(hash).toString(16);
 }
 
+/**
+ * infoHash au format hexadécimal (celui renvoyé par TorrServer) : les magnets en base32
+ * (32 caractères) sont convertis, les autres valeurs renvoyées telles quelles en minuscules
+ */
+export function toHexInfoHash(hash) {
+  if (typeof hash !== 'string') return hash;
+  const value = hash.toLowerCase();
+  if (!/^[a-z2-7]{32}$/.test(value)) return value;
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz234567';
+  let bits = '';
+  for (const c of value) bits += alphabet.indexOf(c).toString(2).padStart(5, '0');
+  let hex = '';
+  for (let i = 0; i < 160; i += 4) hex += parseInt(bits.slice(i, i + 4), 2).toString(16);
+  return hex;
+}
+
 // infoHash BitTorrent v1 : 40 caractères hexadécimaux ou 32 caractères base32
 const INFO_HASH_RE = /^(?:[a-f0-9]{40}|[a-z2-7]{32})$/i;
 const MAX_MAGNET_LENGTH = 4096;

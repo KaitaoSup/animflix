@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { isValidMagnet, isValidInfoHash, validateTorrentParams } from '../src/utils/network.js';
+import { isValidMagnet, isValidInfoHash, validateTorrentParams, toHexInfoHash } from '../src/utils/network.js';
 
 const HEX = 'a'.repeat(40);
 const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
@@ -61,5 +61,17 @@ describe('validateTorrentParams', () => {
     assert.deepEqual(run({ magnet: 'http://evil/x.torrent' }), { status: 400, nextCalled: false });
     assert.deepEqual(run({ magnet: [NYAA_MAGNET, NYAA_MAGNET] }), { status: 400, nextCalled: false });
     assert.deepEqual(run({}, { hash: '../../etc' }), { status: 400, nextCalled: false });
+  });
+});
+
+describe('toHexInfoHash', () => {
+  test('convertit un infoHash base32 en hexadécimal (format TorrServer)', () => {
+    assert.equal(toHexInfoHash('R6QZW62D5STDBZ47BXO32M45UBBCHLIS'), '8fa19b7b43eca630e79f0dddbd339da04223ad12');
+    assert.equal(toHexInfoHash('r6qzw62d5stdbz47bxo32m45ubbchlis'), '8fa19b7b43eca630e79f0dddbd339da04223ad12');
+  });
+
+  test('laisse un hash hexadécimal inchangé (en minuscules)', () => {
+    assert.equal(toHexInfoHash('ABCDEF0123456789abcdef0123456789abcdef01'), 'abcdef0123456789abcdef0123456789abcdef01');
+    assert.equal(toHexInfoHash(null), null);
   });
 });

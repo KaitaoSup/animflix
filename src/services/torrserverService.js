@@ -1,7 +1,7 @@
 import axios from 'axios';
 import path from 'path';
 import { TORRSERVER_LOCAL_URL } from '../config/constants.js';
-import { getTorrentHash, formatBytesSpeed, formatBytesSize } from '../utils/network.js';
+import { getTorrentHash, toHexInfoHash, formatBytesSpeed, formatBytesSize } from '../utils/network.js';
 import { torrentFilesCache } from '../utils/cache.js';
 import { extractFileEpisodeNumber } from '../utils/animeParser.js';
 import { activeHlsSessions, cleanupHlsSession } from '../utils/sessionManager.js';
@@ -135,7 +135,7 @@ export async function dropTorrent(torrentHash) {
 
   await axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
     action: "rem",
-    hash: torrentHash
+    hash: toHexInfoHash(torrentHash)
   }, { timeout: 3000 });
 
   return { success: true, message: `Torrent ${torrentHash} retiré de TorrServer.` };
@@ -180,9 +180,11 @@ export async function cleanTorrServerCache() {
  */
 export async function getTorrServerStats(torrentHash = null) {
   if (torrentHash) {
+    // TorrServer indexe en hexadécimal : un magnet en base32 ne serait jamais retrouvé
+    const hexHash = toHexInfoHash(torrentHash);
     let torrentData = null;
     try {
-      const getRes = await getTorrent(torrentHash);
+      const getRes = await getTorrent(hexHash);
       if (getRes.data && getRes.data.hash) {
         torrentData = getRes.data;
       }
@@ -192,14 +194,22 @@ export async function getTorrServerStats(torrentHash = null) {
       try {
         const listRes = await listTorrents();
         const list = listRes.data || [];
-        torrentData = list.find(t => t.hash && t.hash.toLowerCase() === torrentHash.toLowerCase());
+        torrentData = list.find(t => t.hash && t.hash.toLowerCase() === hexHash);
       } catch (e) {}
     }
 
     if (!torrentData) {
+      // Absent de TorrServer mais lu depuis le serveur : fichier gardé ou épisode déjà entièrement transcodé
+      let playback = null;
+      for (const sess of activeHlsSessions.values()) {
+        if (sess.hash !== torrentHash) continue;
+        if (sess.meta?.local) { playback = 'local'; break; }
+        if (sess.completed) playback = 'completed';
+      }
       return {
         online: true,
         found: false,
+        playback,
         hash: torrentHash,
         stat: 0,
         statLabel: "Initialisation du flux...",
