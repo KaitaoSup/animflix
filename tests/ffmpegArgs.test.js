@@ -114,4 +114,27 @@ describe('buildHlsArgs', () => {
     assert.equal(valueAfter(args, '-c:v'), 'h264_vaapi');
     assert.equal(valueAfter(args, '-c:a'), 'aac');
   });
+  test('H.264 copié + seek : seek rapide sur l\'image clé, audio copié', () => {
+    const args = buildHlsArgs({ ...hls, seekSeconds: 772, streamInfo: AAC_INFO });
+    assert.ok(args.includes('-noaccurate_seek'));
+    assert.equal(valueAfter(args, '-c:a'), 'copy');
+  });
+  test('réencodage + seek : seek précis et audio réencodé (sinon timeline décalée)', () => {
+    const args = buildHlsArgs({ ...hls, seekSeconds: 772, streamInfo: { videoCodec: 'av1', audioTracks: [{ index: 0, codec: 'aac' }] } });
+    assert.ok(!args.includes('-noaccurate_seek'));
+    assert.equal(valueAfter(args, '-ss'), '772');
+    assert.equal(valueAfter(args, '-c:a'), 'aac');
+  });
+  test('réencodage sans seek : audio AAC toujours copié', () => {
+    const args = buildHlsArgs({ ...hls, streamInfo: { videoCodec: 'av1', audioTracks: [{ index: 0, codec: 'aac' }] } });
+    assert.equal(valueAfter(args, '-c:a'), 'copy');
+  });
+});
+
+describe('buildTranscodeArgs (seek)', () => {
+  test('seek précis : vidéo et audio coupés au même instant', () => {
+    const args = buildTranscodeArgs({ ...base, seekSeconds: 772, hwAccel: 'none' });
+    assert.ok(!args.includes('-noaccurate_seek'));
+    assert.ok(args.indexOf('-ss') < args.indexOf('-i'));
+  });
 });

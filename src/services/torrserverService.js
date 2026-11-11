@@ -37,9 +37,10 @@ export async function addTorrent(magnet) {
  * Récupère les données d'un torrent par son hash
  */
 export async function getTorrent(hash) {
+  // TorrServer n'accepte que l'infoHash hexadécimal (40 car.) : un hash base32 provoque un panic côté serveur
   return axios.post(`${TORRSERVER_LOCAL_URL}/torrents`, {
     action: "get",
-    hash
+    hash: toHexInfoHash(hash)
   }, { timeout: 2500 });
 }
 

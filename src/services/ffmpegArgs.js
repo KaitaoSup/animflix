@@ -11,8 +11,17 @@ const FRAGMENTED_MP4_OUTPUT = [
 
 const AAC_STEREO = ['-c:a', 'aac', '-b:a', '192k', '-ac', '2'];
 
-function seekArgs(seekSeconds) {
-  return seekSeconds > 0 ? ['-noaccurate_seek', '-ss', `${seekSeconds}`] : [];
+/**
+ * Seek avant `-i`.
+ * - Vidéo copiée (`accurate = false`) : le flux démarre forcément sur l'image clé précédant le seek ;
+ *   `-noaccurate_seek` fait démarrer l'audio au même endroit, et ce point est mesuré pour caler les sous-titres.
+ * - Vidéo réencodée (`accurate = true`) : FFmpeg coupe vidéo ET audio réencodé exactement au temps demandé.
+ *   Avec `-noaccurate_seek`, seule la vidéo était coupée : l'audio commençait à l'image clé précédente,
+ *   le lecteur calait son 0 dessus et toute la lecture (sous-titres compris) était décalée de plusieurs secondes.
+ */
+function seekArgs(seekSeconds, accurate = false) {
+  if (!(seekSeconds > 0)) return [];
+  return accurate ? ['-ss', `${seekSeconds}`] : ['-noaccurate_seek', '-ss', `${seekSeconds}`];
 }
 
 /**
@@ -24,8 +33,8 @@ function seekArgs(seekSeconds) {
  *
  * `videoCodecArgs` s'insère entre le mapping vidéo et le mapping audio (ordre historique des modes).
  */
-function inputAndMapArgs({ torrUrl, seekSeconds, audioIndex, audioOffset, preInputArgs = [], videoCodecArgs = [] }) {
-  const seek = seekArgs(seekSeconds);
+function inputAndMapArgs({ torrUrl, seekSeconds, accurateSeek = false, audioIndex, audioOffset, preInputArgs = [], videoCodecArgs = [] }) {
+  const seek = seekArgs(seekSeconds, accurateSeek);
   const args = [...seek, ...preInputArgs, '-i', torrUrl];
   let audioInput = 0;
 
@@ -98,7 +107,7 @@ export function buildTranscodeArgs({ torrUrl, seekSeconds, audioIndex, audioOffs
   }
 
   return [
-    ...inputAndMapArgs({ torrUrl, seekSeconds, audioIndex, audioOffset, preInputArgs }),
+    ...inputAndMapArgs({ torrUrl, seekSeconds, accurateSeek: true, audioIndex, audioOffset, preInputArgs }),
     ...videoArgs,
     ...AAC_STEREO,
     ...FRAGMENTED_MP4_OUTPUT
@@ -111,8 +120,14 @@ export function buildTranscodeArgs({ torrUrl, seekSeconds, audioIndex, audioOffs
 export function buildHlsArgs({ torrUrl, seekSeconds, audioIndex, audioOffset, streamInfo, hwAccel, vaapiDevice, segmentPattern, m3u8Path }) {
   let preInputArgs = [];
   let videoCodecArgs;
+  const videoIsCopied = isH264DirectCopy(streamInfo);
+  // Vidéo réencodée après un seek : un audio copié ne peut pas être coupé au temps exact (il démarrerait
+  // avant la vidéo et décalerait toute la timeline) : le réencoder pour qu'il démarre avec elle.
+  const audioArgs = needsAacConversion(streamInfo, audioIndex) || (!videoIsCopied && seekSeconds > 0)
+    ? AAC_STEREO
+    : ['-c:a', 'copy'];
 
-  if (isH264DirectCopy(streamInfo)) {
+  if (videoIsCopied) {
     videoCodecArgs = ['-c:v', 'copy', '-bsf:v', 'h264_mp4toannexb'];
   } else if (hwAccel === 'vaapi') {
     preInputArgs = ['-init_hw_device', `vaapi=va:${vaapiDevice}`, '-filter_hw_device', 'va'];
@@ -125,8 +140,8 @@ export function buildHlsArgs({ torrUrl, seekSeconds, audioIndex, audioOffset, st
 
   return [
     '-threads', '0',
-    ...inputAndMapArgs({ torrUrl, seekSeconds, audioIndex, audioOffset, preInputArgs, videoCodecArgs }),
-    ...(needsAacConversion(streamInfo, audioIndex) ? AAC_STEREO : ['-c:a', 'copy']),
+    ...inputAndMapArgs({ torrUrl, seekSeconds, accurateSeek: !videoIsCopied, audioIndex, audioOffset, preInputArgs, videoCodecArgs }),
+    ...audioArgs,
     '-sn',
     '-f', 'hls',
     '-hls_time', '3',
