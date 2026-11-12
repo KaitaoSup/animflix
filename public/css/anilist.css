@@ -1449,6 +1449,7 @@
         }
         .anime-synopsis-toggle:hover { background: none; color: var(--text); text-decoration: underline; }
         .anime-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 4px; }
+        .anime-actions .btn-anime-anilist { text-decoration: none; }
         .btn-anime-play {
             display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: center;
             padding: 12px 26px; font-size: var(--fs-lg); border-radius: var(--radius-md); min-height: 50px;

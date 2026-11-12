@@ -8,6 +8,17 @@ const STORAGE_KEY_HOME_TAB = 'animflix_home_tab';
 const STORAGE_KEY_PROFILES = 'animflix_user_profiles';
 const STORAGE_KEY_ACTIVE_PROFILE_ID = 'animflix_active_profile_id';
 
+// À l'ouverture de l'appli (URL sans route), on démarre toujours sur l'Accueil plutôt que sur
+// le dernier onglet visité (ex. Serveur pour un admin). Un rafraîchissement sur #/admin, un
+// raccourci PWA (?tab=...) ou un retour OAuth AniList gardent leur comportement.
+(function resetHomeTabOnLaunch() {
+    const hash = window.location.hash || '';
+    const hasTabParam = new URLSearchParams(window.location.search).has('tab');
+    if (!hasTabParam && (hash === '' || hash === '#' || hash === '#/' || hash === '#detail')) {
+        try { localStorage.setItem(STORAGE_KEY_HOME_TAB, 'home'); } catch (e) {}
+    }
+})();
+
 let lastPlaybackSaveTime = 0;
 let pendingResumeSeconds = 0;
 let resumeBannerTimeout = null;

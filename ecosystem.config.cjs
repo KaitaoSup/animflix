@@ -7,7 +7,9 @@ module.exports = {
       exec_mode: 'fork',
       interpreter: 'none',
       autorestart: true,
-      max_memory_restart: '500M'
+      // Le cache RAM de TorrServer (CacheSize, 200 Mo) est alloué PAR torrent : 2 torrents actifs
+      // (épisode en cours + préchargement du suivant) + le runtime Go dépassent 500 Mo
+      max_memory_restart: '1200M'
     },
     {
       name: 'animflix',

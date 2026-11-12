@@ -681,6 +681,9 @@
                                 <button type="button" class="btn-favorite-toggle ${isFav ? 'active' : ''}" onclick="toggleAnimePageFavorite()" aria-pressed="${isFav}">
                                     ${isFav ? '❤️ Dans mes favoris' : '🤍 Favori'}
                                 </button>
+                                <a class="btn-secondary btn-anime-anilist" href="https://anilist.co/anime/${Number(media.id)}" target="_blank" rel="noopener" title="Ouvrir la fiche de cet anime sur AniList">
+                                    ↗ Fiche AniList
+                                </a>
                                 ${typeof renderAutoDownloadToggle === 'function' ? renderAutoDownloadToggle(media) : ''}
                                 <label class="anime-lang-select">
                                     <span class="visually-hidden">Langue des sources</span>
