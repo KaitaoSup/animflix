@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import path from 'path';
 import { SUB_CACHE_DIR } from '../src/config/constants.js';
-import { streamSubtitlesLive } from '../src/services/subtitlesService.js';
+import { streamSubtitlesLive, isTruncatedRead } from '../src/services/subtitlesService.js';
 
 describe('Subtitles Service & Stream Routing', () => {
   const dummyHash = 'test_hash_subtitle_' + Date.now();
@@ -85,5 +85,22 @@ describe('Subtitles Service & Stream Routing', () => {
 
     // Nettoyage
     try { fs.unlinkSync(assFile); } catch (e) {}
+  });
+});
+
+describe('isTruncatedRead (flux coupé avant la fin)', () => {
+  it('lecture complète : pas tronqué', () => {
+    assert.equal(isTruncatedRead(1420.016, 1420), false);
+    assert.equal(isTruncatedRead(1405, 1420), false);
+  });
+  it('flux coupé vers 5 min sur un épisode de 23 min : tronqué', () => {
+    assert.equal(isTruncatedRead(297, 1420), true);
+  });
+  it('aucune progression reçue : tronqué', () => {
+    assert.equal(isTruncatedRead(0, 1420), true);
+  });
+  it('durée inconnue : on fait confiance au code de sortie', () => {
+    assert.equal(isTruncatedRead(297, null), false);
+    assert.equal(isTruncatedRead(297, undefined), false);
   });
 });

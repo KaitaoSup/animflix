@@ -253,6 +253,15 @@ export async function streamSubtitlesLive({ magnet, fileIndex = 1, subIndex = 0,
   attachClientToExtraction(extraction, { isAss, req, res });
 }
 
+/**
+ * Vrai si FFmpeg s'est arrêté nettement avant la fin du fichier (durée connue par ffprobe).
+ * Durée inconnue : on ne peut pas juger, on fait confiance au code de sortie.
+ */
+export function isTruncatedRead(readSeconds, durationSeconds) {
+  if (!(durationSeconds > 0)) return false;
+  return readSeconds < durationSeconds - Math.max(20, durationSeconds * 0.02);
+}
+
 // --- EXTRACTIONS FFMPEG EN COURS (une seule par piste, partagée entre clients) ---
 const activeSubExtractions = new Map(); // key: cacheKey -> extraction
 const SUB_EXTRACTION_IDLE_TIMEOUT_MS = 120000;
@@ -287,6 +296,9 @@ async function startSubExtraction({ magnet, parsedFileIndex, parsedSubIndex, cac
     ffmpegArgs.push('-c:s', 'copy');
   }
   ffmpegArgs.push('-f', 'ass', 'pipe:1');
+  // Sortie témoin (copie vers null, coût négligeable) : sa progression suit la lecture du fichier jusqu'au bout,
+  // ce qui permet de détecter un flux coupé en route (FFmpeg sort alors en code 0 avec des sous-titres tronqués)
+  ffmpegArgs.push('-map', '0:a:0?', '-map', '0:v:0?', '-c', 'copy', '-f', 'null', '-');
 
   const ffmpeg = spawn('ffmpeg', ffmpegArgs);
   const assFileOut = fs.createWriteStream(tmpAssFile);
@@ -326,7 +338,18 @@ async function startSubExtraction({ magnet, parsedFileIndex, parsedSubIndex, cac
   };
   resetIdle();
 
-  ffmpeg.stderr.on('data', resetIdle);
+  let readSeconds = 0;
+  let stderrTail = '';
+  ffmpeg.stderr.on('data', (chunk) => {
+    resetIdle();
+    stderrTail += chunk.toString();
+    const lines = stderrTail.split('\n');
+    stderrTail = lines.pop();
+    for (const line of lines) {
+      const m = /^out_time_us=(\d+)/.exec(line);
+      if (m) readSeconds = Math.max(readSeconds, Number(m[1]) / 1e6);
+    }
+  });
   ffmpeg.stdout.on('data', (chunk) => {
     resetIdle();
     extraction.chunks.push(chunk);
@@ -348,6 +371,12 @@ async function startSubExtraction({ magnet, parsedFileIndex, parsedSubIndex, cac
     clearTimeout(idleTimer);
     ffmpegClosed = true;
     successCode = code === 0;
+    if (successCode && isTruncatedRead(readSeconds, getCachedStreamInfo(magnet, parsedFileIndex)?.duration)) {
+      successCode = false;
+      const msg = `Extraction des sous-titres incomplète (${cacheKey}) : flux lu jusqu'à ${Math.round(readSeconds)} s, non mis en cache`;
+      console.warn(`⚠️ ${msg}`);
+      logServerError('ffmpeg', msg);
+    }
     assFileOut.end();
     if (!successCode) {
       assFileOut.on('close', () => {
