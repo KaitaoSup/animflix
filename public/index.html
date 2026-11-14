@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="/css/player.css?v={{ASSET_VERSION}}">
     <link rel="stylesheet" href="/css/anilist.css?v={{ASSET_VERSION}}">
     <link rel="stylesheet" href="/css/tv.css?v={{ASSET_VERSION}}">
+    <link rel="stylesheet" href="/css/mobile.css?v={{ASSET_VERSION}}">
     <!-- Couleur d'interface préférée : appliquée avant l'affichage pour éviter un flash du rouge par défaut -->
     <script src="/js/theme.js?v={{ASSET_VERSION}}"></script>
 </head>
@@ -1098,6 +1099,15 @@
 
   <div id="toast"></div>
 
+  <!-- NAVIGATION TÉLÉPHONE : BARRE D'ONGLETS DU BAS ET MENU « PLUS » (js/mobile-nav.js, visibles sous 680 px) -->
+  <nav id="mobileTabBar" class="m-tabbar" aria-label="Navigation principale"></nav>
+  <div id="mobileMoreSheet" class="m-sheet-overlay" hidden>
+      <div class="m-sheet" role="dialog" aria-modal="true" aria-label="Plus d'options">
+          <div class="m-sheet-grip" aria-hidden="true"></div>
+          <div class="m-sheet-content"></div>
+      </div>
+  </div>
+
   <!-- SCRIPTS MODULAIRES ANIMFLIX -->
   <script src="/vendor/hls.min.js?v=1.5.17"></script>
   <script src="/vendor/jassub/jassub.bundle.js?v=2.5.23"></script>
@@ -1142,5 +1152,6 @@
   <script src="/js/anilist/anime-page.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/router.js?v={{ASSET_VERSION}}"></script>
   <script src="/js/tv.js?v={{ASSET_VERSION}}"></script>
+  <script src="/js/mobile-nav.js?v={{ASSET_VERSION}}"></script>
 </body>
 </html>

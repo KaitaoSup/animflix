@@ -769,14 +769,21 @@
         if (el) el.style.viewTransitionName = on ? COVER_TRANSITION_NAME : '';
     }
 
-    // Lance `update` dans une transition où `fromEl` devient l'élément trouvé par `findTarget` après la mise à jour
-    function runCoverTransition(fromEl, update, findTarget) {
+    // Lance `update` dans une transition où `fromEl` devient l'élément trouvé par `findTarget` après la mise à jour.
+    // `waitMs` : la vue d'arrivée peut se dessiner en asynchrone (planning, découverte : squelette puis cartes) ;
+    // on attend alors la cible jusqu'à ce délai avant de figer l'état final de la transition.
+    function runCoverTransition(fromEl, update, findTarget, waitMs = 0) {
         let target = null;
         setCoverName(fromEl, true);
-        const transition = document.startViewTransition(() => {
+        const transition = document.startViewTransition(async () => {
             setCoverName(fromEl, false);
             update();
             target = findTarget();
+            const until = Date.now() + waitMs;
+            while (!isInViewport(target) && Date.now() < until) {
+                await new Promise(r => setTimeout(r, 20));
+                target = findTarget();
+            }
             if (isInViewport(target)) setCoverName(target, true);
             else target = null; // pas de vol vers un élément hors écran : simple fondu
         });
@@ -789,9 +796,9 @@
 
     // Affiche d'une carte de cet anime dans l'accueil ou la recherche (la grille a pu être redessinée)
     function findCardCover(id) {
-        // openAnimePage(ID…) ou ID en dernier argument (searchFromDiscover(titre, affiche, ID))
+        // openAnimePage(ID…), watchScheduleEpisode(ID…) ou ID en dernier argument (searchFromDiscover(titre, affiche, ID))
         const n = Number(id);
-        const re = new RegExp(`openAnimePage\\(${n}\\s*[,)]|,\\s*${n}\\s*\\)\\s*;?\\s*$`);
+        const re = new RegExp(`(?:openAnimePage|watchScheduleEpisode)\\(${n}\\s*[,)]|,\\s*${n}\\s*\\)\\s*;?\\s*$`);
         for (const host of document.querySelectorAll('#homeView [onclick], #searchView [onclick]')) {
             if (re.test(host.getAttribute('onclick') || '')) {
                 const img = host.querySelector('img');
@@ -807,7 +814,7 @@
         const cover = document.querySelector('#animeView .anime-cover:not(.anime-cover-skeleton)');
         if (!id || !canAnimateViews() || !isInViewport(cover)) return false;
         const card = coverSource && coverSource.id === id ? coverSource.el : null;
-        runCoverTransition(cover, update, () => (card && card.isConnected && isInViewport(card) ? card : findCardCover(id)));
+        runCoverTransition(cover, update, () => (card && card.isConnected && isInViewport(card) ? card : findCardCover(id)), 150);
         return true;
     }
 
@@ -818,8 +825,11 @@
         if (!id) return;
         const { ep = null, syncUrl = true } = opts;
 
-        const samePage = animePageState.id === id && animePageState.media;
         const container = document.getElementById('animeView');
+        const samePage = animePageState.id === id && animePageState.media;
+        // Même fiche rouverte depuis une carte (on l'avait quittée pour l'accueil ou la recherche) : à traiter
+        // comme une ouverture (animation, retour en haut) et non comme un retour du lecteur
+        const reopening = !!samePage && !!container && container.style.display === 'none';
 
         // Affichage immédiat de la fiche (en cache) ou de son squelette
         const showPage = () => {
@@ -837,8 +847,8 @@
                 animePageState.torrentsPromise = null;
                 animePageState.availability = new Map();
                 animePageState.synopsisOpen = false;
-                window.scrollTo({ top: 0, behavior: 'auto' });
             }
+            if (!samePage || reopening) window.scrollTo({ top: 0, behavior: 'auto' });
             animePageState.highlightEp = ep;
             animePageState.rangeStartLocked = false;
             animePageState.playingEp = null;
@@ -861,7 +871,7 @@
         // Carte cliquée à l'instant, visible et page différente : l'affiche vole jusqu'à la couverture
         const source = coverSource && Date.now() - coverSource.at < COVER_CLICK_MAX_AGE_MS ? coverSource.el : null;
         let transition = null;
-        if (!samePage && container && canAnimateViews() && isInViewport(source)) {
+        if ((!samePage || reopening) && container && canAnimateViews() && isInViewport(source)) {
             coverSource.id = id; // pour le vol retour
             transition = runCoverTransition(source, showPage, () => container.querySelector('.anime-cover'));
         } else {

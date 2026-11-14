@@ -543,9 +543,11 @@
             position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
             background: var(--surface-2); border: 1px solid var(--border-strong); color: white; padding: 12px 24px; border-radius: var(--radius-md);
             font-size: var(--fs-md); box-shadow: 0 8px 24px rgba(0,0,0,0.7); z-index: 500;
-            display: none; animation: fadeIn 0.3s;
+            display: none; animation: toastIn 0.3s;
         }
-        @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        /* Apparition générique des vues et panneaux (sans décalage horizontal : réservé au toast centré) */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
         .empty-state { text-align: center; padding: 100px 20px; color: var(--text-muted); font-size: var(--fs-lg); }
         .shortcuts-hint { font-size: var(--fs-xs); color: var(--text-faint); margin-top: 12px; }

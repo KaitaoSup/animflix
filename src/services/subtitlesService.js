@@ -215,7 +215,7 @@ export async function streamSubtitlesLive({ magnet, fileIndex = 1, subIndex = 0,
     touchCacheFile(assFile);
     res.setHeader('Content-Type', 'text/x-ssa; charset=utf-8');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'no-cache');
     return fs.createReadStream(assFile).pipe(res);
   }
 
@@ -224,7 +224,7 @@ export async function streamSubtitlesLive({ magnet, fileIndex = 1, subIndex = 0,
     touchCacheFile(vttFile);
     res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'no-cache');
     return fs.createReadStream(vttFile).pipe(res);
   }
 
@@ -233,7 +233,7 @@ export async function streamSubtitlesLive({ magnet, fileIndex = 1, subIndex = 0,
     touchCacheFile(assFile);
     res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'no-cache');
     const vttStream = new AssToVttStream();
     const assRead = fs.createReadStream(assFile);
     assRead.pipe(vttStream);

@@ -260,7 +260,7 @@
 
         // Lit un flux texte et transmet uniquement des lignes complètes (jamais une réplique coupée au milieu d'une balise)
         async function readTextLines(url, signal, onLines) {
-            const response = await fetch(url, { signal });
+            const response = await fetch(url, { signal, cache: 'no-cache' });
             if (!response.ok || !response.body) throw new Error("HTTP " + response.status);
             const reader = response.body.getReader();
             const decoder = new TextDecoder();

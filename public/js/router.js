@@ -21,6 +21,14 @@
     let stack = [];
     let dispatching = false;
 
+    // Position de défilement de chaque entrée de l'historique. Gérée par l'app (et non par le navigateur)
+    // pour être rétablie au moment même où la vue est redessinée : le navigateur la rétablissait après coup,
+    // si bien que la transition de retour ne trouvait pas la carte (hors écran) et que la vue « sautait ».
+    const scrolls = [];
+    let pendingScroll = null;
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    window.addEventListener('scroll', () => { scrolls[depth] = window.scrollY; }, { passive: true });
+
     try {
         const saved = JSON.parse(sessionStorage.getItem(STACK_KEY) || '[]');
         if (Array.isArray(saved)) stack = saved;
@@ -260,15 +268,39 @@
                 if (isDetailOpen() && typeof closeDetailView === 'function') closeDetailView({ navigate: false });
                 if (typeof openAnimeDetail === 'function') openAnimeDetail(torrent, route.fileIndex, 0);
             }
+            if (route.name !== 'watch') restoreScroll();
         } finally {
             dispatching = false;
+            pendingScroll = null;
         }
+    }
+
+    // Rétablit la position mémorisée de l'entrée atteinte par précédent/suivant (synchrone : la transition
+    // de retour cherche la carte juste après). Si la vue n'est pas encore assez haute (rendu asynchrone),
+    // on réessaie pendant une seconde au plus, tant que l'utilisateur n'a pas bougé.
+    function restoreScroll() {
+        if (pendingScroll === null) return;
+        const target = pendingScroll;
+        const atDepth = depth;
+        window.scrollTo({ top: target, behavior: 'auto' });
+        if (Math.abs(window.scrollY - target) < 2) return;
+        const until = Date.now() + 1000;
+        let last = window.scrollY;
+        // Minuterie plutôt que requestAnimationFrame : le rendu est suspendu pendant une transition de vue
+        const retry = () => {
+            if (depth !== atDepth || Math.abs(window.scrollY - last) > 2 || Date.now() > until) return;
+            window.scrollTo({ top: target, behavior: 'auto' });
+            last = window.scrollY;
+            if (Math.abs(last - target) >= 2) setTimeout(retry, 16);
+        };
+        setTimeout(retry, 16);
     }
 
     function onPopState(e) {
         const state = e.state;
         depth = (state && state.animflix && typeof state.depth === 'number') ? state.depth : 0;
         if (window.location.hash && !window.location.hash.startsWith('#/')) return; // ex. retour OAuth AniList
+        pendingScroll = typeof scrolls[depth] === 'number' ? scrolls[depth] : 0;
         dispatch(parse(currentPath()));
     }
 

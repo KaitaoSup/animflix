@@ -1,0 +1,734 @@
+/* =========================================================================
+   --- INTERFACE TÉLÉPHONE (≤ 680 px) ---
+   Chargée en dernier : surcharge la mise en page bureau sans la modifier.
+   - En-tête compact qui se masque au défilement, recherche sur une ligne
+   - Barre d'onglets en bas (js/mobile-nav.js) + menu « Plus » en feuille
+   - Grilles 2 colonnes, rangées défilantes sur l'accueil, listes compactes
+   - Lecteur en tête de page, bord à bord, actions en rangée défilante
+   - Fenêtres en feuilles ancrées en bas, zones tactiles ≥ 40 px
+   ========================================================================= */
+
+/* La barre d'onglets et la feuille « Plus » n'existent que sur téléphone */
+.m-tabbar, .m-sheet-overlay, .m-nav-search-btn { display: none; }
+
+@media (max-width: 680px) {
+    :root {
+        --m-gutter: 14px;
+        --m-tabbar-h: 58px;
+        --m-safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior-y: none;
+    }
+    /* iOS zoome sur tout champ < 16 px : on l'évite */
+    input[type="text"], input[type="password"], input[type="search"], input[type="email"], select, textarea {
+        font-size: 16px;
+    }
+    /* Les effets de survol restent « collés » après un tap : on les neutralise */
+    .card:hover { transform: none; box-shadow: none; border-color: var(--card-border); }
+    .card:hover img { transform: none; }
+    .card-overlay-hover { display: none; }
+    .card:active { transform: scale(0.97); transition-duration: 0.1s; }
+
+    /* ---------------------------------------------------------------------
+       EN-TÊTE
+       --------------------------------------------------------------------- */
+    .navbar {
+        padding: calc(env(safe-area-inset-top, 0px) + 8px) var(--m-gutter) 10px;
+        gap: 8px;
+        flex-wrap: nowrap;
+        flex-direction: column;
+        align-items: stretch;
+        transition: transform 0.25s ease;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
+    }
+    body.m-header-hidden .navbar { transform: translateY(-100%); }
+
+    .navbar .logo {
+        position: absolute;
+        top: calc(env(safe-area-inset-top, 0px) + 8px);
+        left: var(--m-gutter);
+        height: 38px;
+        display: flex;
+        align-items: center;
+        font-size: 20px;
+        letter-spacing: 1px;
+    }
+    .controls {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 6px;
+    }
+    /* Ligne 1 (à droite du logo) : réglages + compte. Le reste passe dans « Plus ». */
+    .btn-clean-cache, #tvModeNavBtn, #pwaInstallBtn { display: none !important; }
+    .btn-settings-nav {
+        order: 1;
+        width: 38px; height: 38px;
+        padding: 0;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 17px;
+    }
+    #anilistNavContainer { order: 2; display: flex; align-items: center; gap: 6px; }
+    #anilistNavContainer .btn-anilist-nav {
+        height: 38px;
+        padding: 0 12px;
+        font-size: var(--fs-sm);
+        margin-left: 0 !important;
+    }
+    /* Bouton « Mon Compte » réduit à l'icône */
+    #anilistNavContainer .btn-anilist-nav:has(svg) { width: 38px; padding: 0; justify-content: center; }
+    #anilistNavContainer .btn-anilist-nav:has(svg) span { display: none; }
+    .anilist-user-badge { height: 38px; padding: 3px 8px 3px 3px; gap: 6px; }
+    .anilist-user-badge .anilist-username {
+        max-width: 84px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font-size: var(--fs-sm);
+    }
+    .anilist-avatar { width: 30px; height: 30px; }
+    /* Menu du compte : panneau pleine largeur sous l'en-tête */
+    .anilist-dropdown {
+        position: fixed;
+        top: calc(env(safe-area-inset-top, 0px) + 54px);
+        left: var(--m-gutter);
+        right: var(--m-gutter);
+        width: auto;
+        min-width: 0;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    .anilist-dropdown a, .anilist-dropdown button { min-height: 44px; font-size: var(--fs-md); }
+
+    /* Ligne 2 : champ de recherche pleine largeur avec langue et bouton intégrés */
+    .search-box {
+        order: 3;
+        width: 100%;
+        flex-wrap: nowrap;
+        gap: 0;
+        background: var(--surface-1);
+        border: 1px solid var(--border-strong);
+        border-radius: var(--radius-pill);
+        overflow: hidden;
+        height: 42px;
+    }
+    .search-box:focus-within { border-color: var(--primary); }
+    .search-box input[type="text"] {
+        flex: 1;
+        min-width: 0;
+        width: auto;
+        border: none;
+        background: transparent;
+        padding: 0 4px 0 16px;
+        height: 100%;
+    }
+    .search-box #searchType {
+        flex: none;
+        width: auto;
+        max-width: 96px;
+        border: none;
+        border-left: 1px solid var(--border-strong);
+        border-radius: 0;
+        background: transparent;
+        padding: 0 6px 0 10px;
+        height: 100%;
+        font-size: var(--fs-sm);
+        font-weight: 700;
+        color: var(--text-soft);
+    }
+    .search-box #streamMode { display: none; }
+    .search-box button {
+        flex: none;
+        width: 46px;
+        height: 100%;
+        padding: 0;
+        border-radius: 0;
+        font-size: 0; /* masque « Chercher » : l'icône suffit */
+        display: inline-flex; align-items: center; justify-content: center;
+    }
+    .search-box button::before {
+        content: "";
+        width: 18px; height: 18px;
+        background: currentColor;
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") center / contain no-repeat;
+                mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
+
+    /* ---------------------------------------------------------------------
+       CONTENEUR & ONGLETS
+       --------------------------------------------------------------------- */
+    .container {
+        padding: calc(var(--navbar-height, 110px) + 14px) var(--m-gutter) calc(var(--m-tabbar-h) + var(--m-safe-bottom) + 24px);
+    }
+    /* Les onglets du haut sont remplacés par la barre du bas */
+    .home-tabs-nav { display: none; }
+
+    .empty-state { padding: 56px 16px; font-size: var(--fs-md); }
+
+    /* ---------------------------------------------------------------------
+       BARRE D'ONGLETS DU BAS
+       --------------------------------------------------------------------- */
+    .m-tabbar {
+        display: flex;
+        position: fixed;
+        left: 0; right: 0; bottom: 0;
+        z-index: 120;
+        height: calc(var(--m-tabbar-h) + var(--m-safe-bottom));
+        padding-bottom: var(--m-safe-bottom);
+        background: rgba(var(--bg-rgb), 0.94);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    body.m-watching .m-tabbar, body.tv-mode .m-tabbar { display: none; }
+    .m-tab {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        padding: 6px 2px 4px;
+        background: none;
+        border: none;
+        border-radius: 0;
+        color: var(--text-faint);
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.1px;
+        position: relative;
+    }
+    .m-tab:hover { background: none; }
+    .m-tab:active { transform: none; }
+    .m-tab svg { width: 23px; height: 23px; transition: transform 0.15s; }
+    .m-tab:active svg { transform: scale(0.88); }
+    .m-tab.active { color: var(--text); }
+    .m-tab.active svg { color: var(--primary); }
+    .m-tab.active::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 50%;
+        width: 28px; height: 3px;
+        transform: translateX(-50%);
+        border-radius: 0 0 3px 3px;
+        background: var(--primary);
+    }
+    .m-tab-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+    /* ---------------------------------------------------------------------
+       FEUILLE « PLUS »
+       --------------------------------------------------------------------- */
+    .m-sheet-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1100;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: flex-end;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+    }
+    .m-sheet-overlay.open { opacity: 1; pointer-events: auto; }
+    .m-sheet {
+        width: 100%;
+        max-height: 85vh;
+        overflow-y: auto;
+        background: var(--surface-1);
+        border-radius: 18px 18px 0 0;
+        border-top: 1px solid var(--border-strong);
+        padding: 8px var(--m-gutter) calc(var(--m-safe-bottom) + 16px);
+        transform: translateY(100%);
+        transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .m-sheet-overlay.open .m-sheet { transform: none; }
+    .m-sheet-grip {
+        width: 38px; height: 4px;
+        border-radius: 2px;
+        background: var(--border-hover);
+        margin: 2px auto 12px;
+    }
+    .m-sheet-title {
+        font-size: var(--fs-xs);
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        font-weight: 700;
+        color: var(--text-faint);
+        margin: 10px 4px 6px;
+    }
+    .m-sheet-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+    }
+    .m-sheet-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 78px;
+        padding: 10px 4px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        color: var(--text-soft);
+        font-size: var(--fs-xs);
+        font-weight: 600;
+        text-align: center;
+        line-height: 1.25;
+        position: relative;
+    }
+    .m-sheet-item:hover { background: var(--surface-3); }
+    .m-sheet-item.active { border-color: var(--primary); color: var(--text); background: rgba(var(--primary-rgb), 0.12); }
+    .m-sheet-item-icon { font-size: 22px; line-height: 1; }
+    .m-sheet-item-badge {
+        position: absolute;
+        top: 6px; right: 6px;
+        min-width: 18px;
+        padding: 1px 5px;
+        border-radius: var(--radius-pill);
+        background: var(--primary);
+        color: #fff;
+        font-size: 10px;
+        font-weight: 800;
+    }
+
+    /* ---------------------------------------------------------------------
+       NOTIFICATION (TOAST) : au-dessus de la barre d'onglets
+       --------------------------------------------------------------------- */
+    #toast {
+        bottom: calc(var(--m-tabbar-h) + var(--m-safe-bottom) + 12px);
+        width: max-content;
+        max-width: calc(100vw - 2 * var(--m-gutter));
+        padding: 11px 16px;
+        font-size: var(--fs-sm);
+        text-align: center;
+    }
+    body.m-watching #toast { bottom: calc(var(--m-safe-bottom) + 16px); }
+
+    /* ---------------------------------------------------------------------
+       GRILLES DE CARTES : 2 colonnes, cartes compactes
+       --------------------------------------------------------------------- */
+    .grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px 10px;
+    }
+    .card { border-radius: var(--radius-md); }
+    .card-info { padding: 8px 9px 10px; gap: 5px; }
+    .card-title { font-size: var(--fs-sm); line-height: 1.3; }
+    .card-badges-top { top: 6px; left: 6px; right: 6px; flex-wrap: wrap; gap: 4px; }
+    .card-badges-top > * { display: flex; flex-wrap: wrap; gap: 4px; }
+    .badge-tag-mini { font-size: 10px; padding: 1px 5px; }
+    .stats { font-size: var(--fs-2xs); }
+    .card-season-pill, .card-episode-pill { font-size: 10px; padding: 1px 5px; }
+    .card-btn-delete-history { opacity: 1 !important; width: 30px; height: 30px; }
+
+    /* Découverte : la carte entière ouvre la fiche, genres et bouton superflus */
+    .discover-card .badge-discover-genre,
+    .discover-card .card-next-ep-btn-pill { display: none; }
+    .discover-card .card-info > div:empty { display: none; }
+    .badge-airing-countdown { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Accueil : aperçus en rangées défilantes horizontales */
+    .home-section { margin-top: 24px !important; }
+    .home-section .grid,
+    .home-dashboard-container .grid {
+        display: grid;
+        grid-template-columns: none;
+        grid-auto-flow: column;
+        grid-auto-columns: 38%;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scroll-padding: 0 var(--m-gutter);
+        margin: 0 calc(-1 * var(--m-gutter));
+        padding: 2px var(--m-gutter) 6px;
+        scrollbar-width: none;
+    }
+    .home-section .grid::-webkit-scrollbar,
+    .home-dashboard-container .grid::-webkit-scrollbar { display: none; }
+    .home-section .grid > *,
+    .home-dashboard-container .grid > * { scroll-snap-align: start; }
+    .home-section .grid > .empty-state { grid-column: auto; width: calc(100vw - 2 * var(--m-gutter)); }
+    .home-section-header { margin-bottom: 10px !important; gap: 8px; }
+    .home-section-title { font-size: var(--fs-lg) !important; }
+    .home-section-badge { display: none; }
+    .home-section-link { padding: 6px 10px; font-size: var(--fs-xs); flex-shrink: 0; }
+
+    /* Accueil : bannière d'accueil compacte, les raccourcis sont dans la barre du bas */
+    .home-dashboard-container { gap: 0; }
+    .home-hero-banner { padding: 18px 16px; border-radius: var(--radius-lg); }
+    .home-hero-pill { font-size: var(--fs-2xs); margin-bottom: 4px; }
+    .home-hero-title { font-size: 21px; margin: 6px 0 4px; }
+    .home-hero-desc { display: none; }
+    .home-hero-actions { flex-direction: row; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .home-hero-actions > :not(:first-child) { display: none; }
+    .btn-hero-primary { width: 100%; justify-content: center; }
+    .home-hub-grid { display: none; }
+
+    /* En-têtes de sections (Historique, AniList, Favoris…) */
+    .home-watching-header { margin-bottom: 14px; padding-bottom: 10px; gap: 8px; }
+    .home-watching-title { font-size: var(--fs-lg); }
+    .home-watching-actions { width: 100%; }
+    .home-watching-actions > * { flex: 1; justify-content: center; }
+
+    /* Bandeaux d'en-tête Découverte / Planning */
+    .discover-top-banner {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        padding: 12px 14px;
+        margin-bottom: 14px;
+    }
+    .discover-top-title-group h2 { font-size: var(--fs-lg); margin: 0; }
+    .discover-top-title-group p { display: none; }
+    .discover-top-banner > button { width: 100%; justify-content: center; }
+    .schedule-banner-actions { display: flex; gap: 8px; }
+    .schedule-banner-actions > * { flex: 1; justify-content: center; }
+
+    .discover-container, .schedule-container { gap: 16px; }
+
+    /* Filtres Découverte : tout sur des rangées défilantes */
+    .discover-filters-container { padding: 12px; gap: 10px; margin-bottom: 0; }
+    .discover-filters-main-row { flex-direction: column; align-items: stretch; gap: 10px; }
+    .discover-sort-pills {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        margin: 0 -12px;
+        padding: 0 12px;
+    }
+    .discover-sort-pills::-webkit-scrollbar { display: none; }
+    .discover-sort-pill { flex-shrink: 0; }
+    .discover-filters-right { display: flex; gap: 8px; width: 100%; }
+    .discover-filters-right > * { flex: 1; min-width: 0; }
+    .discover-search-box input { width: 100%; }
+    .discover-genres-label { display: none; }
+    .discover-section-header { gap: 8px; }
+    .discover-section-title { font-size: var(--fs-lg); }
+
+    /* ---------------------------------------------------------------------
+       PLANNING : jours défilants + liste compacte des sorties
+       --------------------------------------------------------------------- */
+    .schedule-days-bar-wrapper {
+        margin: 0 calc(-1 * var(--m-gutter)) 14px;
+        padding: 0 var(--m-gutter) 4px;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .schedule-days-bar-wrapper::-webkit-scrollbar { display: none; }
+    .schedule-days-bar { gap: 6px; }
+    .schedule-day-pill { min-width: 66px; padding: 8px 6px; gap: 2px; }
+    .schedule-day-name { font-size: var(--fs-sm); }
+    .schedule-day-date { font-size: var(--fs-2xs); }
+    .schedule-today-tag { display: none; }
+    .schedule-day-title { font-size: var(--fs-base); }
+    .schedule-day-header { margin-bottom: 12px; }
+
+    /* Liste : vignette à gauche ; les badges (heure, note, statut) passent sous le texte */
+    #scheduleGridContainer { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    .schedule-card { flex-direction: row; min-height: 104px; }
+    .schedule-card .card-img-wrap { width: 70px; flex: none; aspect-ratio: auto; position: static; }
+    .schedule-card .card-img-wrap img { position: absolute; top: 0; left: 0; width: 70px; height: 100%; }
+    .schedule-card .card-badges-top {
+        top: auto; bottom: 9px; left: 82px; right: 10px;
+        justify-content: flex-start;
+    }
+    .schedule-card .card-info { justify-content: flex-start; padding: 10px 12px 36px; gap: 5px; min-width: 0; margin-left: 0; }
+    .schedule-card .card-info > :last-child { display: none !important; } /* genres */
+    .schedule-ep-pill { padding: 0 !important; background: none !important; border: none !important; justify-content: flex-start !important; gap: 8px; }
+
+    /* ---------------------------------------------------------------------
+       RÉSULTATS DE RECHERCHE (TORRENTS) : liste compacte
+       --------------------------------------------------------------------- */
+    .search-anime-matches { margin: 0 calc(-1 * var(--m-gutter)) 16px; }
+    .search-anime-matches-label { padding: 0 var(--m-gutter); }
+    .search-anime-matches-row { padding: 0 var(--m-gutter) 4px; scrollbar-width: none; }
+    .search-anime-match { max-width: 260px; }
+
+    .search-filter-bar { padding: 10px 12px; margin-bottom: 14px; gap: 8px; }
+    .search-filter-left { gap: 8px; width: 100%; }
+    .search-filter-chips {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        margin: 0 -12px;
+        padding: 0 12px;
+    }
+    .search-filter-chips::-webkit-scrollbar { display: none; }
+    .search-filter-chips .filter-chip { flex-shrink: 0; }
+    .search-sort-label { display: none; }
+    .search-filter-right { padding-top: 8px; }
+
+    #results.grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+    #results .card { flex-direction: row; min-height: 118px; }
+    #results .card-img-wrap { width: 76px; flex: none; aspect-ratio: auto; position: static; }
+    #results .card-img-wrap img { position: absolute; top: 0; left: 0; width: 76px; height: 100%; }
+    #results .card-badges-top {
+        top: auto; bottom: 9px; left: 88px; right: 10px;
+        justify-content: flex-start;
+    }
+    #results .card-info { padding: 9px 12px 34px; gap: 6px; min-width: 0; }
+    #results .card-title { -webkit-line-clamp: 2; font-size: var(--fs-md); }
+    #results .stats { gap: 8px; border-top: none; padding-top: 0; margin-top: 0; font-size: var(--fs-xs); justify-content: flex-start; }
+
+    /* ---------------------------------------------------------------------
+       FICHE ANIME
+       --------------------------------------------------------------------- */
+    .anime-hero { margin: 0 calc(-1 * var(--m-gutter)); border-radius: 0 !important; border-left: none !important; border-right: none !important; }
+    .anime-cover { width: 132px; }
+    .anime-title { font-size: 23px; }
+    .anime-ep-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+    /* ---------------------------------------------------------------------
+       LECTURE : lecteur en tête, bord à bord, sans en-tête de site
+       --------------------------------------------------------------------- */
+    body.m-watching .navbar { display: none; }
+    body.m-watching .container { padding-top: env(safe-area-inset-top, 0px); padding-bottom: calc(var(--m-safe-bottom) + 24px); }
+
+    #detailView[style*="block"] { display: flex !important; flex-direction: column; }
+    #detailView > .detail-nav { order: 1; }
+    #detailView > #detailPlayerArea { order: 2; }
+    #detailView > #detailPackEpisodesSection { order: 3; }
+    #detailView > .detail-hero { order: 4; }
+    #detailView > #detailAnilistSection { order: 5; }
+
+    .detail-nav {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        margin: 0 calc(-1 * var(--m-gutter));
+        padding: 8px var(--m-gutter);
+        gap: 10px;
+        background: var(--bg);
+        flex-wrap: nowrap;
+        min-width: 0;
+        margin-bottom: 0 !important;
+    }
+    .detail-nav .btn-back { padding: 8px 12px; flex-shrink: 0; }
+    .detail-breadcrumb {
+        font-size: var(--fs-xs);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+
+    .detail-player-section {
+        margin: 0 calc(-1 * var(--m-gutter)) 14px;
+        padding: 0 0 12px;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        background: transparent;
+    }
+    .player-area-header, .shortcuts-hint { display: none; }
+    .player-video-wrapper {
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+        box-shadow: none;
+        max-height: 60vh;
+    }
+    .player-video-wrapper:fullscreen { max-height: none; }
+
+    /* Barre de contrôle intégrée : l'essentiel, le reste est sous la vidéo */
+    .player-bottom-bar { padding: 0 6px 4px; gap: 4px; }
+    .player-bar-left > button[onclick^="jumpSeekRelative(-"],
+    .player-bar-left > button[onclick="jumpSeekRelative(10)"],
+    #audioNormalizeBtn,
+    #playerCastBtn, #playerDownloadBtn, #playerKeepBtn, #playerPipBtn,
+    .player-badge-ep { display: none !important; }
+    .player-btn { min-width: 36px; min-height: 36px; padding: 6px; }
+    .player-btn-skip { white-space: nowrap; }
+    .player-btn-skip span { font-size: var(--fs-2xs); }
+    .player-time-label { white-space: nowrap; }
+
+    /* Sous la vidéo : pistes en deux lignes pleine largeur, actions défilantes */
+    .player-controls-bar {
+        margin-top: 10px;
+        padding: 0 var(--m-gutter);
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    .player-controls-bar > div { width: 100%; }
+    .player-controls-bar > div:first-child { display: grid !important; grid-template-columns: minmax(0, 1fr); gap: 8px !important; }
+    .player-controls-bar > div:first-child > div:not(.sub-style-popup):not(.player-seek-group) {
+        display: flex !important;
+        flex-wrap: nowrap;
+        padding: 6px 8px !important;
+        gap: 6px !important;
+        min-width: 0;
+        border-radius: var(--radius-md) !important;
+    }
+    .player-controls-bar > div:first-child > div > span:first-child { white-space: nowrap; font-size: 0 !important; }
+    .player-controls-bar > div:first-child > div > span:first-child::first-letter { font-size: 18px; }
+    .player-controls-bar select#subSelect,
+    .player-controls-bar select#audioSelect {
+        flex: 1;
+        min-width: 0;
+        width: 100%;
+        padding: 8px !important;
+        font-size: 15px !important;
+    }
+    #toggleSubBtn, #subStyleBtn { flex-shrink: 0; min-height: 38px; padding: 6px 10px !important; }
+    #sub-status:empty { display: none; }
+    .player-seek-group { display: none !important; }
+
+    .player-controls-bar > div:last-child {
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        scrollbar-width: none;
+        margin: 0 calc(-1 * var(--m-gutter));
+        padding: 0 var(--m-gutter) 2px;
+    }
+    .player-controls-bar > div:last-child::-webkit-scrollbar { display: none; }
+    .player-controls-bar > div:last-child > * { flex-shrink: 0; white-space: nowrap; }
+
+    /* Style des sous-titres : feuille ancrée en bas d'écran */
+    .sub-style-popup {
+        position: fixed;
+        left: 0; right: 0; bottom: 0; top: auto;
+        width: 100%;
+        max-width: none;
+        max-height: 80vh;
+        overflow-y: auto;
+        border-radius: 18px 18px 0 0;
+        padding: 16px var(--m-gutter) calc(var(--m-safe-bottom) + 16px);
+        z-index: 1200;
+    }
+    .sub-style-row { gap: 12px; }
+    .sub-style-row select { max-width: 62%; font-size: 15px; padding: 7px 8px; }
+    .btn-sync-sub { min-height: 38px; }
+
+    /* Fiche de l'épisode : jaquette à gauche, infos à droite, actions défilantes */
+    .detail-hero {
+        flex-direction: row !important;
+        align-items: flex-start !important;
+        text-align: left !important;
+        flex-wrap: wrap;
+        gap: 14px;
+        padding: 14px !important;
+        margin-bottom: 16px;
+    }
+    .detail-poster-wrap { width: 92px; min-width: 92px; border-radius: var(--radius-md); }
+    .detail-info { flex: 1; min-width: 0; display: contents; }
+    .detail-info > div:first-child { flex: 1; min-width: 0; }
+    .detail-title { font-size: var(--fs-xl) !important; margin-bottom: 8px; }
+    .detail-badges-row { justify-content: flex-start !important; gap: 5px; margin-bottom: 10px; }
+    .detail-badge { padding: 3px 8px; font-size: var(--fs-2xs); }
+    .detail-meta-grid {
+        width: 100% !important;
+        justify-content: flex-start !important;
+        gap: 4px 14px;
+        padding: 0;
+        margin-bottom: 8px;
+        background: none;
+        border: none;
+        font-size: var(--fs-xs);
+    }
+    .detail-info > div:first-child > div:last-child { display: none; } /* nom de fichier brut */
+    .detail-actions {
+        width: 100%;
+        flex-wrap: nowrap !important;
+        justify-content: flex-start !important;
+        overflow-x: auto;
+        scrollbar-width: none;
+        gap: 8px;
+        margin: 0 -14px;
+        padding: 2px 14px;
+        width: calc(100% + 28px);
+    }
+    .detail-actions::-webkit-scrollbar { display: none; }
+    .detail-actions > * { flex-shrink: 0; white-space: nowrap; min-height: 40px; }
+    .detail-actions > button[onclick="scrollToPlayer()"] { display: none; }
+
+    .anilist-track-section { padding: 14px; }
+    .pack-episodes-section { margin: 0 0 16px; padding: 12px; }
+    .pack-episodes-grid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)) !important; }
+
+    /* ---------------------------------------------------------------------
+       FENÊTRES : feuilles ancrées en bas
+       --------------------------------------------------------------------- */
+    .anilist-modal-overlay { padding: 0; align-items: flex-end !important; }
+    .anilist-modal-content {
+        max-width: none !important;
+        width: 100%;
+        border-radius: 18px 18px 0 0;
+        border-left: none; border-right: none; border-bottom: none;
+        padding: 18px var(--m-gutter) calc(var(--m-safe-bottom) + 18px);
+        max-height: 92vh;
+        max-height: 92dvh;
+        animation: mSheetUp 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .anilist-modal-title { font-size: var(--fs-lg); }
+    .anilist-modal-close { min-width: 40px; min-height: 40px; }
+    .anilist-modal-body input[type="text"], .anilist-modal-body input[type="password"] { width: 100%; min-width: 0; }
+    .ui-dialog-overlay { align-items: flex-end !important; padding: 0 !important; }
+    .ui-dialog { width: 100%; border-radius: 18px 18px 0 0; padding: 20px var(--m-gutter) calc(var(--m-safe-bottom) + 20px); }
+    .ui-dialog-actions > button { flex: 1; min-height: 44px; }
+
+    /* Paramètres : libellé au-dessus, champ pleine largeur */
+    .settings-modal-card { max-height: 92dvh; }
+    .settings-label { flex-direction: column; align-items: stretch; gap: 6px; }
+    .settings-label .settings-select, .settings-group .settings-select { width: 100%; max-width: none; min-height: 42px; }
+    .settings-profiles-header { gap: 8px; flex-wrap: wrap; }
+
+    .cast-url-row { flex-direction: column; align-items: stretch; }
+    .cast-wireless-actions { flex-direction: column; align-items: stretch; }
+}
+
+@keyframes mSheetUp {
+    from { transform: translateY(40px); opacity: 0.4; }
+    to { transform: none; opacity: 1; }
+}
+
+/* Téléphone en paysage pendant la lecture : la vidéo occupe tout l'écran, le reste en dessous */
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 1000px) {
+    body.m-watching .navbar { display: none; }
+    body.m-watching .container { padding: 0 16px 24px; }
+    body.m-watching #detailView[style*="block"] { display: flex !important; flex-direction: column; }
+    body.m-watching #detailView > #detailPlayerArea { order: 1; }
+    body.m-watching #detailView > .detail-nav { order: 2; margin-top: 4px; }
+    body.m-watching #detailView > #detailPackEpisodesSection { order: 3; }
+    body.m-watching #detailView > .detail-hero { order: 4; }
+    body.m-watching #detailView > #detailAnilistSection { order: 5; }
+    body.m-watching .detail-player-section {
+        margin: 0 -16px 12px;
+        padding: 0 0 10px;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        background: transparent;
+    }
+    body.m-watching .player-area-header,
+    body.m-watching .shortcuts-hint { display: none; }
+    body.m-watching .player-video-wrapper {
+        height: 100vh;
+        height: 100dvh;
+        max-height: none;
+        aspect-ratio: auto;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+    }
+    body.m-watching .player-controls-bar { padding: 0 16px; }
+    /* Barre intégrée allégée (les actions restent sous la vidéo) */
+    .player-volume-group,
+    .player-bar-left > button[onclick^="jumpSeekRelative(-"],
+    .player-bar-left > button[onclick="jumpSeekRelative(10)"],
+    #audioNormalizeBtn,
+    #playerCastBtn, #playerDownloadBtn, #playerKeepBtn,
+    .player-badge-ep { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .navbar, .m-sheet, .m-sheet-overlay { transition: none !important; }
+    .anilist-modal-content { animation: none; }
+}
