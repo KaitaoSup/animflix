@@ -558,9 +558,8 @@
             if (streamMode === 'direct' && lastAutoFallbackKey !== fallbackKey) {
                 lastAutoFallbackKey = fallbackKey;
                 const detailSel = document.getElementById('detailStreamMode');
-                const navSel = document.getElementById('streamMode');
+                // Bascule limitée à ce fichier : le prochain épisode repart du mode choisi
                 if (detailSel) detailSel.value = 'hls';
-                if (navSel) navSel.value = 'hls';
                 showToast("📡 Codec non supporté en Direct : bascule automatique en HLS Adaptatif...");
                 startStreamingInPlayer(magnet, titre, vlcUrl, currentActiveFileIndex, currentStreamOffset);
                 return;

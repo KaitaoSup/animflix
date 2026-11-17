@@ -37,20 +37,11 @@
                   <option value="multisub">Multi-Sub</option>
                   <option value="sub">VOSTA</option>
               </select>
-              <select id="streamMode" title="Mode de lecture">
-                  <option value="direct" selected>⚡ Lecture Directe (0% CPU, Instantané)</option>
-                  <option value="hls">📡 HLS Adaptatif (.m3u8 - Fluide & iOS/TV)</option>
-                  <option value="transcode">🔄 Transcodage H.264 (Compatibilité standard)</option>
-              </select>
               <button onclick="handleSearchClick()">Chercher</button>
           </div>
           <!-- BOUTON INSTALLATION PWA -->
           <button id="pwaInstallBtn" class="btn-pwa-install" onclick="triggerPwaInstall()" style="display: none;" title="Installer Animflix comme application native">
               📲 Installer l'App
-          </button>
-          <!-- BOUTON PURGE CACHE TORRSERVER -->
-          <button class="btn-clean-cache" onclick="cleanTorrServerCache()" title="Purger le cache et les torrents en mémoire de TorrServer">
-              🧹
           </button>
           <!-- BOUTON MODE TV & MANETTE (10-FOOT UI) -->
           <button id="tvModeNavBtn" class="btn-tv-nav" onclick="toggleTvMode()" title="Mode Téléviseur / Manette (10-foot UI)">
@@ -998,6 +989,11 @@
                   <div class="settings-server-title">🖥️ Statut Serveur & Décodeur</div>
                   <div id="settingsServerStatusContent" style="font-size: 12px; color: #aaa; margin-top: 6px; line-height: 1.5;">
                       Chargement des informations serveur...
+                  </div>
+                  <div class="settings-server-actions">
+                      <button type="button" class="btn-sub-style" onclick="cleanTorrServerCache()" title="Libère la RAM, le cache de streaming, les sous-titres et miniatures en cache">
+                          🧹 Purger le cache TorrServer
+                      </button>
                   </div>
               </div>
           </div>

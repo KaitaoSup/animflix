@@ -228,11 +228,9 @@
         const generalSelectors = [
             '#searchInput',
             '#searchType',
-            '#streamMode',
             '.search-box button',
             '#tvModeNavBtn',
             '#pwaInstallBtn',
-            '.btn-clean-cache',
             '.btn-settings-nav',
             '#anilistNavContainer button',
             '#anilistNavContainer a',

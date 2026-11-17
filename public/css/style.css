@@ -114,6 +114,7 @@
         .logo:hover { transform: scale(1.03); }
         .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .search-box { display: flex; gap: 8px; flex-wrap: wrap; }
+        .search-box input[type="text"] { width: 320px; }
         input[type="text"], input[type="password"], select { 
             padding: 10px 14px; 
             border-radius: var(--radius-sm); 
@@ -551,26 +552,6 @@
 
         .empty-state { text-align: center; padding: 100px 20px; color: var(--text-muted); font-size: var(--fs-lg); }
         .shortcuts-hint { font-size: var(--fs-xs); color: var(--text-faint); margin-top: 12px; }
-
-        .btn-clean-cache {
-            background: var(--surface-1);
-            border: 1px solid var(--border);
-            color: var(--text-muted);
-            padding: 7px 11px;
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            font-size: var(--fs-base);
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .btn-clean-cache:hover {
-            background: var(--surface-2);
-            color: var(--text);
-            border-color: var(--border-hover);
-            transform: scale(1.05);
-        }
 
         /* --- BARRE D'ONGLETS DE L'ACCUEIL --- */
         .home-tabs-nav {
@@ -1281,6 +1262,12 @@
             border-radius: var(--radius-md);
             padding: 12px 14px;
         }
+        .settings-server-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
         .settings-server-title {
             font-size: var(--fs-sm);
             font-weight: 700;
@@ -1420,11 +1407,7 @@
                 padding-right: 24px;
             }
             .search-box input[type="text"] {
-                width: 190px;
-            }
-            #streamMode {
-                max-width: 170px;
-                font-size: var(--fs-sm);
+                width: 240px;
             }
         }
 
@@ -1457,11 +1440,6 @@
             #searchType {
                 font-size: var(--fs-sm);
                 padding: 8px 10px;
-            }
-            #streamMode {
-                max-width: 135px;
-                font-size: var(--fs-xs);
-                padding: 8px 8px;
             }
             .search-box button {
                 padding: 8px 14px;
@@ -1507,9 +1485,6 @@
                 flex: 1;
                 width: auto;
                 min-width: 0;
-            }
-            #streamMode {
-                display: none;
             }
             .container {
                 padding-left: 14px;

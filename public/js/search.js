@@ -202,7 +202,7 @@
         // Synchronisation du mode de lecture de la fiche
         const streamModeSelect = document.getElementById('detailStreamMode');
         if (streamModeSelect) {
-            streamModeSelect.value = document.getElementById('streamMode').value || 'direct';
+            streamModeSelect.value = getCurrentStreamMode();
         }
 
         // Synchronisation du suivi de progression AniList
@@ -356,8 +356,7 @@
     function onDetailStreamModeChange() {
         if (!currentAnimeItem) return;
         const newMode = document.getElementById('detailStreamMode').value;
-        const navMode = document.getElementById('streamMode');
-        if (navMode) navMode.value = newMode;
+        setSessionStreamMode(newMode);
         const video = document.getElementById('videoPlayer');
         const curPos = Math.max(0, Math.round(currentStreamOffset + (video?.currentTime || 0)));
         const vlcUrl = "http://" + TORR_HOST + ":8090/stream?link=" + encodeURIComponent(currentAnimeItem.lienMagnet) + "&index=" + currentActiveFileIndex + "&play";

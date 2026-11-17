@@ -321,6 +321,25 @@ function triggerPwaInstall() {
 window.triggerPwaInstall = triggerPwaInstall;
 
 // --- GESTION DES PARAMÈTRES ET PRÉFÉRENCES UTILISATEUR ---
+
+// Mode de lecture : choix fait sur une fiche pendant la session, sinon préférence par défaut (⚙️)
+const SESSION_STREAM_MODE_KEY = 'animflix_session_stream_mode';
+const STREAM_MODES = ['direct', 'hls', 'transcode'];
+
+function getCurrentStreamMode() {
+    let mode = null;
+    try { mode = sessionStorage.getItem(SESSION_STREAM_MODE_KEY); } catch (e) {}
+    if (!STREAM_MODES.includes(mode)) mode = localStorage.getItem('animflix_default_stream_mode');
+    return STREAM_MODES.includes(mode) ? mode : 'direct';
+}
+
+function setSessionStreamMode(mode) {
+    if (!STREAM_MODES.includes(mode)) return;
+    try { sessionStorage.setItem(SESSION_STREAM_MODE_KEY, mode); } catch (e) {}
+}
+window.getCurrentStreamMode = getCurrentStreamMode;
+window.setSessionStreamMode = setSessionStreamMode;
+
 function loadUserSettings() {
     const searchType = localStorage.getItem('animflix_default_search_type') || 'vostfr';
     const streamMode = localStorage.getItem('animflix_default_stream_mode') || 'direct';
@@ -332,11 +351,8 @@ function loadUserSettings() {
     const elSearch = document.getElementById('searchType');
     if (elSearch) elSearch.value = searchType;
 
-    const elStream = document.getElementById('streamMode');
-    if (elStream) elStream.value = streamMode;
-
     const elDetailStream = document.getElementById('detailStreamMode');
-    if (elDetailStream) elDetailStream.value = streamMode;
+    if (elDetailStream) elDetailStream.value = getCurrentStreamMode();
 
     // Remplissage des contrôles dans la modale
     const prefSearch = document.getElementById('prefDefaultSearchType');
@@ -470,8 +486,8 @@ function saveUserSettings() {
     }
     if (prefStream) {
         localStorage.setItem('animflix_default_stream_mode', prefStream);
-        const el = document.getElementById('streamMode');
-        if (el) el.value = prefStream;
+        // Un nouveau choix par défaut remplace celui fait sur une fiche pendant la session
+        try { sessionStorage.removeItem(SESSION_STREAM_MODE_KEY); } catch (e) {}
         const elDetail = document.getElementById('detailStreamMode');
         if (elDetail) elDetail.value = prefStream;
     }
