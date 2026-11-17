@@ -48,7 +48,8 @@ function createDevice(server, userId = 1) {
     setInterval: () => 0,
     clearInterval: noop,
     URL,
-    window: { addEventListener: noop },
+    URLSearchParams,
+    window: { addEventListener: noop, location: { hash: '', search: '' } },
     document: { addEventListener: noop, getElementById: () => null, visibilityState: 'visible' },
     renderHomeScreen: () => { renders.home++; },
     showToast: noop
