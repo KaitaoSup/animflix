@@ -139,6 +139,10 @@
         const isDetailActive = detailView && detailView.style.display === 'block';
 
         if (e.key === 'Escape') {
+            if (typeof isDetailMoreMenuOpen === 'function' && isDetailMoreMenuOpen()) {
+                closeDetailMoreMenu(true);
+                return;
+            }
             const castModal = document.getElementById('castModal');
             if (castModal && castModal.style.display === 'flex') {
                 closeCastModal();

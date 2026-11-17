@@ -40,6 +40,28 @@ describe('Anime Parser Utils', () => {
       assert.strictEqual(details.audioLang, 'VOSTFR');
     });
 
+    it('classe un « S01 » sans numéro d\'épisode comme saison complète, pas comme Épisode 1', () => {
+      const details = parseAnimeDetails('Miru.Tights.S01.1080p.BluRay.REMUX.AVC.FLAC.2.0-StaFer');
+      assert.strictEqual(details.season, 'Saison 1');
+      assert.strictEqual(details.episode, 'Saison Complète');
+      // Sans aucune indication de saison ni d'épisode, on garde le repli « Épisode 1 »
+      assert.strictEqual(parseAnimeDetails('[ASW] Some Anime [1080p HEVC]').episode, 'Épisode 1');
+    });
+
+    it('ne prend pas « S2 - 03 » / « Saison 2 - 05 » pour une plage de saisons', () => {
+      const erai = parseAnimeDetails('[Erai-raws] Kaiju No 8 S2 - 03 [1080p]');
+      assert.strictEqual(erai.season, 'Saison 2');
+      assert.strictEqual(erai.episode, 'Épisode 3');
+      const fr = parseAnimeDetails('[Group] Anime Saison 2 - 05 VOSTFR');
+      assert.strictEqual(fr.season, 'Saison 2');
+      assert.strictEqual(fr.episode, 'Épisode 5');
+      // Les vraies plages restent reconnues
+      assert.strictEqual(parseAnimeDetails('Anime S1 - S3 BD').season, 'Saisons 1 à 3');
+      assert.strictEqual(parseAnimeDetails('Anime S01-02 1080p').season, 'Saisons 1 à 2');
+      assert.strictEqual(parseAnimeDetails('Anime S1 & S2').season, 'Saisons 1 & 2');
+      assert.strictEqual(parseAnimeDetails('Anime Saisons 1 à 3 VF').season, 'Saisons 1 à 3');
+    });
+
     it('détecte les packs et intégrales multi-saisons', () => {
       const raw = '[Anime-Fans] Attack on Titan S01-S04 Complete Pack 1080p MULTI';
       const details = parseAnimeDetails(raw);

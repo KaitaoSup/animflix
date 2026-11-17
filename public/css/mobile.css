@@ -646,7 +646,21 @@
     }
     .detail-actions::-webkit-scrollbar { display: none; }
     .detail-actions > * { flex-shrink: 0; white-space: nowrap; min-height: 40px; }
-    .detail-actions > button[onclick="scrollToPlayer()"] { display: none; }
+    .detail-actions > .btn-go-player { display: none; } /* lecteur déjà en tête sur téléphone */
+
+    /* Menu « Plus » : feuille ancrée en bas */
+    .detail-more-menu.is-sheet {
+        left: 0; right: 0; bottom: 0; top: auto;
+        min-width: 0;
+        border-radius: 18px 18px 0 0;
+        border-left: none; border-right: none; border-bottom: none;
+        padding: 10px var(--m-gutter) calc(var(--m-safe-bottom) + 12px);
+        z-index: 1250;
+        /* Voile sur le reste de la page */
+        box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.55), 0 -12px 40px rgba(0, 0, 0, 0.6);
+        animation: mSheetUp 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .detail-more-menu.is-sheet .detail-more-item { min-height: 46px; font-size: var(--fs-md); }
 
     .anilist-track-section { padding: 14px; }
     .pack-episodes-section { margin: 0 0 16px; padding: 12px; }

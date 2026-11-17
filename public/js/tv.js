@@ -197,6 +197,12 @@
                 .filter(el => isElementVisible(el) && !el.disabled);
         }
 
+        // Menu « Plus » de la fiche épisode : seules ses entrées sont navigables
+        const moreMenu = document.getElementById('detailMoreMenu');
+        if (moreMenu && !moreMenu.hidden) {
+            return Array.from(moreMenu.querySelectorAll('.detail-more-item')).filter(el => isElementVisible(el));
+        }
+
         // 2. Vérifier si la vue détail / lecteur est ouverte
         const detailView = document.getElementById('detailView');
         if (detailView && detailView.style.display !== 'none') {
@@ -206,7 +212,10 @@
             // Si la vidéo joue et les contrôles personnalisés sont actifs
             const selectors = [
                 '.btn-back',
+                '#detailResumeBtn',
                 '#detailFavoriteBtn',
+                '#detailStreamMode',
+                '#detailMoreBtn',
                 '.btn-play-custom',
                 '.player-btn',
                 '#playerScrubberTrack',
@@ -423,6 +432,12 @@
         // 0. Dialogue de confirmation : Retour = Annuler
         if (typeof isUiDialogOpen === 'function' && isUiDialogOpen()) {
             cancelUiDialog();
+            return true;
+        }
+
+        // Menu « Plus » de la fiche épisode
+        if (typeof isDetailMoreMenuOpen === 'function' && isDetailMoreMenuOpen()) {
+            closeDetailMoreMenu(true);
             return true;
         }
 

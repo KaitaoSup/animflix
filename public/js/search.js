@@ -244,6 +244,7 @@
         }
         const detailResumeBtn = document.getElementById('detailResumeBtn');
         if (detailResumeBtn) detailResumeBtn.style.display = 'none';
+        closeDetailMoreMenu();
 
         if (streamTimeout) clearTimeout(streamTimeout);
         if (currentSubAbort) currentSubAbort.abort();
@@ -352,6 +353,105 @@
             playerArea.scrollIntoView({ behavior: 'smooth' });
         }
     }
+
+    // --- MENU « PLUS » DE LA FICHE ÉPISODE ---
+    // Le menu vit hors de .detail-hero (overflow: hidden) et de .detail-actions (défilante sur mobile) :
+    // il est positionné en fixed sous le bouton, ou affiché en feuille ancrée en bas sur téléphone.
+
+    function isDetailMoreMenuOpen() {
+        const menu = document.getElementById('detailMoreMenu');
+        return !!(menu && !menu.hidden);
+    }
+
+    function getDetailMoreItems() {
+        const menu = document.getElementById('detailMoreMenu');
+        return menu ? Array.from(menu.querySelectorAll('.detail-more-item')) : [];
+    }
+
+    function positionDetailMoreMenu() {
+        const menu = document.getElementById('detailMoreMenu');
+        const btn = document.getElementById('detailMoreBtn');
+        if (!menu || !btn) return;
+        const asSheet = window.matchMedia('(max-width: 680px)').matches;
+        menu.classList.toggle('is-sheet', asSheet);
+        if (asSheet) {
+            menu.style.left = menu.style.top = '';
+            return;
+        }
+        const r = btn.getBoundingClientRect();
+        const gap = 6, margin = 8;
+        const w = menu.offsetWidth, h = menu.offsetHeight;
+        const left = Math.max(margin, Math.min(r.left, window.innerWidth - w - margin));
+        let top = r.bottom + gap;
+        if (top + h > window.innerHeight - margin) top = Math.max(margin, r.top - h - gap);
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
+    }
+
+    function openDetailMoreMenu() {
+        const menu = document.getElementById('detailMoreMenu');
+        const btn = document.getElementById('detailMoreBtn');
+        if (!menu || !btn) return;
+        menu.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+        positionDetailMoreMenu();
+        const first = getDetailMoreItems()[0];
+        if (first) first.focus({ preventScroll: true });
+    }
+
+    function closeDetailMoreMenu(restoreFocus = false) {
+        const menu = document.getElementById('detailMoreMenu');
+        const btn = document.getElementById('detailMoreBtn');
+        if (!menu || menu.hidden) return;
+        menu.hidden = true;
+        if (btn) {
+            btn.setAttribute('aria-expanded', 'false');
+            if (restoreFocus) btn.focus({ preventScroll: true });
+        }
+    }
+
+    function toggleDetailMoreMenu(event) {
+        if (event) event.stopPropagation();
+        if (isDetailMoreMenuOpen()) closeDetailMoreMenu(true);
+        else openDetailMoreMenu();
+    }
+
+    (function initDetailMoreMenu() {
+        const menu = document.getElementById('detailMoreMenu');
+        if (!menu) return;
+        // Un choix ferme le menu (après l'exécution de son propre onclick)
+        menu.addEventListener('click', (e) => {
+            if (e.target.closest('.detail-more-item')) closeDetailMoreMenu();
+        });
+        // Flèches haut/bas entre les entrées, Tab referme le menu
+        menu.addEventListener('keydown', (e) => {
+            const items = getDetailMoreItems();
+            const idx = items.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                e.stopPropagation();
+                const next = e.key === 'ArrowDown' ? (idx + 1) % items.length : (idx - 1 + items.length) % items.length;
+                items[next].focus();
+            } else if (e.key === 'Tab') {
+                closeDetailMoreMenu();
+            }
+        });
+        // Clic à l'extérieur : ferme le menu. En feuille (téléphone), le tap sur le voile ne doit pas
+        // déclencher aussi l'élément situé dessous (lecture/pause, lien…) : phase de capture + arrêt.
+        document.addEventListener('click', (e) => {
+            if (!isDetailMoreMenuOpen()) return;
+            if (menu.contains(e.target) || e.target.closest('#detailMoreBtn')) return;
+            if (menu.classList.contains('is-sheet')) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            closeDetailMoreMenu();
+        }, true);
+        window.addEventListener('resize', () => closeDetailMoreMenu());
+        window.addEventListener('scroll', () => {
+            if (isDetailMoreMenuOpen() && !menu.classList.contains('is-sheet')) positionDetailMoreMenu();
+        }, { passive: true });
+    })();
 
     function onDetailStreamModeChange() {
         if (!currentAnimeItem) return;

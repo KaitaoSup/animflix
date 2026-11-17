@@ -146,47 +146,26 @@
                       </div>
                   </div>
 
-                  <!-- Boutons d'action rapides -->
+                  <!-- Actions : reprendre, favori, mode de lecture ; le reste dans « Plus » -->
                   <div class="detail-actions">
-                      <button id="detailFavoriteBtn" class="btn-favorite-toggle" onclick="toggleCurrentAnimeFavorite()" title="Ajouter cet anime à vos favoris locaux">
-                          <span id="detailFavoriteIcon">🤍</span> <span id="detailFavoriteText">Ajouter aux favoris</span>
-                      </button>
                       <button id="detailResumeBtn" class="btn-secondary btn-detail-resume" style="display: none;" onclick="resumePlaybackFromSaved()" title="Reprendre la lecture de cet épisode">
                           ▶ Reprendre
                       </button>
+                      <button id="detailFavoriteBtn" class="btn-favorite-toggle" onclick="toggleCurrentAnimeFavorite()" title="Ajouter cet anime à vos favoris locaux">
+                          <span id="detailFavoriteIcon">🤍</span> <span id="detailFavoriteText">Ajouter aux favoris</span>
+                      </button>
                       <div class="detail-mode-select-wrap">
-                          <label for="detailStreamMode" style="font-size: 12px; color: #aaa; margin-right: 4px;">Mode :</label>
+                          <label for="detailStreamMode" class="detail-mode-label">Mode :</label>
                           <select id="detailStreamMode" onchange="onDetailStreamModeChange()">
                               <option value="direct">⚡ Lecture Directe (0% CPU)</option>
                               <option value="hls">📡 HLS Adaptatif (.m3u8)</option>
                               <option value="transcode">🔄 Transcodage H.264</option>
                           </select>
                       </div>
-                      <button id="detailDownloadBtn" class="btn-secondary btn-download-ep" onclick="downloadCurrentEpisode()" title="Télécharger le fichier vidéo original sur votre appareil (Mode Hors-Ligne)">
-                          📥 Télécharger
+                      <button id="detailMoreBtn" class="btn-secondary btn-detail-more" onclick="toggleDetailMoreMenu(event)" aria-haspopup="menu" aria-expanded="false" aria-controls="detailMoreMenu" title="Télécharger, VLC, magnet, diffuser, signaler…">
+                          <span aria-hidden="true">⋯</span> Plus
                       </button>
-                      <button id="detailKeepBtn" class="btn-secondary btn-keep-ep" onclick="onKeepOnServerClick()" title="Télécharger l'épisode sur le serveur : il restera regardable même sans seeders">
-                          💾 Garder sur le serveur
-                      </button>
-                      <button id="detailReportBtn" class="btn-secondary btn-report-source" onclick="reportCurrentSourceBroken()" title="Le torrent ne démarre pas ou est illisible : le signaler pour que le choix automatique en prenne un autre">
-                          🚫 Source cassée
-                      </button>
-                      <button id="detailCastBtn" class="btn-secondary btn-cast-tv" onclick="openCastModal()" title="Diffuser sur TV (Chromecast, AirPlay, Smart TV, VLC Réseau)">
-                          📺 Diffuser TV
-                      </button>
-                      <a id="detailVlcBtn" href="#" class="vlc-btn" target="_blank" title="Lancer le flux dans VLC">
-                          🟠 Ouvrir dans VLC
-                      </a>
-                      <button id="detailCopyVlcBtn" class="btn-secondary" title="Copier le lien réseau pour VLC">
-                          📋 Copier flux
-                      </button>
-                      <a id="detailMagnetBtn" href="#" class="btn-secondary" title="Ouvrir directement dans le client torrent">
-                          🧲 Ouvrir Magnet
-                      </a>
-                      <button id="detailCopyMagnetBtn" class="btn-secondary" title="Copier le lien magnet P2P">
-                          📋 Copier
-                      </button>
-                      <button onclick="scrollToPlayer()" class="btn-secondary" style="background: var(--primary); border-color: var(--primary);">
+                      <button onclick="scrollToPlayer()" class="btn-secondary btn-go-player">
                           ▶️ Aller au lecteur
                       </button>
                   </div>
@@ -213,17 +192,6 @@
                   <div class="player-area-title">
                       <span style="color: var(--primary);">▶</span> Lecteur Multimédia Intégré
                       <span id="playerEngineBadge" class="player-engine-badge">Direct MP4</span>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                      <button onclick="downloadCurrentEpisode()" class="btn-sub-style" title="Télécharger cet épisode hors-ligne">
-                          📥 Hors-ligne
-                      </button>
-                      <button onclick="openCastModal()" class="btn-sub-style" title="Diffuser sur TV (Chromecast, AirPlay, Smart TV)">
-                          📺 Cast / TV
-                      </button>
-                      <button onclick="togglePlayerFullscreen()" class="btn-sub-style" title="Plein écran [F]">
-                          ⛶ Plein écran
-                      </button>
                   </div>
               </div>
 
@@ -630,6 +598,36 @@
               <div class="shortcuts-hint">Raccourcis : [Espace] Pause | [C] Sous-titres | [S] Style | [F] Plein écran | [P] PiP | [N] Boost Voix | [ < / > ] Vitesse | [← / →] -10s / +10s | [G / H] ST | [J / K] Audio</div>
           </div>
       </div>
+  </div>
+
+  <!-- MENU « PLUS » DE LA FICHE ÉPISODE (hors des conteneurs à overflow : positionné en fixed par search.js) -->
+  <div id="detailMoreMenu" class="detail-more-menu" role="menu" aria-labelledby="detailMoreBtn" hidden>
+      <button id="detailDownloadBtn" type="button" class="detail-more-item" role="menuitem" onclick="downloadCurrentEpisode()" title="Télécharger le fichier vidéo original sur votre appareil (Mode Hors-Ligne)">
+          📥 Télécharger sur cet appareil
+      </button>
+      <button id="detailKeepBtn" type="button" class="detail-more-item btn-keep-ep" role="menuitem" onclick="onKeepOnServerClick()" title="Télécharger l'épisode sur le serveur : il restera regardable même sans seeders">
+          💾 Garder sur le serveur
+      </button>
+      <button id="detailCastBtn" type="button" class="detail-more-item" role="menuitem" onclick="openCastModal()" title="Diffuser sur TV (Chromecast, AirPlay, Smart TV, VLC Réseau)">
+          📺 Diffuser sur la TV
+      </button>
+      <div class="detail-more-sep" role="separator"></div>
+      <a id="detailVlcBtn" href="#" class="detail-more-item" role="menuitem" target="_blank" title="Lancer le flux dans VLC">
+          🟠 Ouvrir dans VLC
+      </a>
+      <button id="detailCopyVlcBtn" type="button" class="detail-more-item" role="menuitem" title="Copier le lien réseau pour VLC">
+          📋 Copier le lien du flux
+      </button>
+      <a id="detailMagnetBtn" href="#" class="detail-more-item" role="menuitem" title="Ouvrir directement dans le client torrent">
+          🧲 Ouvrir le magnet
+      </a>
+      <button id="detailCopyMagnetBtn" type="button" class="detail-more-item" role="menuitem" title="Copier le lien magnet P2P">
+          📋 Copier le magnet
+      </button>
+      <div class="detail-more-sep" role="separator"></div>
+      <button id="detailReportBtn" type="button" class="detail-more-item detail-more-danger" role="menuitem" onclick="reportCurrentSourceBroken()" title="Le torrent ne démarre pas ou est illisible : le signaler pour que le choix automatique en prenne un autre">
+          🚫 Signaler une source cassée
+      </button>
   </div>
 
   <!-- MODAL DE CONNEXION / INSCRIPTION ANIMFLIX -->

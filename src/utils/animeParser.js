@@ -50,10 +50,15 @@ export function parseAnimeDetails(rawTitle) {
 
   // 3. Détection de la Saison
   let season = null;
-  const sMultiMatch = rawTitle.match(/S(\d{1,2})\s*[-+&]\s*S?(\d{1,2})/i) || 
-                      rawTitle.match(/Saisons?\s*(\d{1,2})\s*[-+&]\s*(\d{1,2})/i);
+  // Plages de saisons : « S01 + S02 », « S01-02 », « S1 - S3 », « Saisons 1 à 3 ».
+  // « S2 - 05 » / « Saison 2 - 05 » sont des épisodes : sans « S » des deux côtés, le tiret doit être collé.
+  const sMultiMatch = rawTitle.match(/\bS0*(\d{1,2})\s*[+&]\s*S?0*(\d{1,2})\b/i) ||
+                      rawTitle.match(/\bS0*(\d{1,2})-S?0*(\d{1,2})\b/i) ||
+                      rawTitle.match(/\bS0*(\d{1,2})\s*[-~]\s*S0*(\d{1,2})\b/i) ||
+                      rawTitle.match(/\bSaisons\s*0*(\d{1,2})\s*(?:[-&~+]|à)\s*0*(\d{1,2})\b/i) ||
+                      rawTitle.match(/\bSaison\s*0*(\d{1,2})(?:\s*[&+]\s*|-|\s+à\s+)0*(\d{1,2})\b/i);
   if (sMultiMatch) {
-    const separator = /[-~]/.test(sMultiMatch[0]) ? ' à ' : ' & ';
+    const separator = /[-~]|\sà\s/.test(sMultiMatch[0]) ? ' à ' : ' & ';
     season = `Saisons ${parseInt(sMultiMatch[1], 10)}${separator}${parseInt(sMultiMatch[2], 10)}`;
   } else {
     const seMatch = rawTitle.match(/\bS0*(\d{1,2})E\d+/i);
@@ -69,6 +74,8 @@ export function parseAnimeDetails(rawTitle) {
       }
     }
   }
+  // Saison explicitement indiquée dans le titre (S01, Season 1…) : sans numéro d'épisode, c'est un pack de saison
+  const seasonExplicit = !!season;
   if (!season) season = 'Saison 1';
 
   // 4. Détection de l'Épisode
@@ -95,7 +102,7 @@ export function parseAnimeDetails(rawTitle) {
       episode = 'Intégrale / Pack';
     } else if (/\bmovie\b|\bfilm\b/i.test(rawTitle)) {
       episode = 'Film';
-    } else if (season && season !== 'Saison 1') {
+    } else if (seasonExplicit) {
       episode = 'Saison Complète';
     } else {
       episode = 'Épisode 1';

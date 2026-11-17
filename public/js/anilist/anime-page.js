@@ -137,7 +137,8 @@
         const m = title.match(/\bS0*(\d{1,2})\s*[+&]\s*S?0*(\d{1,2})\b/i) ||
                   title.match(/\bS0*(\d{1,2})-S?0*(\d{1,2})\b/i) ||
                   title.match(/\bS0*(\d{1,2})\s*[-~]\s*S0*(\d{1,2})\b/i) ||
-                  title.match(/\bSaisons?\s*0*(\d{1,2})\s*(?:[-&~+]|à)\s*0*(\d{1,2})\b/i);
+                  title.match(/\bSaisons\s*0*(\d{1,2})\s*(?:[-&~+]|à)\s*0*(\d{1,2})\b/i) ||
+                  title.match(/\bSaison\s*0*(\d{1,2})(?:\s*[&+]\s*|-|\s+à\s+)0*(\d{1,2})\b/i);
         if (m) {
             const a = parseInt(m[1], 10);
             const b = parseInt(m[2], 10);
