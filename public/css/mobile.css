@@ -165,6 +165,10 @@
     }
     /* Les onglets du haut sont remplacés par la barre du bas */
     .home-tabs-nav { display: none; }
+    .home-boot-tabs { display: none; }
+    .home-boot-hero { height: 190px; border-radius: var(--radius-lg); margin-bottom: 22px; }
+    .home-boot-title { width: 180px; height: 18px; }
+    .grid.home-boot-grid { grid-auto-flow: column; grid-auto-columns: 42%; grid-template-columns: none; }
 
     .empty-state { padding: 56px 16px; font-size: var(--fs-md); }
 
@@ -293,7 +297,7 @@
         padding: 1px 5px;
         border-radius: var(--radius-pill);
         background: var(--primary);
-        color: #fff;
+        color: var(--text);
         font-size: 10px;
         font-weight: 800;
     }

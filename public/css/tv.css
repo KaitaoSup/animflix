@@ -28,7 +28,7 @@
 .btn-tv-nav.active {
     background: rgba(var(--primary-rgb), 0.2);
     border-color: var(--primary);
-    color: #ff4d58;
+    color: var(--primary-light);
     box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.35);
 }
 
@@ -126,7 +126,7 @@ body.tv-focus-active .file-row.tv-focused,
     border-radius: var(--radius-xs);
     font-weight: 700;
     font-size: var(--fs-2xs);
-    color: #ff4d58;
+    color: var(--primary-light);
     margin-right: 4px;
 }
 

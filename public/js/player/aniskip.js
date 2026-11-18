@@ -77,7 +77,19 @@
     }
     window.aniSkipNeedsRefresh = aniSkipNeedsRefresh;
 
+    // Boutons « Skip OP (+85s) » : saut fixe de secours, masqué quand l'opening est connu
+    // (AniSkip ou chapitres du fichier) puisque le bouton AniSkip fait alors un saut exact.
+    function syncManualSkipOpButtons() {
+        const area = document.getElementById('detailPlayerArea');
+        if (!area) return;
+        const skipPref = localStorage.getItem('animflix_aniskip_mode') || 'button';
+        const opKnown = !!currentAniSkipIntervals && isValidSkipInterval(currentAniSkipIntervals.op);
+        area.classList.toggle('has-op-skip', opKnown && skipPref !== 'disabled');
+    }
+    window.syncManualSkipOpButtons = syncManualSkipOpButtons;
+
     function renderAniSkipTimelineMarkers() {
+        syncManualSkipOpButtons();
         const markersEl = document.getElementById('playerScrubberMarkers');
         if (!markersEl) return;
         markersEl.innerHTML = '';

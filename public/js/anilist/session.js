@@ -127,10 +127,10 @@
                 <div id="anilistUserBadge" class="anilist-user-badge" onclick="toggleAnilistDropdown(event)" tabindex="0" title="Connecté à AniList : ${escapeHtml(currentAnilistUser.name)}">
                     <img class="anilist-avatar" src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(currentAnilistUser.name)}" onerror="this.src='https://anilist.co/img/icons/icon.svg'">
                     <span class="anilist-username">${escapeHtml(currentAnilistUser.name)}</span>
-                    <span style="font-size: 10px; color: #888;">▼</span>
+                    <span style="font-size: 10px; color: var(--text-faint);">▼</span>
                     <div class="anilist-dropdown" onclick="event.stopPropagation()">
                         <div style="padding: 4px 10px 8px; border-bottom: 1px solid #23374d; margin-bottom: 6px;">
-                            <div style="font-size: 11px; color: #888;">Bienvenue</div>
+                            <div style="font-size: 11px; color: var(--text-faint);">Bienvenue</div>
                             <div style="font-weight: bold; color: #02a9ff; font-size: 13.5px;">${escapeHtml(currentAnilistUser.name)} 👋</div>
                         </div>
                         <div class="anilist-dropdown-nsfw" onclick="toggleNsfwFilter(!getShowNsfwPreference())">

@@ -231,7 +231,7 @@
         } catch (e) {
             if (resultsArea) {
                 resultsArea.innerHTML = `
-                    <div class="empty-state" style="padding: 50px 20px; color: #ff525d;">
+                    <div class="empty-state" style="padding: 50px 20px; color: var(--danger);">
                         Erreur chargement des résultats : ${escapeHtml(e.message)}
                         <br><br>
                         <button class="btn-refresh-watching" onclick="resetDiscoverFilters()">Réinitialiser</button>
@@ -293,7 +293,7 @@
                     </div>
                     <div class="card-info">
                         <span class="card-title" title="${safeTitle}">${safeTitle}</span>
-                        ${subTitle && subTitle !== title ? `<span style="font-size: 11px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(subTitle)}">${escapeHtml(subTitle)}</span>` : ''}
+                        ${subTitle && subTitle !== title ? `<span style="font-size: 11px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(subTitle)}">${escapeHtml(subTitle)}</span>` : ''}
                         <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px;">
                             ${genres.map(g => `<span class="badge-discover-genre">${escapeHtml(g)}</span>`).join('')}
                         </div>
@@ -499,12 +499,12 @@
                             <p>Explorez les tendances et sorties de la saison ${seasonInfo.labelFr}</p>
                         </div>
                     </div>
-                    <div class="empty-state" style="padding: 50px 20px; color: #ff525d;">
+                    <div class="empty-state" style="padding: 50px 20px; color: var(--danger);">
                         <div style="font-size: 38px; margin-bottom: 12px;">⚠️</div>
-                        <div style="font-size: 16px; font-weight: bold; color: #fff; margin-bottom: 8px;">
+                        <div style="font-size: 16px; font-weight: bold; color: var(--text); margin-bottom: 8px;">
                             Impossible de contacter AniList pour récupérer les tendances
                         </div>
-                        <div style="font-size: 13.5px; color: #aaa; margin-bottom: 20px;">
+                        <div style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 20px;">
                             ${escapeHtml(err.message || 'Erreur réseau temporaire')}
                         </div>
                         <button class="btn-refresh-watching" onclick="renderDiscoverTabHtml(null, true)">

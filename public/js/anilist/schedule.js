@@ -126,8 +126,8 @@
             return `
                 <div class="empty-state" style="grid-column: 1 / -1; padding: 50px 20px;">
                     <div style="font-size: 32px; margin-bottom: 10px;">☕</div>
-                    <div style="font-size: 15px; color: #fff; font-weight: 600;">Aucune diffusion répertoriée ce jour-là.</div>
-                    <div style="font-size: 13px; color: #888; margin-top: 4px;">Profitez-en pour rattraper vos animes en cours !</div>
+                    <div style="font-size: 15px; color: var(--text); font-weight: 600;">Aucune diffusion répertoriée ce jour-là.</div>
+                    <div style="font-size: 13px; color: var(--text-faint); margin-top: 4px;">Profitez-en pour rattraper vos animes en cours !</div>
                 </div>
             `;
         }
@@ -180,7 +180,7 @@
                     </div>
                     <div class="card-info">
                         <span class="card-title" title="${safeTitle}">${safeTitle}</span>
-                        ${subTitle && subTitle !== title ? `<span style="font-size: 11px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(subTitle)}">${escapeHtml(subTitle)}</span>` : ''}
+                        ${subTitle && subTitle !== title ? `<span style="font-size: 11px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(subTitle)}">${escapeHtml(subTitle)}</span>` : ''}
                         <div class="schedule-ep-pill">
                             <span class="schedule-ep-num">🎬 Épisode <b>${item.episode}</b></span>
                             <span class="badge-tag-mini" style="margin: 0;">${escapeHtml(format)}</span>
@@ -310,12 +310,12 @@
             console.error('[Schedule] Erreur chargement planning:', err);
             targetContainer.innerHTML = `
                 <div class="schedule-container">
-                    <div class="empty-state" style="padding: 50px 20px; color: #ff525d;">
+                    <div class="empty-state" style="padding: 50px 20px; color: var(--danger);">
                         <div style="font-size: 38px; margin-bottom: 12px;">⚠️</div>
-                        <div style="font-size: 16px; font-weight: bold; color: #fff; margin-bottom: 8px;">
+                        <div style="font-size: 16px; font-weight: bold; color: var(--text); margin-bottom: 8px;">
                             Impossible de charger le planning des sorties
                         </div>
-                        <div style="font-size: 13.5px; color: #aaa; margin-bottom: 20px;">
+                        <div style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 20px;">
                             ${escapeHtml(err.message || 'Erreur réseau temporaire')}
                         </div>
                         <button class="btn-refresh-watching" onclick="renderScheduleTabHtml(null, true)">

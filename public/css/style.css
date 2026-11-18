@@ -26,6 +26,7 @@
 
             /* Couleurs de statut */
             --danger: #ff4757;
+            --danger-rgb: 255, 71, 87;
             --accent-cyan: #00e5ff;
             --accent-green: #46d369;
             --accent-gold: #ffc107;
@@ -290,7 +291,7 @@
         }
         .card-season-pill {
             background: rgba(var(--primary-rgb), 0.15);
-            color: #ff5e68;
+            color: var(--primary-light);
             border: 1px solid rgba(var(--primary-rgb), 0.3);
             font-size: var(--fs-2xs);
             font-weight: 700;
@@ -345,7 +346,7 @@
             align-items: center;
             gap: 8px;
             background: var(--surface-2);
-            border: 1px solid #3d3d3d;
+            border: 1px solid var(--border-strong);
             color: var(--text);
             padding: 10px 18px;
             border-radius: var(--radius-md);
@@ -372,7 +373,7 @@
         .detail-hero {
             display: flex;
             gap: 32px;
-            background: linear-gradient(135deg, #1d1d1d 0%, #171717 100%);
+            background: linear-gradient(135deg, var(--surface-1) 0%, var(--bg) 100%);
             border: 1px solid var(--card-border);
             border-radius: var(--radius-xl);
             padding: 30px;
@@ -404,7 +405,7 @@
             aspect-ratio: 2/3;
             border-radius: var(--radius-lg);
             overflow: hidden;
-            background: #0d0d0d;
+            background: var(--bg-deep);
             box-shadow: 0 14px 30px rgba(0,0,0,0.85);
             border: 1px solid var(--border-strong);
             position: relative;
@@ -459,7 +460,7 @@
         }
         .badge-season {
             background: rgba(var(--primary-rgb), 0.16);
-            color: #ff525d;
+            color: var(--primary-light);
             border: 1px solid rgba(var(--primary-rgb), 0.4);
             box-shadow: 0 2px 8px rgba(var(--primary-rgb), 0.15);
         }
@@ -504,7 +505,7 @@
 
         .detail-raw-title-box {
             background: rgba(0,0,0,0.4);
-            border: 1px solid #2d2d2d;
+            border: 1px solid var(--border);
             border-radius: var(--radius-sm);
             padding: 8px 12px;
             font-size: var(--fs-xs);
@@ -706,7 +707,7 @@
             gap: 8px;
             background: rgba(var(--primary-rgb), 0.18);
             border: 1px solid rgba(var(--primary-rgb), 0.45);
-            color: #ff6b6b;
+            color: var(--primary-light);
             padding: 5px 14px;
             border-radius: var(--radius-pill);
             font-size: var(--fs-sm);
@@ -804,7 +805,7 @@
 
         .btn-hero-secondary {
             background: rgba(255, 255, 255, 0.08);
-            color: #f1f5f9;
+            color: var(--text);
             padding: 11px 20px;
             border-radius: var(--radius-lg);
             font-size: var(--fs-md);
@@ -854,7 +855,7 @@
         }
 
         .home-hub-card {
-            background: #14171f;
+            background: var(--bg);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: var(--radius-lg);
             padding: 20px;
@@ -917,7 +918,7 @@
         .home-hub-card-title {
             font-size: var(--fs-lg);
             font-weight: 700;
-            color: #f8fafc;
+            color: var(--text);
             margin: 0 0 6px 0;
         }
 
@@ -979,7 +980,7 @@
 
         .home-section-badge {
             background: rgba(var(--primary-rgb), 0.18);
-            color: #ff6b6b;
+            color: var(--primary-light);
             font-size: var(--fs-xs);
             font-weight: 700;
             padding: 3px 9px;
@@ -1206,7 +1207,7 @@
 
         .settings-modal-card {
             max-width: 540px;
-            background: #161616;
+            background: var(--bg);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             display: flex;
@@ -1316,8 +1317,8 @@
         .theme-custom-picker input[type="color"]::-webkit-color-swatch { border: none; border-radius: var(--radius-xs); }
         .theme-custom-picker input[type="color"]::-moz-color-swatch { border: none; border-radius: var(--radius-xs); }
         .settings-server-info {
-            background: #141c26;
-            border: 1px solid #203146;
+            background: var(--anilist-dark);
+            border: 1px solid var(--anilist-border);
             border-radius: var(--radius-md);
             padding: 12px 14px;
         }
@@ -1344,8 +1345,8 @@
             flex-wrap: wrap;
             gap: 12px;
             padding: 10px 16px;
-            background: #14161a;
-            border: 1px solid #232730;
+            background: var(--bg);
+            border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             margin-bottom: 22px;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
@@ -1377,8 +1378,8 @@
         }
 
         .filter-chip {
-            background: #1e222a;
-            border: 1px solid #313745;
+            background: var(--surface-2);
+            border: 1px solid var(--border-strong);
             color: #b0bac9;
             padding: 5px 12px;
             border-radius: var(--radius-pill);
@@ -1419,8 +1420,8 @@
         }
 
         .search-sort-select {
-            background: #1e222a;
-            border: 1px solid #313745;
+            background: var(--surface-2);
+            border: 1px solid var(--border-strong);
             color: var(--text);
             padding: 5px 10px;
             border-radius: var(--radius-md);
@@ -1444,7 +1445,7 @@
             .search-filter-right {
                 margin-left: 0;
                 justify-content: space-between;
-                border-top: 1px solid #232730;
+                border-top: 1px solid var(--border);
                 padding-top: 8px;
             }
             .search-sort-select {
@@ -1571,7 +1572,7 @@
 
         .ui-dialog-overlay { z-index: 3000; }
         .ui-dialog {
-            background: #1b1b1b;
+            background: var(--surface-1);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             padding: 24px;
@@ -1592,7 +1593,7 @@
         .ui-dialog-ok.ui-dialog-danger:hover { background: var(--primary-hover); }
 
         .skeleton-block {
-            background: linear-gradient(90deg, #1f1f1f 0%, #2a2a2a 40%, #1f1f1f 80%);
+            background: linear-gradient(90deg, var(--surface-1) 0%, var(--surface-2) 40%, var(--surface-1) 80%);
             background-size: 200% 100%;
             animation: skeletonShimmer 1.3s ease-in-out infinite;
             border-radius: var(--radius-sm);
@@ -1607,6 +1608,20 @@
         .skeleton-line { height: 14px; margin-bottom: 10px; }
         .skeleton-line-short { width: 55%; }
         .skeleton-grid { margin-top: 8px; }
+
+        /* Squelette de démarrage de l'accueil (index.html, remplacé par renderHomeScreen) */
+        .home-boot-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .home-boot-tab { flex: none; width: 118px; height: 38px; border-radius: var(--radius-pill); }
+        .home-boot-hero { height: 250px; border-radius: var(--radius-xl); margin-bottom: 32px; }
+        .home-boot-title { width: 260px; height: 22px; margin-bottom: 16px; }
+        .home-boot-grid { margin-top: 0; overflow: hidden; }
         .search-loading-label { color: var(--text-muted); font-size: var(--fs-md); }
         @media (prefers-reduced-motion: reduce) {
             .skeleton-block, .ui-dialog { animation: none; }

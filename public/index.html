@@ -61,9 +61,24 @@
       <div id="catalogView">
           <!-- VUE ACCUEIL : ANIMES EN COURS (SI CONNECTÉ) OU MESSAGE D'INVITATION -->
           <div id="homeView">
-              <div id="homeWatchingContainer">
-                  <div class="empty-state" style="grid-column: 1 / -1;">
-                      Tapez le nom d'un anime ci-dessus pour lancer la recherche 🍿
+              <!-- Squelette affiché jusqu'au premier rendu de l'accueil (après /api/auth/me) -->
+              <div id="homeWatchingContainer" class="home-boot-skeleton" role="status" aria-label="Chargement de l'accueil…">
+                  <div class="home-boot-tabs" aria-hidden="true">
+                      <span class="skeleton-block home-boot-tab"></span>
+                      <span class="skeleton-block home-boot-tab"></span>
+                      <span class="skeleton-block home-boot-tab"></span>
+                      <span class="skeleton-block home-boot-tab"></span>
+                      <span class="skeleton-block home-boot-tab"></span>
+                  </div>
+                  <div class="skeleton-block home-boot-hero" aria-hidden="true"></div>
+                  <div class="skeleton-block skeleton-line home-boot-title" aria-hidden="true"></div>
+                  <div class="grid skeleton-grid home-boot-grid" aria-hidden="true">
+                          <div class="card skeleton-card"><div class="skeleton-block skeleton-poster"></div><div class="card-info"><div class="skeleton-block skeleton-line"></div><div class="skeleton-block skeleton-line skeleton-line-short"></div></div></div>
+                          <div class="card skeleton-card"><div class="skeleton-block skeleton-poster"></div><div class="card-info"><div class="skeleton-block skeleton-line"></div><div class="skeleton-block skeleton-line skeleton-line-short"></div></div></div>
+                          <div class="card skeleton-card"><div class="skeleton-block skeleton-poster"></div><div class="card-info"><div class="skeleton-block skeleton-line"></div><div class="skeleton-block skeleton-line skeleton-line-short"></div></div></div>
+                          <div class="card skeleton-card"><div class="skeleton-block skeleton-poster"></div><div class="card-info"><div class="skeleton-block skeleton-line"></div><div class="skeleton-block skeleton-line skeleton-line-short"></div></div></div>
+                          <div class="card skeleton-card"><div class="skeleton-block skeleton-poster"></div><div class="card-info"><div class="skeleton-block skeleton-line"></div><div class="skeleton-block skeleton-line skeleton-line-short"></div></div></div>
+                          <div class="card skeleton-card"><div class="skeleton-block skeleton-poster"></div><div class="card-info"><div class="skeleton-block skeleton-line"></div><div class="skeleton-block skeleton-line skeleton-line-short"></div></div></div>
                   </div>
               </div>
           </div>
@@ -141,7 +156,7 @@
                       </div>
 
                       <div>
-                          <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #777; margin-bottom: 4px;">Fichier source :</div>
+                          <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-faint); margin-bottom: 4px;">Fichier source :</div>
                           <div id="detailRawTitle" class="detail-raw-title-box"></div>
                       </div>
                   </div>
@@ -181,7 +196,7 @@
                   <span style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px;">
                       📦 Épisodes disponibles dans ce Pack (<span id="packEpisodesCount">0</span>) :
                   </span>
-                  <span style="font-size: 12px; color: #888;">Sélectionnez l'épisode à lire dans le lecteur</span>
+                  <span style="font-size: 12px; color: var(--text-faint);">Sélectionnez l'épisode à lire dans le lecteur</span>
               </div>
               <div id="packEpisodesList" class="pack-episodes-grid"></div>
           </div>
@@ -400,9 +415,9 @@
               <!-- Barre de contrôle des sous-titres et options -->
               <div class="player-controls-bar">
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: relative;">
-                      <div style="display: flex; align-items: center; gap: 6px; background: #1f1f1f; padding: 6px 12px; border-radius: 6px; border: 1px solid #333;">
-                          <span style="font-size: 13px; color: #aaa;">💬 Sous-titres :</span>
-                          <select id="subSelect" onchange="onSubtitleChange(this.value)" style="padding: 4px 8px; font-size: 13px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; color: white;">
+                      <div style="display: flex; align-items: center; gap: 6px; background: var(--surface-1); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);">
+                          <span style="font-size: 13px; color: var(--text-muted);">💬 Sous-titres :</span>
+                          <select id="subSelect" onchange="onSubtitleChange(this.value)" style="padding: 4px 8px; font-size: 13px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 4px; color: white;">
                               <option value="-1">Recherche des pistes... ⏳</option>
                           </select>
                           <button id="toggleSubBtn" onclick="toggleSubtitles()" title="Raccourci : [C]" style="padding: 4px 10px; font-size: 12px; background: var(--primary); border-radius: 4px; margin: 0;">CC ON</button>
@@ -413,15 +428,15 @@
                       <span id="sub-status" style="font-size: 12px; color: #46d369; font-weight: 500;"></span>
 
                       <!-- SÉLECTEUR AUDIO DYNAMIQUE -->
-                      <div style="display: flex; align-items: center; gap: 6px; background: #1f1f1f; padding: 6px 12px; border-radius: 6px; border: 1px solid #333;">
-                          <span style="font-size: 13px; color: #aaa;">🎧 Audio :</span>
-                          <select id="audioSelect" onchange="onAudioChange(this.value)" style="padding: 4px 8px; font-size: 13px; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; color: white;">
+                      <div style="display: flex; align-items: center; gap: 6px; background: var(--surface-1); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);">
+                          <span style="font-size: 13px; color: var(--text-muted);">🎧 Audio :</span>
+                          <select id="audioSelect" onchange="onAudioChange(this.value)" style="padding: 4px 8px; font-size: 13px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 4px; color: white;">
                               <option value="">Auto (Défaut)</option>
                           </select>
                       </div>
 
                       <!-- NAVIGATION TEMPORELLE / SEEK RAPIDE -->
-                      <div class="player-seek-group" style="display: flex; align-items: center; gap: 4px; background: #1a1a1a; padding: 4px 8px; border-radius: 6px; border: 1px solid #333;">
+                      <div class="player-seek-group" style="display: flex; align-items: center; gap: 4px; background: var(--surface-1); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);">
                           <button class="btn-seek-jump" onclick="jumpSeekRelative(-10)" title="Reculer de 10s [←]">-10s</button>
                           <button class="btn-seek-jump" onclick="jumpSeekRelative(10)" title="Avancer de 10s [→]">+10s</button>
                           <button class="btn-seek-jump btn-skip-op" onclick="jumpSeekRelative(85)" title="Sauter l'Opening (+85s)">⏭️ Skip OP (+85s)</button>
@@ -429,16 +444,16 @@
 
                       <!-- POPUP DE MODIFICATION DU STYLE DES SOUS-TITRES -->
                       <div id="subStyleMenu" class="sub-style-popup">
-                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #2e2e2e; padding-bottom: 8px;">
+                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
                               <span style="font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px;">
                                   🎨 Style des sous-titres
                               </span>
-                              <span onclick="toggleSubStyleMenu(event)" style="cursor: pointer; font-size: 20px; color: #888; line-height: 1;" title="Fermer">&times;</span>
+                              <span onclick="toggleSubStyleMenu(event)" style="cursor: pointer; font-size: 20px; color: var(--text-faint); line-height: 1;" title="Fermer">&times;</span>
                           </div>
 
                           <!-- APERÇU EN DIRECT -->
-                          <div style="background: #0d0d0d; border-radius: 6px; padding: 14px 10px; text-align: center; margin-bottom: 12px; border: 1px solid #282828; min-height: 54px; display: flex; flex-direction: column; justify-content: center; align-items: center; background-image: radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px); background-size: 10px 10px;">
-                              <div style="font-size: 10px; color: #777; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Aperçu en direct</div>
+                          <div style="background: var(--bg-deep); border-radius: 6px; padding: 14px 10px; text-align: center; margin-bottom: 12px; border: 1px solid var(--border); min-height: 54px; display: flex; flex-direction: column; justify-content: center; align-items: center; background-image: radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px); background-size: 10px 10px;">
+                              <div style="font-size: 10px; color: var(--text-faint); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Aperçu en direct</div>
                               <span id="sub-preview-box" style="display: inline-block; padding: 3px 10px; border-radius: 4px; transition: all 0.15s ease;">
                                   Sous-titre VOSTFR d'exemple
                               </span>
@@ -542,10 +557,10 @@
                           </div>
 
                           <!-- SYNCHRONISATION / DÉCALAGE MANUEL -->
-                          <div class="sub-style-row" style="flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 6px; border-top: 1px dashed #2a2a2a; padding-top: 10px;">
+                          <div class="sub-style-row" style="flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 6px; border-top: 1px dashed var(--border); padding-top: 10px;">
                               <!-- SYNCHRO SOUS-TITRES -->
                               <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
-                                  <label style="font-size: 12px; font-weight: 600; color: #eee;">💬 Décalage Sous-titres :</label>
+                                  <label style="font-size: 12px; font-weight: 600; color: var(--text);">💬 Décalage Sous-titres :</label>
                                   <span id="subSyncDisplay" style="font-size: 12px; font-weight: bold; color: var(--primary);">0.0s</span>
                               </div>
                               <div style="display: flex; gap: 4px; width: 100%;">
@@ -555,11 +570,11 @@
                                   <button type="button" onclick="adjustSubtitleSync(0.1)" class="btn-sync-sub" title="Avancer les sous-titres de 0.1s [H]">+0.1s</button>
                                   <button type="button" onclick="adjustSubtitleSync(0.5)" class="btn-sync-sub" title="Avancer les sous-titres de 0.5s">+0.5s</button>
                               </div>
-                              <div style="font-size: 10px; color: #777; width: 100%; text-align: center; margin-bottom: 6px;">Raccourcis sous-titres : <b>G</b> (-0.1s) / <b>H</b> (+0.1s)</div>
+                              <div style="font-size: 10px; color: var(--text-faint); width: 100%; text-align: center; margin-bottom: 6px;">Raccourcis sous-titres : <b>G</b> (-0.1s) / <b>H</b> (+0.1s)</div>
 
                               <!-- SYNCHRO AUDIO (SON) -->
-                              <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; border-top: 1px dashed #222; padding-top: 8px;">
-                                  <label style="font-size: 12px; font-weight: 600; color: #eee;">🔊 Décalage Audio :</label>
+                              <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; border-top: 1px dashed var(--border); padding-top: 8px;">
+                                  <label style="font-size: 12px; font-weight: 600; color: var(--text);">🔊 Décalage Audio :</label>
                                   <span id="audioSyncDisplay" style="font-size: 12px; font-weight: bold; color: #ffa033;">0.0s</span>
                               </div>
                               <div style="display: flex; gap: 4px; width: 100%;">
@@ -569,11 +584,11 @@
                                   <button type="button" onclick="adjustAudioSync(0.1)" class="btn-sync-sub" title="Avancer l'audio de 0.1s [K]">+0.1s</button>
                                   <button type="button" onclick="adjustAudioSync(0.5)" class="btn-sync-sub" title="Avancer l'audio de 0.5s">+0.5s</button>
                               </div>
-                              <div style="font-size: 10px; color: #777; width: 100%; text-align: center;">Raccourcis audio : <b>J</b> (-0.1s) / <b>K</b> (+0.1s)</div>
+                              <div style="font-size: 10px; color: var(--text-faint); width: 100%; text-align: center;">Raccourcis audio : <b>J</b> (-0.1s) / <b>K</b> (+0.1s)</div>
                           </div>
 
-                          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #2e2e2e; padding-top: 10px; margin-top: 4px;">
-                              <button type="button" onclick="resetSubStyle()" style="background: transparent; border: 1px solid #555; color: #aaa; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s;">
+                          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px;">
+                              <button type="button" onclick="resetSubStyle()" style="background: transparent; border: 1px solid var(--border-hover); color: var(--text-muted); padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s;">
                                   Réinitialiser
                               </button>
                               <button type="button" onclick="toggleSubStyleMenu(event)" style="background: var(--primary); border: none; color: white; padding: 5px 14px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer;">
@@ -648,15 +663,15 @@
               <form id="animflixAuthForm" onsubmit="handleAnimflixAuthSubmit(event)">
                   <div style="display: flex; flex-direction: column; gap: 14px;">
                       <div>
-                          <label style="display: block; font-size: 12px; color: #aaa; margin-bottom: 6px;">Nom d'utilisateur</label>
+                          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Nom d'utilisateur</label>
                           <input type="text" id="authUsernameInput" required placeholder="Ex: Otaku99" autocomplete="username" style="width: 100%; box-sizing: border-box;">
                       </div>
                       <div>
-                          <label style="display: block; font-size: 12px; color: #aaa; margin-bottom: 6px;">Mot de passe</label>
+                          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Mot de passe</label>
                           <input type="password" id="authPasswordInput" required placeholder="••••••••" autocomplete="current-password" style="width: 100%; box-sizing: border-box;">
                       </div>
 
-                      <div id="authErrorMessage" role="alert" style="display: none; background: rgba(229, 9, 20, 0.1); border: 1px solid rgba(229, 9, 20, 0.4); color: #ff8a8a; border-radius: 8px; padding: 9px 12px; font-size: 13px;"></div>
+                      <div id="authErrorMessage" role="alert" style="display: none; background: rgba(var(--danger-rgb), 0.1); border: 1px solid rgba(var(--danger-rgb), 0.4); color: #ff8a8a; border-radius: 8px; padding: 9px 12px; font-size: 13px;"></div>
 
                       <div id="authRegisterAnilistNotice" style="display: none; background: rgba(2, 169, 255, 0.08); border: 1px solid rgba(2, 169, 255, 0.25); border-radius: 8px; padding: 10px 12px;">
                           <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12.5px; color: #cbe6ff;">
@@ -694,14 +709,14 @@
               <button class="anilist-modal-close" onclick="closeAnilistAuthModal()">&times;</button>
           </div>
           <div class="anilist-modal-body">
-              <p style="color: #bbb; font-size: 13.5px; margin-top: 0; line-height: 1.5;">
+              <p style="color: var(--text-muted); font-size: 13.5px; margin-top: 0; line-height: 1.5;">
                   Connectez votre compte AniList pour synchroniser automatiquement vos épisodes visionnés et suivre votre progression en temps réel.
               </p>
 
               <!-- OPTION 1: OAUTH CLIENT ID -->
               <div class="anilist-auth-section">
                   <div class="anilist-section-title">🚀 Option 1 : Connexion en 1 clic (OAuth)</div>
-                  <div style="font-size: 12.5px; color: #999; margin-bottom: 10px;">
+                  <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 10px;">
                       Entrez votre <b>Client ID</b> AniList :
                   </div>
                   <div style="display: flex; gap: 8px; margin-bottom: 12px;">
@@ -710,7 +725,7 @@
                           Se connecter
                       </button>
                   </div>
-                  <details style="font-size: 12px; color: #888; background: #141c27; padding: 10px 12px; border-radius: 6px; border: 1px solid #1f2e42;">
+                  <details style="font-size: 12px; color: var(--text-faint); background: #141c27; padding: 10px 12px; border-radius: 6px; border: 1px solid #1f2e42;">
                       <summary style="cursor: pointer; color: var(--anilist-blue); font-weight: 600;">Comment obtenir votre Client ID gratuit (30s) ?</summary>
                       <ol style="margin: 8px 0 4px 18px; padding: 0; line-height: 1.7;">
                           <li>Rendez-vous sur <a href="https://anilist.co/settings/developer" target="_blank" style="color: #02a9ff; text-decoration: underline;">AniList > Paramètres > Developer</a></li>
@@ -725,14 +740,14 @@
               <!-- OPTION 2: JETON DIRECT (TOKEN - TAILSCALE & MOBILE FRIENDLY) -->
               <div class="anilist-auth-section" style="margin-top: 16px;">
                   <div class="anilist-section-title">🔑 Option 2 : Jeton d'accès direct (Idéal pour Tailscale & Mobile)</div>
-                  <div style="font-size: 12.5px; color: #999; margin-bottom: 8px;">
+                  <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 8px;">
                       Vous accédez à l'application via Tailscale ou un smartphone ? Collez directement votre jeton :
                   </div>
                   <div style="margin-bottom: 10px;">
                       <a href="https://anilist.co/api/v2/oauth/authorize?client_id=24891&response_type=token" target="_blank" rel="noopener" style="font-size: 12px; color: #02a9ff; text-decoration: underline; font-weight: 600;">
                           👉 Obtenir mon jeton AniList en 1 clic
                       </a>
-                      <span style="font-size: 11px; color: #777;"> (copiez l'<code>access_token</code> de l'URL obtenue)</span>
+                      <span style="font-size: 11px; color: var(--text-faint);"> (copiez l'<code>access_token</code> de l'URL obtenue)</span>
                   </div>
                   <div style="display: flex; gap: 8px;">
                       <input type="password" id="anilistTokenInput" placeholder="Collez votre access_token..." style="flex: 1;">
@@ -779,7 +794,7 @@
               <!-- Gestion des profils utilisateurs -->
               <div class="settings-profiles-group">
                   <div class="settings-profiles-header">
-                      <span style="font-weight: 700; color: #fff; font-size: 13.5px;">👥 Profil Utilisateur :</span>
+                      <span style="font-weight: 700; color: var(--text); font-size: 13.5px;">👥 Profil Utilisateur :</span>
                       <button type="button" class="btn-add-profile" onclick="openAddProfileModal()" title="Créer un nouveau profil">+ Nouveau profil</button>
                   </div>
                   <div id="settingsProfileList" class="settings-profiles-chips">
@@ -884,8 +899,8 @@
 
               <!-- Notifications de nouveaux épisodes -->
               <div class="settings-group">
-                  <div style="font-size: 13.5px; font-weight: 700; color: #fff; margin-bottom: 6px;">🔔 Notifications de nouveaux épisodes</div>
-                  <div id="settingsNotifContent" style="font-size: 12px; color: #aaa; line-height: 1.5;">Chargement...</div>
+                  <div style="font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 6px;">🔔 Notifications de nouveaux épisodes</div>
+                  <div id="settingsNotifContent" style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">Chargement...</div>
               </div>
 
               <!-- Vitesse par défaut -->
@@ -925,8 +940,8 @@
               </div>
 
               <!-- Sources Torrent & Résilience (Multi-sources) -->
-              <div class="settings-group" style="border-top: 1px solid #333; padding-top: 14px; margin-top: 14px;">
-                  <div style="font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+              <div class="settings-group" style="border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px;">
+                  <div style="font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
                       <span>🌐 Sources Torrent & Résilience</span>
                   </div>
                   <label class="settings-label">
@@ -937,7 +952,7 @@
                           <option value="nyaa_only">Nyaa.si uniquement</option>
                       </select>
                   </label>
-                  <div style="font-size: 11px; color: #888; margin-top: 4px; line-height: 1.4;">
+                  <div style="font-size: 11px; color: var(--text-faint); margin-top: 4px; line-height: 1.4;">
                       Bascule automatiquement sur Tokyo Toshokan si Nyaa est bloqué ou ne renvoie aucun résultat.
                   </div>
                   <div id="torrentSettingsLockNote" style="display: none; font-size: 11.5px; color: #f5c518; margin-top: 6px;">
@@ -948,22 +963,22 @@
               <!-- Miroirs Nyaa -->
               <div class="settings-group">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                      <span style="font-size: 12px; font-weight: 600; color: #ccc;">Miroirs Nyaa.si disponibles :</span>
+                      <span style="font-size: 12px; font-weight: 600; color: var(--text-soft);">Miroirs Nyaa.si disponibles :</span>
                       <button type="button" class="btn-sub-style" style="padding: 3px 8px; font-size: 11px;" onclick="testNyaaMirrorsUI()">
                           🔄 Tester les miroirs
                       </button>
                   </div>
-                  <div id="nyaaMirrorsList" style="font-size: 11px; color: #aaa; background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; border: 1px solid #282828;">
+                  <div id="nyaaMirrorsList" style="font-size: 11px; color: var(--text-muted); background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border);">
                       Miroir actif : <span id="activeNyaaMirrorLabel" style="color: #46d369; font-weight: bold;">Chargement...</span>
                   </div>
               </div>
 
               <!-- Torznab (Jackett / Prowlarr) -->
               <div class="settings-group">
-                  <div style="font-size: 13px; font-weight: 600; color: #ddd; margin-bottom: 4px;">
+                  <div style="font-size: 13px; font-weight: 600; color: var(--text-soft); margin-bottom: 4px;">
                       🔌 Indexeur Torznab (Jackett / Prowlarr) — <i>Optionnel</i>
                   </div>
-                  <div style="font-size: 11px; color: #888; margin-bottom: 8px;">
+                  <div style="font-size: 11px; color: var(--text-faint); margin-bottom: 8px;">
                       Idéal pour les releases VF et trackers privés francophones (Sharewood, YggTorrent, etc.).
                   </div>
                   <label class="settings-label" style="margin-bottom: 8px;">
@@ -985,7 +1000,7 @@
               <!-- Informations Système & Serveur -->
               <div class="settings-server-info" id="settingsServerInfo">
                   <div class="settings-server-title">🖥️ Statut Serveur & Décodeur</div>
-                  <div id="settingsServerStatusContent" style="font-size: 12px; color: #aaa; margin-top: 6px; line-height: 1.5;">
+                  <div id="settingsServerStatusContent" style="font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.5;">
                       Chargement des informations serveur...
                   </div>
                   <div class="settings-server-actions">
@@ -1009,11 +1024,11 @@
           </div>
           <div class="anilist-modal-body" style="display: flex; flex-direction: column; gap: 14px;">
               <div>
-                  <label style="display: block; font-size: 12.5px; color: #aaa; margin-bottom: 6px;">Nom du profil :</label>
+                  <label style="display: block; font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px;">Nom du profil :</label>
                   <input type="text" id="newProfileNameInput" placeholder="Ex: Alex, Salon, Famille..." style="width: 100%; box-sizing: border-box;" onkeypress="if(event.key === 'Enter') submitCreateProfile()">
               </div>
               <div>
-                  <label style="display: block; font-size: 12.5px; color: #aaa; margin-bottom: 6px;">Avatar :</label>
+                  <label style="display: block; font-size: 12.5px; color: var(--text-muted); margin-bottom: 6px;">Avatar :</label>
                   <div class="profile-avatar-picker" id="profileAvatarPicker" style="display: flex; gap: 8px; flex-wrap: wrap;">
                       <button type="button" class="btn-avatar-choice active" onclick="selectProfileAvatar('🍿')">🍿</button>
                       <button type="button" class="btn-avatar-choice" onclick="selectProfileAvatar('🎮')">🎮</button>
@@ -1026,7 +1041,7 @@
                   </div>
               </div>
               <div style="background: rgba(255,255,255,0.03); border: 1px solid #23374d; border-radius: 8px; padding: 10px 12px;">
-                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #eee;">
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text);">
                       <input type="checkbox" id="newProfileKidCheckbox">
                       <span>👶 Profil Enfant (Verrouiller le filtre 18+)</span>
                   </label>

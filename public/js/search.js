@@ -834,7 +834,7 @@
                                     <span class="next-ep-badge-highlight" style="background:rgba(245,158,11,0.2);border-color:rgba(245,158,11,0.5);color:#fbbf24;" data-airing-at="${targetInfo.airingTimestamp}">
                                         ${targetInfo.airingCountdownStr}
                                     </span>)
-                                    <span style="font-size:12.5px;color:#888;">— Épisodes précédents ci-dessous :</span>
+                                    <span style="font-size:12.5px;color:var(--text-faint);">— Épisodes précédents ci-dessous :</span>
                                 </div>
                             </div>
                         </div>
@@ -854,7 +854,7 @@
                                 <div class="next-ep-banner-subtitle">
                                     Prochain épisode à visionner : 
                                     <span class="next-ep-badge-highlight">Épisode ${nextEp}</span>
-                                    ${targetInfo.totalEpisodes ? `<span style="color:#888;">(sur ${targetInfo.totalEpisodes})</span>` : ''}
+                                    ${targetInfo.totalEpisodes ? `<span style="color:var(--text-faint);">(sur ${targetInfo.totalEpisodes})</span>` : ''}
                                 </div>
                             </div>
                         </div>
@@ -908,7 +908,7 @@
                 resultsDiv.innerHTML = `
                     <div class="empty-state" style="grid-column: 1 / -1;">
                         Aucun torrent trouvé pour "${escapeHtml(searchTitle)}".<br>
-                        <span style="font-size: 13.5px; color: #888; margin-top: 8px; display: inline-block;">
+                        <span style="font-size: 13.5px; color: var(--text-faint); margin-top: 8px; display: inline-block;">
                             Essayez de changer de langue (ex: VF ou Multi-Sub) ci-dessus.
                         </span>
                         <div style="margin-top: 18px;">

@@ -1,6 +1,6 @@
         /* --- SECTION DU LECTEUR MULTIMÉDIA (ENDROIT DÉDIÉ AU MEDIA PLAYER) --- */
         .detail-player-section {
-            background: linear-gradient(180deg, #1a1a1a 0%, #151515 100%);
+            background: linear-gradient(180deg, var(--surface-1) 0%, var(--bg) 100%);
             border: 1px solid var(--card-border);
             border-radius: var(--radius-xl);
             padding: 24px;
@@ -352,7 +352,7 @@
 
         .sub-style-popup {
             display: none; position: absolute; bottom: calc(100% + 12px); left: 0;
-            background: #181818; border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
+            background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
             padding: 16px; box-shadow: 0 14px 40px rgba(0,0,0,0.95); z-index: 350;
             width: 325px; max-width: calc(100vw - 30px); color: var(--text); font-size: var(--fs-sm);
             animation: fadeIn 0.2s ease-out; box-sizing: border-box;
@@ -381,7 +381,7 @@
             transition: all 0.15s ease;
         }
         .btn-sync-sub:hover {
-            background: #383838;
+            background: var(--surface-3);
             border-color: var(--border-hover);
             color: var(--text);
         }
@@ -399,7 +399,7 @@
         .vlc-btn:hover { background: #ffa033; color: #000; }
 
         .spinner {
-            width: 48px; height: 48px; border: 5px solid #222;
+            width: 48px; height: 48px; border: 5px solid var(--border);
             border-top: 5px solid var(--primary); border-radius: 50%;
             animation: spin 0.9s linear infinite; margin-bottom: 16px;
         }
@@ -408,7 +408,7 @@
         /* SECTION SÉLECTEUR D'ÉPISODES DU PACK */
         .pack-episodes-section {
             background: var(--bg);
-            border: 1px solid #2b2b2b;
+            border: 1px solid var(--border);
             border-radius: var(--radius-lg);
             padding: 16px 20px;
             margin-bottom: 24px;
@@ -459,7 +459,7 @@
             box-shadow: 0 0 12px rgba(var(--primary-rgb), 0.5);
         }
         .btn-seek-jump {
-            background: #252525;
+            background: var(--surface-2);
             border: 1px solid var(--border-strong);
             color: var(--text-soft);
             padding: 4px 9px;
@@ -470,10 +470,14 @@
             transition: all 0.15s;
         }
         .btn-seek-jump:hover {
-            background: #383838;
+            background: var(--surface-3);
             color: var(--text);
             border-color: var(--border-hover);
         }
+        /* Opening connu (AniSkip / chapitres) : le saut fixe de +85s n'a plus lieu d'être */
+        .has-op-skip .player-btn-skip,
+        .has-op-skip .btn-skip-op { display: none !important; }
+
         .btn-skip-op {
             background: rgba(245, 158, 11, 0.15);
             border-color: rgba(245, 158, 11, 0.4);
@@ -534,7 +538,7 @@
             font-weight: 600;
         }
         .player-resume-sub b {
-            color: #ff525d;
+            color: var(--primary-light);
             font-weight: 700;
         }
         .player-resume-buttons {
@@ -563,12 +567,12 @@
             transform: scale(1.04);
         }
         .btn-resume-secondary {
-            background: #27272f;
+            background: var(--surface-2);
             color: var(--text-soft);
             border: 1px solid var(--border-strong);
         }
         .btn-resume-secondary:hover {
-            background: #363640;
+            background: var(--surface-3);
             color: var(--text);
         }
         .btn-resume-close {
@@ -711,15 +715,15 @@
             transform: scale(1.03);
         }
         .btn-next-ep-cancel {
-            background: #25252e;
+            background: var(--surface-2);
             color: var(--text-soft);
-            border: 1px solid #3c3c48;
+            border: 1px solid var(--border-strong);
             padding: 8px 12px;
             border-radius: var(--radius-sm);
             font-size: var(--fs-xs);
             cursor: pointer;
         }
-        .btn-next-ep-cancel:hover { background: #32323e; color: var(--text); }
+        .btn-next-ep-cancel:hover { background: var(--surface-3); color: var(--text); }
 
         /* --- VITESSE & CONTRÔLES COMPLÉMENTAIRES --- */
         .player-btn-speed {
@@ -851,7 +855,7 @@
         .player-status-text {
             font-size: var(--fs-base);
             font-weight: 600;
-            color: #f1f5f9;
+            color: var(--text);
             line-height: 1.45;
             margin-bottom: 2px;
             text-align: center;
@@ -1034,7 +1038,7 @@
         .p2p-hud-title {
             font-size: var(--fs-sm);
             font-weight: 700;
-            color: #f8fafc;
+            color: var(--text);
             display: flex;
             align-items: center;
             gap: 5px;
@@ -1078,7 +1082,7 @@
         .p2p-hud-val {
             font-size: var(--fs-sm);
             font-weight: 600;
-            color: #f1f5f9;
+            color: var(--text);
             font-variant-numeric: tabular-nums;
         }
 
@@ -1241,7 +1245,7 @@
             height: 94px;
             border-radius: var(--radius-xs);
             overflow: hidden;
-            background: #090b10;
+            background: var(--bg-deep);
             border: 1px solid rgba(255, 255, 255, 0.12);
         }
         .scrubber-thumb-wrap img {
@@ -1285,15 +1289,15 @@
             gap: 16px;
         }
         .cast-section-box {
-            background: #141c27;
-            border: 1px solid #223247;
+            background: var(--anilist-dark);
+            border: 1px solid var(--anilist-border);
             border-radius: var(--radius-lg);
             padding: 14px 16px;
         }
         .cast-section-title {
             font-size: var(--fs-md);
             font-weight: 700;
-            color: #f8fafc;
+            color: var(--text);
             margin-bottom: 6px;
         }
         .cast-section-desc {
@@ -1342,8 +1346,8 @@
         }
         .cast-url-input {
             flex: 1;
-            background: #0d131c;
-            border: 1px solid #2b3d54;
+            background: var(--anilist-dark);
+            border: 1px solid var(--anilist-line);
             color: var(--anilist-sky);
             font-family: monospace;
             font-size: var(--fs-xs);
@@ -1353,5 +1357,5 @@
 
 
         /* Sources signalées (ne démarrent pas / illisibles) */
-        .badge-tag-mini.badge-tag-reported { background: rgba(229, 9, 20, 0.85); color: var(--text); }
+        .badge-tag-mini.badge-tag-reported { background: rgba(var(--danger-rgb), 0.85); color: var(--text); }
         .btn-report-source-inline { margin-top: 10px; font-size: var(--fs-sm); padding: 6px 12px; }

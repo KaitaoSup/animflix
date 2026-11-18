@@ -595,11 +595,11 @@ function renderHistoryCards(historyList) {
 
                 <div class="card-info">
                     <span class="card-title" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</span>
-                    <div style="font-size: 11.5px; color: #888; margin-top: 2px;">
+                    <div style="font-size: 11.5px; color: var(--text-faint); margin-top: 2px;">
                         ${escapeHtml(item.season)} • ${escapeHtml(item.episode)}
                     </div>
                     <div class="card-watching-meta" style="margin-top: 4px;">
-                        <span class="card-ep-progress-text" style="color: ${isFinished ? '#46d369' : '#ff525d'}; font-weight: 600;">
+                        <span class="card-ep-progress-text" style="color: ${isFinished ? 'var(--accent-green)' : 'var(--primary-light)'}; font-weight: 600;">
                             ${isFinished ? '✅ Visionné en entier' : `⏱️ Arrêté à ${timeFormatted} / ${durFormatted}`}
                         </span>
                     </div>
@@ -633,10 +633,10 @@ function renderHistoryTabHtml(container) {
                 </div>
                 <div class="empty-state" style="padding: 60px 20px;">
                     <div style="font-size: 42px; margin-bottom: 14px;">⏱️</div>
-                    <div style="font-size: 17px; font-weight: bold; color: #fff; margin-bottom: 8px;">
+                    <div style="font-size: 17px; font-weight: bold; color: var(--text); margin-bottom: 8px;">
                         Votre historique de lecture est vide
                     </div>
-                    <div style="font-size: 13.5px; color: #aaa; max-width: 480px; margin: 0 auto 20px; line-height: 1.5;">
+                    <div style="font-size: 13.5px; color: var(--text-muted); max-width: 480px; margin: 0 auto 20px; line-height: 1.5;">
                         Lancez un anime avec le lecteur intégré pour que votre progression et vos épisodes s'enregistrent ici automatiquement !
                     </div>
                 </div>
@@ -689,10 +689,10 @@ function renderFavoritesTabHtml(container) {
                 </div>
                 <div class="empty-state" style="padding: 60px 20px;">
                     <div style="font-size: 42px; margin-bottom: 14px;">🤍</div>
-                    <div style="font-size: 17px; font-weight: bold; color: #fff; margin-bottom: 8px;">
+                    <div style="font-size: 17px; font-weight: bold; color: var(--text); margin-bottom: 8px;">
                         Vous n'avez aucun anime favori
                     </div>
-                    <div style="font-size: 13.5px; color: #aaa; max-width: 480px; margin: 0 auto 20px; line-height: 1.5;">
+                    <div style="font-size: 13.5px; color: var(--text-muted); max-width: 480px; margin: 0 auto 20px; line-height: 1.5;">
                         Ouvrez la page de détail d'un anime et cliquez sur <b>"🤍 Ajouter aux favoris"</b> pour le retrouver ici facilement !
                     </div>
                 </div>
@@ -732,7 +732,7 @@ function renderFavoritesTabHtml(container) {
 
                 <div class="card-info">
                     <span class="card-title" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</span>
-                    <div style="font-size: 11.5px; color: #888; margin-top: 2px;">
+                    <div style="font-size: 11.5px; color: var(--text-faint); margin-top: 2px;">
                         Ajouté ${ago}
                     </div>
                     <div class="card-next-ep-btn-pill" style="margin-top: 8px;">

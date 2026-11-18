@@ -105,7 +105,7 @@ function showAuthError(message, field) {
         ? document.getElementById('authUsernameInput')
         : field === 'password' ? document.getElementById('authPasswordInput') : null;
     if (input) {
-        input.style.borderColor = '#e50914';
+        input.style.borderColor = 'var(--danger)';
         input.focus();
         if (field === 'password') input.select();
     }
@@ -477,17 +477,17 @@ function renderUserAccountNav() {
                 }
                 <span class="anilist-username">${escape(currentAnimflixUser.username)}</span>
                 ${hasAnilist ? `<span title="Compte AniList synchronisé" style="font-size: 11px; color: #02a9ff;">⚡</span>` : ''}
-                <span style="font-size: 10px; color: #888;">▼</span>
+                <span style="font-size: 10px; color: var(--text-faint);">▼</span>
                 
                 <div class="anilist-dropdown" onclick="event.stopPropagation()">
                     <div style="padding: 6px 10px 10px; border-bottom: 1px solid #23374d; margin-bottom: 6px;">
-                        <div style="font-size: 11px; color: #888;">Compte Animflix</div>
+                        <div style="font-size: 11px; color: var(--text-faint);">Compte Animflix</div>
                         <div style="font-weight: bold; color: #02a9ff; font-size: 14px;">${escape(currentAnimflixUser.username)} 👋</div>
                     </div>
 
                     ${hasAnilist ? `
-                        <div style="padding: 4px 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 6px; font-size: 12px; color: #aaa;">
-                            <span style="color: #4ade80;">●</span> AniList lié : <b style="color: #fff;">${escape(anilistName)}</b>
+                        <div style="padding: 4px 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 6px; font-size: 12px; color: var(--text-muted);">
+                            <span style="color: #4ade80;">●</span> AniList lié : <b style="color: var(--text);">${escape(anilistName)}</b>
                         </div>
                         <a href="https://anilist.co/user/${encodeURIComponent(anilistName)}" target="_blank" rel="noopener">
                             🔗 Profil AniList
@@ -532,10 +532,10 @@ function renderUserAccountNav() {
             <div id="anilistUserBadge" class="anilist-user-badge" onclick="toggleAnilistDropdown(event)" tabindex="0" title="AniList invité : ${escape(localAnilist.name)}">
                 <img class="anilist-avatar" src="${escape(avatarUrl)}" alt="${escape(localAnilist.name)}" onerror="this.src='https://anilist.co/img/icons/icon.svg'">
                 <span class="anilist-username">${escape(localAnilist.name)}</span>
-                <span style="font-size: 10px; color: #888;">▼</span>
+                <span style="font-size: 10px; color: var(--text-faint);">▼</span>
                 <div class="anilist-dropdown" onclick="event.stopPropagation()">
                     <div style="padding: 4px 10px 8px; border-bottom: 1px solid #23374d; margin-bottom: 6px;">
-                        <div style="font-size: 11px; color: #888;">Session locale</div>
+                        <div style="font-size: 11px; color: var(--text-faint);">Session locale</div>
                         <div style="font-weight: bold; color: #02a9ff; font-size: 13.5px;">${escape(localAnilist.name)} (Invité)</div>
                     </div>
                     <button onclick="openAnimflixAuthModal('register')" style="color: #4ade80; font-weight: bold;">

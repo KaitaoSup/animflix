@@ -447,7 +447,7 @@
                         ${secondaryTitle ? `<div style="font-size: 11px; color: #718096; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px;">${escapeHtml(secondaryTitle)}</div>` : ''}
                         <div class="card-watching-meta">
                             <span class="card-ep-progress-text">
-                                ${isCompleted ? `✅ Tous les ${total} épisodes vus` : `Visionné : <b>Épisode ${progress}</b> ${total ? '<span style="color:#777;">/ ' + total + '</span>' : ''}`}
+                                ${isCompleted ? `✅ Tous les ${total} épisodes vus` : `Visionné : <b>Épisode ${progress}</b> ${total ? '<span style="color:var(--text-faint);">/ ' + total + '</span>' : ''}`}
                             </span>
                         </div>
                         ${actionPillHtml}
@@ -510,10 +510,10 @@
                     </div>
                     <div class="empty-state" style="padding: 50px 20px;">
                         <div style="font-size: 38px; margin-bottom: 12px;">🛡️</div>
-                        <div style="font-size: 16px; font-weight: bold; color: #fff; margin-bottom: 8px;">
+                        <div style="font-size: 16px; font-weight: bold; color: var(--text); margin-bottom: 8px;">
                             ${totalNsfw} anime${totalNsfw > 1 ? 's masqués' : ' masqué'} par le filtre 18+
                         </div>
-                        <div style="font-size: 13.5px; color: #aaa; margin-bottom: 20px;">
+                        <div style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 20px;">
                             Activez l'interrupteur "🔞 18+" en haut à droite pour afficher vos animes adultes en cours.
                         </div>
                         <button class="btn-secondary" onclick="toggleNsfwFilter(true)">
@@ -539,7 +539,7 @@
                     </div>
                     <div class="home-watching-actions">
                         ${nsfwToggleHtml}
-                        <span id="homeWatchingSubtitle" style="font-size: 13px; color: #888;">
+                        <span id="homeWatchingSubtitle" style="font-size: 13px; color: var(--text-faint);">
                             Synchronisé avec AniList (${escapeHtml(currentAnilistUser.name)})
                         </span>
                         <button class="btn-refresh-watching" onclick="loadAnilistWatchingList(true)" title="Actualiser la liste depuis AniList">
@@ -614,10 +614,10 @@
                 </div>
                 <div class="empty-state" style="padding: 50px 20px;">
                     <div style="font-size: 38px; margin-bottom: 12px;">📺</div>
-                    <div style="font-size: 16px; font-weight: bold; color: #fff; margin-bottom: 8px;">
+                    <div style="font-size: 16px; font-weight: bold; color: var(--text); margin-bottom: 8px;">
                         Aucun anime marqué comme "En cours" sur AniList
                     </div>
-                    <div style="font-size: 13.5px; color: #aaa; margin-bottom: 20px;">
+                    <div style="font-size: 13.5px; color: var(--text-muted); margin-bottom: 20px;">
                         Ajoutez des animes à votre liste "Watching" sur AniList ou utilisez la barre de recherche ci-dessus !
                     </div>
                     <button class="btn-refresh-watching" onclick="loadAnilistWatchingList(true)">
@@ -644,10 +644,10 @@
                 </div>
                 <div class="home-watching-error">
                     <div style="font-size: 36px; margin-bottom: 12px;">⚠️</div>
-                    <div style="font-size: 16px; font-weight: bold; color: #fff; margin-bottom: 8px;">
+                    <div style="font-size: 16px; font-weight: bold; color: var(--text); margin-bottom: 8px;">
                         Impossible de synchroniser vos animes en cours pour l'instant
                     </div>
-                    <div style="font-size: 13px; color: #aaa; max-width: 500px; margin: 0 auto 16px; line-height: 1.5;">
+                    <div style="font-size: 13px; color: var(--text-muted); max-width: 500px; margin: 0 auto 16px; line-height: 1.5;">
                         ${escapeHtml(errorMsg)}<br>
                         (L'API AniList subit parfois de courtes instabilités temporaires).
                     </div>

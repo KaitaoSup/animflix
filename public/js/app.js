@@ -498,7 +498,10 @@ function saveUserSettings() {
         const elDetail = document.getElementById('detailStreamMode');
         if (elDetail) elDetail.value = prefStream;
     }
-    if (prefSkip) localStorage.setItem('animflix_aniskip_mode', prefSkip);
+    if (prefSkip) {
+        localStorage.setItem('animflix_aniskip_mode', prefSkip);
+        if (typeof syncManualSkipOpButtons === 'function') syncManualSkipOpButtons();
+    }
     if (prefAuto) localStorage.setItem('animflix_autoplay_next', prefAuto);
     if (prefSpeed) localStorage.setItem('animflix_default_speed', prefSpeed);
     if (prefVoice) localStorage.setItem('animflix_default_voice_boost', prefVoice);
@@ -523,7 +526,7 @@ async function fetchServerStatus() {
         } else if (data.hwAccel === 'nvenc') {
             hwBadge = `<span style="color: #76b900; font-weight: bold;">🚀 Nvidia NVENC Actif</span>`;
         } else {
-            hwBadge = `<span style="color: #aaa;">⚙️ CPU Logiciel (libx264 ultrafast)</span>`;
+            hwBadge = `<span style="color: var(--text-muted);">⚙️ CPU Logiciel (libx264 ultrafast)</span>`;
         }
 
         const torrBadge = data.torrserverOnline
@@ -541,7 +544,7 @@ async function fetchServerStatus() {
             <div><b>Transcodage vidéo :</b> ${hwBadge}</div>
             <div style="margin-top: 5px;"><b>TorrServer P2P :</b> ${torrBadge}</div>
             <div style="margin-top: 5px;"><b>Sources actives :</b> ${sourcesText}</div>
-            <div style="margin-top: 5px; font-size: 11px; color: #888;">Version Animflix : v${data.version || '1.1.0'}</div>
+            <div style="margin-top: 5px; font-size: 11px; color: var(--text-faint);">Version Animflix : v${data.version || '1.1.0'}</div>
         `;
 
         const activeMirrorLabel = document.getElementById('activeNyaaMirrorLabel');

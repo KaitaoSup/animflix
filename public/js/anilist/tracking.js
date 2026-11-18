@@ -89,7 +89,7 @@
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
-                    <div style="font-size: 13.5px; color: #bbb;">
+                    <div style="font-size: 13.5px; color: var(--text-muted);">
                         Connectez votre compte AniList pour synchroniser automatiquement vos épisodes visionnés.
                     </div>
                     <button class="btn-anilist-nav" onclick="openAnilistAuthModal()">
@@ -102,7 +102,7 @@
 
         if (isLoading) {
             container.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 12px; color: #bbb; font-size: 13.5px;">
+                <div style="display: flex; align-items: center; gap: 12px; color: var(--text-muted); font-size: 13.5px;">
                     <div class="spinner" style="width: 20px; height: 20px; border-width: 3px; margin: 0;"></div>
                     <span>Synchronisation avec AniList en cours... ⏳</span>
                 </div>
@@ -125,7 +125,7 @@
                         </button>
                     </div>
                 </div>
-                <div style="font-size: 13px; color: #888;">
+                <div style="font-size: 13px; color: var(--text-faint);">
                     Aucune correspondance trouvée automatiquement sur AniList. Cliquez sur <b>Associer manuellement</b> pour rechercher le titre exact.
                 </div>
             `;
@@ -157,7 +157,7 @@
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09h-2.82l.83-2.5h1.16l.83 2.5zm1.5-4.5h-4.32l2.16-6.5 2.16 6.5z"/>
                     </svg>
                     <span>AniList :</span>
-                    <span style="color: #fff; font-weight: 600;">${escapeHtml(mediaTitle)}</span>
+                    <span style="color: var(--text); font-weight: 600;">${escapeHtml(mediaTitle)}</span>
                     <span class="anilist-badge-status status-${escapeHtml(status)}">${escapeHtml(statusLabels[status] || status)}</span>
                 </div>
                 <div class="anilist-track-actions-top">
@@ -177,7 +177,7 @@
                         <span>
                             Progression : <b style="color: var(--anilist-blue); font-size: 16px;">Épisode ${currentProgress}</b> / ${totalEpisodes ? totalEpisodes : '?'}
                         </span>
-                        <span style="color: #888; font-size: 12.5px;">${totalEpisodes ? progressPercent + '%' : ''}</span>
+                        <span style="color: var(--text-faint); font-size: 12.5px;">${totalEpisodes ? progressPercent + '%' : ''}</span>
                     </div>
                     <div class="anilist-progress-bar-bg">
                         <div class="anilist-progress-fill" style="width: ${progressPercent}%;"></div>
@@ -402,7 +402,7 @@
         const list = document.getElementById('anilistCandidatesList');
         if (!query) return;
 
-        list.innerHTML = '<div style="color: #888; font-size: 13px; text-align: center; padding: 20px;">Recherche sur AniList... ⏳</div>';
+        list.innerHTML = '<div style="color: var(--text-faint); font-size: 13px; text-align: center; padding: 20px;">Recherche sur AniList... ⏳</div>';
 
         try {
             const gql = `
@@ -422,7 +422,7 @@
             const data = await callAnilistGraphQL(gql, { search: query });
             const items = data?.Page?.media || [];
             if (items.length === 0) {
-                list.innerHTML = '<div style="color: #888; font-size: 13px; text-align: center; padding: 20px;">Aucun résultat trouvé sur AniList.</div>';
+                list.innerHTML = '<div style="color: var(--text-faint); font-size: 13px; text-align: center; padding: 20px;">Aucun résultat trouvé sur AniList.</div>';
                 return;
             }
 
@@ -434,8 +434,8 @@
                 itemEl.innerHTML = `
                     <img class="anilist-candidate-thumb" src="${escapeHtml(it.coverImage?.medium || '')}" alt="${escapeHtml(title)}">
                     <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 700; font-size: 14px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(title)}</div>
-                        <div style="font-size: 12px; color: #888; margin-top: 3px;">
+                        <div style="font-weight: 700; font-size: 14px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(title)}</div>
+                        <div style="font-size: 12px; color: var(--text-faint); margin-top: 3px;">
                             ${escapeHtml(it.format || 'TV')} • ${it.episodes ? Number(it.episodes) + ' épisodes' : 'Épisodes en cours'} • ${escapeHtml(it.status)}
                         </div>
                     </div>
